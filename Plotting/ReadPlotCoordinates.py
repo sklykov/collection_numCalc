@@ -29,15 +29,15 @@ if (path!= ""):
         # They have "OOP" alternative style but for many classes somehow autocompletion doesn't work!
 
         # Figure preformatting
-        wSize = 1.4*(10.0/2.54); hSize = (10.0/2.54) # converting santimeters to inches
+        wSize = 1.2*(7.0/2.54); hSize = (7.0/2.54) # converting santimeters to inches
         plt.figure(figsize=(wSize,hSize))  # empty container with specified sizes
         axes = plt.axes() # get the instance of axes for making minor plots and suppress the poped warning
-        plt.rc('font',family='sans-serif') # setting font type
-        plt.rc('axes',titlesize=12)  # setting up font sizes
+        plt.rc('font',family='serif') # setting font type
         plt.plot(x,y,'ro',markersize=9) # formatting line itself / auto adding axes
         xMin = min(x); xMax = max(x); yMin = min(y); yMax = max(y)
         plt.axis([xMin-1,xMax+1,yMin-2,yMax+2]) # specifiying axis ranges in form xmin xmax
-        plt.xlabel('timepoints'); plt.ylabel('measurments')
+        plt.xlabel('timepoints',fontsize=14,fontfamily='Liberation Serif')
+        plt.ylabel('measurments',fontsize=14,fontfamily='Liberation Serif')
         # separation 'timepoints' to even and odd numbers
         x1=[]; x2=[]
         for i in range(len(x)):
@@ -46,9 +46,9 @@ if (path!= ""):
             else:
                 x2.append(x[i])
         # ticks handling
-        plt.xticks(x1,fontsize=10) # main xticks
+        plt.xticks(x1,fontsize=10,fontfamily='Liberation Serif') # main xticks
         axes.set_xticks(x2,minor=True)  # minor ticks
-        plt.yticks(np.arange(yMin,yMax+1,step=4),fontsize=10)
+        plt.yticks(np.arange(yMin,yMax+1,step=4),fontsize=10,fontfamily='Liberation Serif')
         axes.set_yticks(np.arange(yMin+2,yMax-1,step=2),minor=True)
 
         plt.grid(which='both') # the grid ON
