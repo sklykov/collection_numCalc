@@ -15,7 +15,7 @@ import numpy as np
 path = "XY.txt" # Don't forget to specify actual path to file
 if (path!= ""):
     try:
-        # Reading data
+        #%%  Reading data
         x = []; y = []  # maybe redundant initializers
         file = open(path, 'r')
         lines = file.readlines()
@@ -25,10 +25,9 @@ if (path!= ""):
             x.append(int(xBuff))  # put variable in a list with X coordinates
             y.append(int(yBuff))
 
-        # Below many commands have beem written in "Matlab style"
+        # %% Below many commands have beem written in "Matlab style"
         # They have "OOP" alternative style but for many classes somehow autocompletion doesn't work!
-
-        # Figure preformatting
+        # %% Figure preformatting
         wSize = 1.2*(7.0/2.54); hSize = (7.0/2.54) # converting santimeters to inches
         plt.figure(figsize=(wSize,hSize))  # empty container with specified sizes
         axes = plt.axes() # get the instance of axes for making minor plots and suppress the poped warning
@@ -57,9 +56,10 @@ if (path!= ""):
         # plt.savefig("SimpleLine.png",dpi=300)
         # plt.savefig("SimpleLine.jpg",dpi=300)
 
+    # %% Guarantee of file closing
     finally:
-        # Guarantee of file closing
         file.close()
 
+# %% Inquiry for path
 else:
     print("Specify path to a file!")
