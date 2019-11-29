@@ -25,7 +25,7 @@ for i in range(len(ar3)):
 
 # %% Insertion sort implementation in the following function
 # Again, np.array - mutable, operations of sorting / insertion could be performed on it
-def InsertSort(xIn,to):
+def InsertSort(xIn,t0):
     if (isinstance(xIn,np.ndarray)) and (len(xIn)>1):
         x = xIn.copy()  # Create copy of an input array
         xj = 0  # Interim values
@@ -54,7 +54,7 @@ t0 = time.process_time()  # get the starting point from the CPU time [s]
 print('Initial array for demo',ar1); print("Sorted array for demo",sortedAr1)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr2,t,res) = InsertSort(ar2,t0)
-print("Sorting of a unsorted array takes s = ",t); print('Is sorting correct?',res)
+print("Sorting of an unsorted array takes s = ",t); print('Is sorting correct?',res)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr3,t,res) = InsertSort(ar3,t0)
-print("Sorting of a unsorted array takes s = ",t)
+print("Sorting of a presorted array takes s = ",t)
