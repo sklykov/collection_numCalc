@@ -24,12 +24,12 @@ if __name__ == "main":
     except ValueError:
         print("Wrong input value - the lower border")
 else:
-    a = -2; b = 3  # Testing values along with test function
+    a = -1; b = 4  # Testing values along with test function
 
 
 # %% Plotting of function
 nValues = 500  # For plotting the function under revision
-nFunc = 1  # Number of an function from examples
+nFunc = 3  # Number of an function from examples
 plotMyExampleFunc(f,nFunc,a,b,nValues) # calling related function for plotting
 
 # %% Bisection method implementation
@@ -37,10 +37,10 @@ def Bisection(func,nFunc:int,a:float,b:float,epsilon:float,digitRound:int,showIt
     # Epsilon - Presicion of equality the interesting function f(x) ~= 0
     # DigitRound - number of digits for rounding calculations (in some dependence to Epsilon)
     # nFunc - number of a predefined function
-    i = 0  # For calculation of a number of iteration steps
+    i = 0  # For calculation of a number of iteration steps, the upper bound for a number of iteration (divergance)
     if (func(a,nFunc)*func(b,nFunc)<0):
         xMiddle = (a+b)/2  # The middle point in interval [a,b]
-        while (abs(func(xMiddle,nFunc)) > epsilon):
+        while (abs(func(xMiddle,nFunc)) > epsilon) and (i <= 5000):
             if (func(xMiddle,nFunc)*func(a,nFunc) < 0):
                b = xMiddle # [a,b] => [a,xMiddle] - the bisection operation
             elif (func(xMiddle,nFunc)*func(b,nFunc) < 0):
@@ -49,7 +49,9 @@ def Bisection(func,nFunc:int,a:float,b:float,epsilon:float,digitRound:int,showIt
                 print("Apparantly, there is more than real 1 root or no roots...")
                 return None
             # The row below is for showing iteration process
-            if showIteration: i += 1; print("Iteration step #",i,"Root approximation is: ",round(xMiddle,digitRound+1))
+            if showIteration: print("Iteration step #",i,"Root approximation is: ",round(xMiddle,digitRound+1))
+            i += 1
+            if (i > 5000): print("For some reason, there is too many (> 5000) iteration steps made")
             xMiddle = (a+b)/2  # For allowing iteration ad test next approximation to the root
         return float(round(xMiddle,digitRound)) # In the end of while cycle
     else:

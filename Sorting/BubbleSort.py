@@ -8,16 +8,19 @@ Developed in the Spyder IDE
 import numpy as np
 import time
 from IsSortingCorrect import CheckSortArray
+from matplotlib import pyplot as plt
+
 # %% Generation of a random sequence with integer numbers
 ar1 = np.zeros(9,dtype=int)  # Initialize empty (filled with zeros) numpy array for demo
 ar2 = np.zeros(2000,dtype=int) # Initialize empty (filled with zeros) numpy array for benchmark
+arI2 = [i for i in range(2000)] # as x for making plots for arrays of unsorted / sorted graphs
 ar3 = np.zeros(1000,dtype=int) # Initialize empty (filled with zeros) PRESORTED numpy array for becnhmark
 
 # Fill initialized nparray with random integers from the specified ranges
 for i in range(len(ar1)):
     ar1[i] = np.random.randint(-50,51)
 for i in range(len(ar2)):
-    ar2[i] = np.random.randint(-1000,1001)
+    ar2[i] = np.random.randint(0,3001)
 # Generation of presorted array
 for i in range(len(ar3)):
     ar3[i] = i
@@ -50,7 +53,11 @@ t0 = time.process_time()  # get the starting point from the CPU time [s]
 print('Initial array for demo',ar1); print("Sorted array for demo",sortedAr1)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr2,t,res) = BubbleSort(ar2,t0)
+# Showing unsorted and sorted arrays as bar plots
+plt.figure(); plt.bar(arI2,ar2)
+plt.figure(); plt.bar(arI2,sortedAr2)
 print("Sorting of a unsorted array takes s = ",t); print("Is sorting correct?",res)
+# Testing sorting of a presorted array for making benchmark
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr3,t,res) = BubbleSort(ar3,t0)
 print("Sorting of a presorted array takes s = ",t)
