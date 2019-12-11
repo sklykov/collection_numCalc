@@ -31,7 +31,7 @@ def QuickSort(xIn,t0):
     if (isinstance(xIn,np.ndarray)) and (len(xIn)>1):
         x = xIn.copy()  # Ok, again copy of the input array
 
-        SortPivot(x,0,len(x)-1) # Actual sorting step
+        SortPivot(x,0,len(x)-1) # Actual sorting step - see below
 
         isSortCorrect = CheckSortArray(x)
         t1 = time.process_time() # Tick time
@@ -45,7 +45,8 @@ def QuickSort(xIn,t0):
 
 # %% Function for recursive calling
 """
-Implementation of Quick Sort algorithm, there se
+Implementation of Quick Sort algorithm that calls itself recursively for sorting at each step two subarrays:
+less than pivot and equal or more than pivot (pivot here is selected as a last value in subarray)
 input parameters: x - an array to sort, iStart and iFinal - indexes of subarray what actually sorted
 """
 def SortPivot(x,iStart,iFinal):
