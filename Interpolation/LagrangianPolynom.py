@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 # %% Testing values
-nPoints = 15; nPoints += 1 # Adding 1 to the number points for making equal steps in the interval [a,b]
+nPoints = 12; nPoints += 1 # Adding 1 to the number points for making equal steps in the interval [a,b]
 percentageError = 10  # For making disturbed values
 startInterval = 0 # a from [a,b]
 finishInterval = 10 # b from [a,b]
@@ -40,7 +40,7 @@ axes.legend() # Necessary for displaying the legend
 plt.grid()
 
 # %% Evaluation of y values for making interpolation
-def LangragianPol(xIn:float,xArray,yArray,nRoundDigit):
+def LagrangianPol(xIn:float,xArray,yArray,nRoundDigit):
     # xIn - x value for that the returning value y should be calculated
     # xArray - x values for which y values from yArray are known
     yReturn = 0
@@ -67,10 +67,10 @@ for i in range(1,len(xInterpol)):
     xInterpol[i] = xInterpol[i-1] + ((x[1]-x[0])/nTimesPointsMore)
 # Get interpolated values for yPure
 for i in range(len(yInterpol)):
-    yInterpol[i] = LangragianPol(xInterpol[i],x,y,nDigit)
+    yInterpol[i] = LagrangianPol(xInterpol[i],x,y,nDigit)
 # Get interpolated values for yEr
 for i in range(len(yInterpolEr)):
-    yInterpolEr[i] = LangragianPol(xInterpol[i],x,yEr,nDigit)
+    yInterpolEr[i] = LagrangianPol(xInterpol[i],x,yEr,nDigit)
 # Get theoretical (tabulated) values for y(x)
 for i in range(len(yTheoretical)):
     yTheoretical[i] = InterpolSamples.sampleFunction(xInterpol[i])
