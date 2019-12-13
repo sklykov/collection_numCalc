@@ -13,12 +13,12 @@ from PlottingArrays import plotSingleArrSameX as plotSingle
 from TridiagonalSol import Solution as solve3diag
 
 # %% Testing values
-nPoints = 20; nPoints += 1 # Adding 1 to the number points for making equal steps in the interval [a,b]
-percentageError = 15  # For making disturbed values
+nPoints = 25; nPoints += 1 # Adding 1 to the number points for making equal steps in the interval [a,b]
+percentageError = 10  # For making disturbed values
 startInterval = 0 # a from [a,b]
 finishInterval = 8 # b from [a,b]
 nDigits = 3 # as in the sample function inside the class InterpolSamples
-nTimesPointsMore = 10  # how many points one want to generate more than it was in a sample (defined by nPoints)
+nTimesPointsMore = 4  # how many points one want to generate more than it was in a sample (defined by nPoints)
 
 # %% Generation sample points and plot them
 intps = InterpolSamples(nPoints,percentageError,startInterval,finishInterval)
@@ -67,11 +67,12 @@ def cubicSplineCoeffCalc(x,y):
 """ Interpolation of input values using previous. It uses the coefficients calculated before """
 def cubicInterpolation(cubicCoefficients:tuple,xCustom:float,nRoundingDigits:int):
     # Defining the index number of interval [x[i],x[i+1]]
+    xCustom = round(xCustom,5) # Rounding appears to be neccessary to exclude bug of non-equality 8.000004 = 8.0
     (A,B,C,D) = cubicCoefficients  # Really not effictive passing arguments but it's quick workaround up to now
     intervalFound = False; i = 0
     while (not intervalFound) and (i < (len(A)-1)):
         if (xCustom >= x[i]) and (xCustom <= x[i+1]):
-            intervalFound = True;
+            intervalFound = True
         else:
             i += 1
     yVal = None
@@ -83,9 +84,13 @@ def cubicInterpolation(cubicCoefficients:tuple,xCustom:float,nRoundingDigits:int
     return yVal
 
 # %% Testing interpolation
-coeff = cubicSplineCoeffCalc(x,y)  # Coefficients calculation for splines
+coeff = cubicSplineCoeffCalc(x,y)  # Coefficients calculation for splines for pure y
+coeffErr = cubicSplineCoeffCalc(x,yEr) # Coefficients calculation for splines for y with introduced errors
+
 xInterpol = np.zeros((len(x)-1)*nTimesPointsMore + 1) # For these values should be the function interpolated
 yInterpol = np.zeros((len(x)-1)*nTimesPointsMore + 1) # For holding interpolation values
+yInterpolErr = np.zeros((len(x)-1)*nTimesPointsMore + 1) # Interpolation of values with errors
+
 # Generation x values for interpolations
 xInterpol[0] = x[0]
 for i in range(1,len(xInterpol)):
@@ -93,6 +98,10 @@ for i in range(1,len(xInterpol)):
 # Get interpolated values for yPure
 for i in range(len(yInterpol)):
     yInterpol[i] = cubicInterpolation(coeff,xInterpol[i],nDigits)
+# Get interpolated values for yError
+for i in range(len(yInterpolErr)):
+    yInterpolErr[i] = cubicInterpolation(coeffErr,xInterpol[i],nDigits)
 
 # %% Plotting results of interpolation
 plotTwo(x,xInterpol,y,yInterpol,"Interpolation results","original","interpolated")
+plotTwo(x,xInterpol,yEr,yInterpolErr,"Interpolation results","original with errors","interpolated")

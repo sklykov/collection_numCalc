@@ -4,7 +4,6 @@ Plotting of input arrays - call different functions to plot different sets of in
 @author: ssklykov
 """
 # %% Import section
-import numpy as np
 from matplotlib import pyplot as plt
 
 # %% Plotting of two arrays with identical [a,b] in X axis

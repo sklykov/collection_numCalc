@@ -40,6 +40,7 @@ class InterpolSamples():
 
     """
     Sample function (x**2)*exp(-0.5*x)
+    Returning rounded float number with 3 digits
     """
     @staticmethod
     def sampleFunction(x:float):
