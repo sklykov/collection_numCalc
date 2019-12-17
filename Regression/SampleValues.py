@@ -8,6 +8,7 @@ Developed in Spyder IDE
 import numpy as np
 import math
 # %% Class itself
+"""Class for generating sample values"""
 class GenerateSample():
     xMin = 0; xMax = 1; nSamples = 5; percentError = 10; a = 1; b = 0; nDigits = 3
     def __init__(self,a:float,b:float,xMin:float,xMax:float,nSamples:int,percentError:int,nDigits:int):
@@ -17,14 +18,16 @@ class GenerateSample():
     """ Mimicring the measurements with errors """
     def generateSamplePoint(self,x:float):
         n = 10  # modelling how many points "have been measured" for calcution mean values and standard deviations
-        y = np.zeros(n,dtype=float); sum = 0.0;
+        y = np.zeros(n,dtype=float); sum = 0.0
         for i in range(n):
             # modelling  a measurment with an error
-            y[i] = (self.a*x + self.b)*(1+0.01*(np.random.randint(-self.percentError,self.percentError+1)))
+            rand1 = 1+0.01*(np.random.randint(-self.percentError,self.percentError+1)) # generation of rand coeff 1
+            rand2 = 1+0.01*(np.random.randint(-self.percentError,self.percentError+1)) # rand coeff 2
+            y[i] = self.a*rand1*x + self.b*rand2
             sum += y[i]
         # Calculation of returning values
         yMean = sum / n # Mean value
-        sum = 0 # making again it zero!
+        sum = 0.0 # making again it zero!
         for i in range(n):
             sum += pow((y[i]-yMean),2) # Calculation of (y[i] - yMean)**2
         yStD = math.sqrt(sum/(n-1))  # Calculation of estimation of a standard deviation
