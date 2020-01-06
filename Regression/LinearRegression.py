@@ -11,11 +11,11 @@ import numpy as np
 from ComparisonLinPlots import PlotWErrTwo
 # %% Controlling / modelling values
 a = 2; b = 1 # From dependency y(x) = a*x + b
-n = 10  # number of sampling points
+n = 10  # number of sampling points (modelling measures from some awesome experiment)
 nDigits = 2  # Precision of calculation / rounding
-percentError = 30  # An error controlling deviations in generated values
-xMin = 0; xMax = 5  # Controlling minimal and maximal values from an interval
-nSamples = 11 # 10 + 1 samples, specify always in this manner, because np.linspace(a,b,n) - including a from the interval
+percentError = 30  # An error controlling deviations in generated values [%]
+xMin = 0; xMax = 5  # Controlling minimal and maximal values from an interval [a,b]
+nSamples = 11 # 10 + 1 samples, specify always in this manner, because np.linspace(a,b,n) - including "a" from the interval
 
 # %% Generating the sample values - from a linear dependency
 values = GenerateSample(a,b,xMin,xMax,nSamples,percentError,nDigits)
@@ -41,7 +41,7 @@ def LinearRegression(x,yMean,yStD,nDigits):
 
 # %% Plotting
 # Generation of arrays for plotting
-nRegressed = (nSamples-1)*10 + 1  # For plotting - calculation in 10 times points between specified interval [xMin,xMax]
+nRegressed = (nSamples-1)*10 + 1  # For plotting - calculation in 10 times more points between specified interval [xMin,xMax]
 xRegressed = np.linspace(xMin,xMax,nRegressed)
 yRegressed = np.zeros(nRegressed)
 for i in range(nRegressed):
