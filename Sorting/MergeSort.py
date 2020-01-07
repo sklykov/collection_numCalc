@@ -119,4 +119,4 @@ t0 = time.process_time()  # get the starting point from the CPU time [s]
 print("Sorting of a presorted array takes s = ",t)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (arSorted4,t,res) = MergeSort(ar4,t0)
-print("Sorting of a presorted array (the worst case) takes s = ",t)
+print("Sorting of a presorted in descending order array (the worst case) takes s = ",t)

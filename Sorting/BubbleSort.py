@@ -31,6 +31,7 @@ def BubbleSort(xIn,t0):
     if (isinstance(xIn,np.ndarray)) and (len(xIn)>1):
         x = xIn.copy()  # Create copy of an input array
         xj = 0; i = 0; flag = True; isSortingPerformedCorrect = False  # Interim values
+
         # Actual bubble sort
         while ((len(x)-1-i) >= 1) and flag:
             flag = False  # flag for checking if any swapping occured
@@ -38,6 +39,8 @@ def BubbleSort(xIn,t0):
                 if (x[j]>x[j+1]): # Swapping two values in a pair
                     xj = x[j]; x[j]=x[j+1]; x[j+1]=xj; flag = True;  # The flag = at least 1 swap occured, continue sorting
             i+=1; # Next step in sorting
+
+        # Checking correctness and timing
         isSortingPerformedCorrect = CheckSortArray(x)
         t1 = time.process_time() # Tick time
         t = round((t1-t0),3)  # rounding to seconds for completion of the sorting operation
