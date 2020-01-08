@@ -69,7 +69,7 @@ def MySort(xIn,t0):
                         while (n < (l / 2)):
                             xk = x[k+n]; x[k+n] = x[k+l-n]; x[k+l-n] = xk; n += 1
                         # print(x,"after even swapping") # Debugging purposes
-                        k += l-1
+                        k += l
                     # Swapping odd numbers of unsorted pairs from a whole unsorted subarray (like [8765])
                     else:
                         # Here is found number of pairs in unsorted sequence is odd
@@ -78,7 +78,7 @@ def MySort(xIn,t0):
                         while (n < ((l // 2) + 1)): # l//2 - integer division, 5//2 = 2
                             xk = x[k+n]; x[k+n] = x[k+l-n]; x[k+l-n] = xk; n += 1
                         # print(x,"after odd swapping") # Debugging purposes
-                        k += l-1
+                        k += l
                     swaps += 1
 
                 # print(k,"current index")
