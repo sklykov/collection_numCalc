@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Numerical Integration testing
-
+Numerical Integration testing - Trapezoidal rule with constant step h for creating mesh points
+Trapezoidal rule integration precision can be roughly estimated as ~ h**2
 @author: ssklykov
 """
 # %% Import Section
@@ -30,7 +30,7 @@ def TrapezoidalIntegr(a:float,b:float,h:float,y,nDigits:int=3):
         return round(intSum,nDigits)
 
 # %% Parameters for testing
-nDigits = 2; a = 0; b = 2; nSample = 1; h =0.05
+nDigits = 2; a = 0; b = 2; nSample = 1; h = 0.05
 nPoints = int((b-a)/h) + 1
 # print(nPoints," - nPoints inside the interval [a,b]")
 x = np.zeros(nPoints); y = np.zeros(nPoints)
@@ -45,4 +45,4 @@ fig = plt.figure(); plt.plot(x,y); plt.grid()
 # %% Testing
 integral = TrapezoidalIntegr(a,b,h,fClass.sampleF,nDigits)
 print(integral," - calculated integral value")
-print("1 - exact value from Newton-Leibniz equation F(b) - F(a)")
+print("1 - exact value from Newton-Leibniz equation F(b) - F(a)") # F(a) = 0; F(b) = 1; F(x) = x^3 - x^2 - 1.5*x

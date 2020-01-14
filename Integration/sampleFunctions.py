@@ -17,7 +17,10 @@ class SampleFuncIntegr():
     def sampleF(self,x:float):
         y = 0
         if (self.nOfSample == 1):
-            y = 3*math.pow(x,2) - 2*x - 1.5
+            y = 3*math.pow(x,2) - 2*x - 1.5 # F(x) = x^3 - x^2 - 1.5*x - analytical integral
+        elif(self.nOfSample == 2):
+            x2 = math.pow(x,2)
+            y = x2*math.exp(-x2)  # difficult for analytical integration
 
         return round(y,self.nDigits)
 
