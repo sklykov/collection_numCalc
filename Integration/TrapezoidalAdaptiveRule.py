@@ -13,8 +13,9 @@ import matplotlib.pyplot as plt
 
 # %% Algorithm implementation
 """Trapezoidal Integration implementation. It demands [a,b] of interval for integration; h - step size, y - function or
-method returning single float number and accepting single float number; epsilon - presicion of calculations of two sub
-sequent integrals (condition for stopping); nMaxIterations - maximum number of iterations of lowering step size h"""
+method returning single float number and accepting single float number; epsilon - difference of two sub
+sequent calculated integrals (condition for stopping) - absolute error; nMaxIterations - maximum number of iterations
+of lowering step size h (no more than 30)"""
 def TrapezoidalAdaptiveInt(a:float,b:float,h:float,y,nDigits:int=3,epsilon:float=0.01,nMaxIterations:int=3):
     if (a >= b) and (int((b-a)/h) <= 1):
         print("Incosistent interval assigning [a,b] or step size h")
@@ -36,8 +37,12 @@ def TrapezoidalAdaptiveInt(a:float,b:float,h:float,y,nDigits:int=3,epsilon:float
             x = a + i*h; intSum2 += y(x)
         intSum2 += (y(a) + y(b))/2
         intSum2 *= h
+        # As described, max int number: 2**31 -1, so it's impossible to make more iterations using nPoints evaluation
+        if (nMaxIterations > 30):
+            print("impossible to make so many halving iterations")
+            nMaxIterations = 30
         j = 1 # number of iterations for obtaining
-        while((j < nMaxIterations) and (abs(intSum1-intSum2) > epsilon)):
+        while((j < nMaxIterations) and (abs(intSum1-intSum2) > epsilon*intSum2)): # |I2-I1| <= epsilon*I2 - relative error
             intSum1 = intSum2
             h = h/2
             nPoints = int((b-a)/h) + 1

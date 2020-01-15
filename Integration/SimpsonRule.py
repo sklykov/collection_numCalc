@@ -31,12 +31,18 @@ def SimpsonIntegr(a:float,b:float,h:float,y,nDigits:int=3):
         return round(intSum,nDigits)
 
 # %% Adaptive calling of the Simpson's rule(above)
-"""Adaptive calling of Simpson's Rule for numerical integration"""
+"""Adaptive calling of Simpson's Rule for numerical integration. Epsilon - difference of two sub
+sequent calculated integrals (condition for stopping) - absolute error; nMaxIterations - maximum number of iterations
+of lowering step size h (no more than 30)"""
 def AdaptiveSimpsonInt(a:float,b:float,h:float,y,nDigits:int=3,epsilon:float=0.01,nMaxIterations:int=3):
     intSum1 = SimpsonIntegr(a,b,h,y,nDigits*4); h = h/2
     intSum2 = SimpsonIntegr(a,b,h,y,nDigits*4) # nDigits should be more  than digits in epsilon!
+    # As described, max int number: 2**32 -1, so it's impossible to make more iterations using nPoints evaluation
+    if (nMaxIterations > 30):
+        print("impossible to make so many halving iterations")
+        nMaxIterations = 30
     j = 1 # number of iterations
-    while((j < nMaxIterations) and (abs(intSum2-intSum1) > epsilon)):
+    while((j < nMaxIterations) and (abs(intSum2-intSum1) > epsilon*intSum2)): # |I2-I1| <= epsilon*I2 - relative error check
         intSum1 = intSum2
         h = h/2
         intSum2 = SimpsonIntegr(a,b,h,y,nDigits*4) # nDigits should be more  than digits in epsilon!

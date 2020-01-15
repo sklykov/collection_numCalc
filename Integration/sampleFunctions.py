@@ -21,6 +21,8 @@ class SampleFuncIntegr():
         elif(self.nOfSample == 2):
             x2 = math.pow(x,2)
             y = x2*math.exp(-x2)  # difficult for analytical integration
+        elif(self.nOfSample == 3):
+            y = math.pow(x,3)*math.exp(-math.pow(x,2))
 
         return round(y,self.nDigits)
 
