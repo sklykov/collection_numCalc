@@ -36,8 +36,9 @@ sys.path.append(currentPath2)
 from sampleFunctions import SampleFuncIntegr as yClass # TODO: there are now many different names and it obfuscates the code!
 
 # %% Monte Carlo one dimensional integral implementation
-""" Implementation of 1D Monte Carlo integration of the input function y(x) using # Samples (nSamples) in an interval [a,b]"""
 def MonteCarloInt1D(a:float,b:float,y,nSamples:int=100):
+    """ Implementation of 1D Monte Carlo integration of the input function y(x) using # Samples (nSamples)\
+        in an interval [a,b]"""
     # Checking input parameters
     if (a >= b):
         print("Incosistent interval assigning [a,b]")

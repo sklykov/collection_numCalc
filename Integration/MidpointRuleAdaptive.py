@@ -9,10 +9,10 @@ from sampleFunctions import SampleFuncIntegr as sfint
 import inspect
 
 # %% Algorithm implementation
-"""Midpoint Rule implementation. It demands [a,b] of interval for integration; y - function or
-method returning single float number and accepting single float number; epsilon - difference of two sub
-sequent calculated integrals (condition for stopping) - absolute error"""
 def midpointRuleAdaptive(a:float,b:float,y,epsilon:float=0.01):
+    """Midpoint Rule implementation. It demands [a,b] of interval for integration; y - function or method returning \
+        single float number and accepting single float number; epsilon - difference of two subsequent calculated \
+        integrals (condition for stopping) - absolute error"""
     if (a >= b):
         print("Incosistent interval assigning [a,b]")
         return None # returning null object instead of any result, even equal to zero

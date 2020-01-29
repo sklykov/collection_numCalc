@@ -24,11 +24,10 @@ class InterpolSamples():
             self.percentError = 5 # Default value remains
         self.lowestVal = lowestVal; self.highestVal = highestVal  # [a,b] interval
 
-    """
-    The main function for sample values generation
-    return x values (evenly spaced values in [a,b] range), yPure - tabulated values of y(x), yErrors - yPure + errors
-    """
+
     def valuesForInterpol(self):
+        """ The main function for sample values generation that returns x values (evenly spaced values in [a,b] range),\
+            yPure - tabulated values of y(x), yErrors - yPure + errors"""
         yError = np.zeros(self.n) # Initialization of returning values with errors
         yPure = np.zeros(self.n) # Initialization of returning values without errors
         x = np.linspace(self.lowestVal,self.highestVal,self.n)  # Number of points + 1 because of including starting point
@@ -38,12 +37,9 @@ class InterpolSamples():
                   (np.random.randint(-self.percentError,self.percentError+1))),3)
         return (x,yPure,yError)
 
-    """
-    Sample function (x**2)*exp(-0.5*x)
-    Returning rounded float number with 3 digits
-    """
     @staticmethod
     def sampleFunction(x:float):
+        """Sample function (x**2)*exp(-0.5*x). Returning rounded float number with 3 digits"""
         return round(pow(x,3)*math.exp(-x),3)
 
     # Only for testing the class creation
