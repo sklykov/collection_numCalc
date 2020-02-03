@@ -15,9 +15,13 @@ class SampleFunctions():
         if (self.nSample == 1):
             y = math.pow(x,2)
             return round(y,self.nDigits)
+        else:
+            return 0.0
 
     def getTheoreticalValue(self,x:float) -> float:
         """Returning values of theoretical (solution) values"""
         if (self.nSample == 1):
             y = math.pow(x,3)/3
             return round(y,self.nDigits)
+        else:
+            return 0.0

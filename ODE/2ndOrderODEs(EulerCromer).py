@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Euler - Cromer algorithm for solving 2nd order ODEs like y''(x) = f(x,t,y(x))
-And 1D oscillator modelling
+And 1D oscillator modelling as the demo
 @author: ssklykov
 """
 # %% Import section
@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from DynamicSystem import dynamicSys
 
-# %% Algorithm implementation (for this particular case!)
-def eulerCromer(f:float,y1stDerivPrevious:float,yPrevious:float,h:float):
+# %% Algorithm implementation (in general form - using 1st, 2nd order derivatives)
+def eulerCromer(f:float,y1stDerivPrevious:float,yPrevious:float,h:float) -> tuple:
     """Implementation is kept general - it consumes only the values calculated outside of it"""
     y2ndDeriv = f # y''(x..) = f(*args); a  = f/m - this is the 2nd derivative!!! (acceleration)
     y1stDeriv = y1stDerivPrevious + h*y2ndDeriv # y'(n) = y'(n-1) + h*y''; this is speed or velocity!
@@ -36,7 +36,7 @@ for i in range(nX):
 plt.figure(); plt.plot(x,f,linewidth=2); plt.xlabel("x coordinates"); plt.title("External force profile f(x)")
 
 # %% Testing algorithm for solving 1D oscillatory form
-xCoord = np.zeros(nTimePoints+1,dtype='float'); speeds = np.zeros(nTimePoints+1,dtype='float');
+xCoord = np.zeros(nTimePoints+1,dtype='float'); speeds = np.zeros(nTimePoints+1,dtype='float')
 timePoints = np.zeros(nTimePoints+1,dtype='float')
 xCoord[0] = xStart; speeds[0] = initSpeed; timePoints[0] = 0
 # Get modelled values - x coordinates, speed along x
