@@ -5,34 +5,27 @@ One dimensional integration using the Monte Carlo sampling method (Integral ~= V
 @author: ssklykov
 """
 
-# %% Import section
+# %% Import section + Adding a path to import module to sys.path
 import os # for getting cwd
 import platform # for getting name of a running platform
 import sys # for setting another folder into a searching path for modules
 import inspect # for inspection that transferred to the developed method is a function like y = f(x)
 import random
 import math
-# TODO: Take care and test path representations for Linux system as well (now it's written on Win)
-# print(platform.system())
-# Workaround to select proper separator for path handling
-if (platform.system() == "Windows"):
-        charPathSeparator = "\\"
-        print("This script running on Windows system")
-elif(platform.system() == "Linux"):
-    charPathSeparator = "/"
-# Variables for path handling
-currentPath = os.getcwd()
-indexOfLastSlash = 0; i = 0
-# Deletion of path to current subfolder (kind of command "cd..")
-while(i < len(currentPath)):
-    if (currentPath[i] == charPathSeparator):
-        indexOfLastSlash = i
-    i += 1
-currentPath2 = currentPath[0:indexOfLastSlash] # Get the path with command "cd.." implemented to the working directory
-currentPath2 += "\\Integration" # going to the another folder
-# print(currentPath2)
-# Adding directory to the PATH variable for importing (only as a workaround)
-sys.path.append(currentPath2)
+# Done: the appending to sys.path should be OS agnostic - it should work both for Windows and Unix systems (the first one tested)
+# Workaround to select proper separator for path handling (cleaned out)
+current_path = os.getcwd() # Inspect in a variable inspection window (instead of printing it out)
+os.chdir("..") # Unix-like command to go in a directory tree up
+head_directory = os.getcwd() # Checking that cwd changed
+list_dirs = os.listdir(head_directory) # Inspection only - get all directories in this repo
+append_dir = os.path.join(head_directory,"Integration") # Creating a path to other directory in this repo (should be OS agnostic)
+# Checking the added folder and deleting extra ones
+if (sys.path.count(append_dir) == 0):
+    sys.path.append(append_dir)
+elif (sys.path.count(append_dir) > 1):
+    for i in (2,sys.path.count(append_dir)):
+        sys.path.remove(append_dir)
+sys_path = sys.path
 from sampleFunctions import SampleFuncIntegr as yClass # TODO: there are now many different names and it obfuscates the code!
 
 # %% Monte Carlo one dimensional integral implementation
