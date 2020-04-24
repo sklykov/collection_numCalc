@@ -9,14 +9,15 @@ from forceField import dipole
 
 # %% Parameters
 charge = 100
-xPlusCharge = 20
-yPlusCharge = 20
-xMinusCharge = 60
-yMinusCharge = 60
-size = 100
-nPoints = 100
+xPlusCharge = 4
+yPlusCharge = 4
+xMinusCharge = 36
+yMinusCharge = 36
+size = 40
+nPoints = 40
 
 # %% Demo
 dip1 = dipole(charge, [xPlusCharge, yPlusCharge], [xMinusCharge, yMinusCharge])
 # (Ex, Ey) = dip1.createFieldMap(size, nPoints)
-dip1.createFieldMap(size, nPoints)
+(Ex, Ey) = dip1.createFieldMap(size, nPoints)
+(ExT, EyT) = dip1.createFieldMap(size, nPoints, "thermo")
