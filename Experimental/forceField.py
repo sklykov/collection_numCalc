@@ -49,9 +49,10 @@ class dipole():
         yDipoleField = yPlusField + yMinusField
         return (xDipoleField, yDipoleField)
 
-    def thermoFieldCalc(self, x: float, y: float) -> tuple:
+    def thermoFieldCalc(self, x: float, y: float, decayPower: float) -> tuple:
         """Mimicking the force field (thermo flow) created by scanning laser in liquid medium.
-        Charge gives the estimate of force tension """
+        Charge gives the estimate of force tension. The parameter decayPower helps to calculate decay power (^ - power)
+        in the thermofield (not on the central line). """
         x1 = self.coordinatesMinusCharge[0]; x2 = self.coordinatesPlusCharge[0]  # To mark equations
         y1 = self.coordinatesMinusCharge[1]; y2 = self.coordinatesPlusCharge[1]
         A = y1 - y2
@@ -79,22 +80,22 @@ class dipole():
             yMin = y1
         # For making always right direction - the orientation depends on the orientations of minus / plus charges
         # This is central part of thermoflow
-        if (d <= 1) and (x < xMax) and (x > xMin):
+        if (d <= 1.05) and (x <= xMax) and (x >= xMin):
             xThermoField = self.charge*np.sign(xPlusField + xMinusField)
         else:
             distancePlus = euclidean(self.coordinatesPlusCharge, [x, y])  # Distance between + charge and point in 2D
             plusFieldModule = self.charge
             if distancePlus > 1:
-                plusFieldModule *= 1/(np.power(distancePlus, 1.5))
+                plusFieldModule *= 1/(np.power(distancePlus, decayPower))
             minusFieldModule = self.charge  # Modulus of field tension (mimicking r^(-2) decay)
             distanceMinus = euclidean(self.coordinatesMinusCharge, [x, y])  # Distance between + charge and point in 2D
             if distanceMinus > 1:
-                minusFieldModule *= 1/(np.power(distanceMinus, 1.5))
+                minusFieldModule *= 1/(np.power(distanceMinus, decayPower))
             xPlusField *= plusFieldModule
             xMinusField *= minusFieldModule
             xThermoField = -(xPlusField + xMinusField)
-
-        if (d <= 1) and (y < yMax) and (y > yMin):
+        # d <= 1.05 due to rounding error in the distance calculations (it's especially a case in pixels calculations)
+        if (d <= 1.05) and (y <= yMax) and (y >= yMin):
             yThermoField = self.charge*np.sign(yPlusField + yMinusField)
         # Here the field should resemble the dipole far field
         else:
@@ -112,10 +113,22 @@ class dipole():
 
         return (xThermoField, yThermoField)
 
-    def createFieldMap(self, size: int, nPoints: int, fieldType: str = "dipole"):
+    def createFieldMap(self, size: int, nPoints: int, fieldType: str = "dipole", decayPower: float = 1.5):
         """Shows the map of created by a dipole the force field (can be calculated by using 'forceFieldCalc' method
-        The map itself is a square with sizes [dimension x dimension].
-        Two types of force fields: 'dipole' (default) and 'thermo'"""
+        The map itself is a square with sizes [dimension x dimension]. Two types of force fields: 'dipole'
+        (default) and 'thermo'.
+        Parameters
+        ----------
+        size:
+            size of generated map of a force field
+        nPoints:
+            number of points for calculation of a force (tension) in them
+        decayPower:
+            demanded by 'thermo' field parameter
+        Returns
+        -------
+        tuple with meschgrids of Ex, Ey - tensions (forces) of a selected force field.
+        """
         # step = size/nPoints  # Step for making grid (dimensionless, "pixels")
         xGrid = np.linspace(0, size, nPoints)
         # print(xGrid)
@@ -131,11 +144,11 @@ class dipole():
                 if fieldType == "dipole":
                     (Ex[i][j], Ey[i][j]) = self.forceFieldCalc(xP, yP)
                 elif fieldType == "thermo":
-                    (Ex[i][j], Ey[i][j]) = self.thermoFieldCalc(xP, yP)
+                    (Ex[i][j], Ey[i][j]) = self.thermoFieldCalc(xP, yP, decayPower)
         fig1 = plt.figure(figsize=(8, 8))  # Empty figure
         fig1.tight_layout()
         plt.streamplot(x, y, Ex, Ey, linewidth=1)  # Creation of map of force field (streamlines of a vector flow)
         fig2 = plt.figure(figsize=(8, 8))
         fig2.tight_layout()
-        plt.quiver(x, y, Ex, Ey)
+        plt.quiver(x, y, Ex, Ey)  # Over type of force field mapping
         return (Ex, Ey)
