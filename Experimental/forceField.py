@@ -56,7 +56,7 @@ class dipole():
         x1 = self.coordinatesMinusCharge[0]; x2 = self.coordinatesPlusCharge[0]  # To mark equations
         y1 = self.coordinatesMinusCharge[1]; y2 = self.coordinatesPlusCharge[1]
         widthOfFlow = 1  # Important parameter that defines the the width of a flow field
-        decayDistance = 10
+        # decayDistance = 10
         A = y1 - y2
         B = x2 - x1
         C = x1*y2 - x2*y1
@@ -221,3 +221,41 @@ class dipole():
         """
         scaling_factor = maxDisplacement / self.charge
         return scaling_factor
+
+    def equalPotentialApprox(self, x: float, y: float):
+        """
+        Approximation of calculation of force lines with equal forces along them.
+        """
+        thermoFieldAdjustment = 1
+        x1 = self.coordinatesMinusCharge[0]
+        x2 = self.coordinatesPlusCharge[0]
+        y1 = self.coordinatesMinusCharge[1]
+        y2 = self.coordinatesPlusCharge[1]
+        xDipoleCenter = np.absolute(x1 - x2)/2
+        yDipoleCenter = np.absolute(y1 - y2)/2
+        # print("dipole center at", [xDipoleCenter, yDipoleCenter])
+        Adipole = y1 - y2
+        Bdipole = x2 - x1
+        # Dipole length l:
+        L = euclidean([x1, y1], [x2, y2])
+        maxMultiplicator = (L*L)/(4*self.charge)
+        Aline = yDipoleCenter - y
+        Bline = x - xDipoleCenter
+        if (Bline != 0):
+            kLine = -(Aline/Bline)
+        else:
+            kLine = 0
+        if (Bdipole != 0):
+            kDipole = -(Adipole/Bdipole)
+        else:
+            kDipole = 0
+        print(Adipole, Bdipole, kDipole, " - A, B, k of a dipole")
+        print(Aline, Bline, kLine, " - A, B, k of a line")
+        if (kLine == kDipole):
+            # Two lines - dipole and for coordinate are parallel to each other
+            thermoFieldAdjustment = 1
+        elif (kLine == -(1/kDipole)) or (kDipole == 0 and kLine == 0):
+            # Two lines - dipole and for coordinate are perpendicular to each other
+            thermoFieldAdjustment = maxMultiplicator
+
+        return thermoFieldAdjustment

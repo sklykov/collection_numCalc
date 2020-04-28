@@ -30,11 +30,13 @@ dip = dipole(charge, [xPlusCharge, yPlusCharge], [xMinusCharge, yMinusCharge])
 particles = pDynamics(size, nParticles)
 x = particles.coordinatesX
 y = particles.coordinatesY
+print(dip.equalPotentialApprox(14, 14), " - correction coefficient")
+print(dip.equalPotentialApprox(15, 17), " - correction coefficient")
 
-for i in range(2):
-    for j in range(nParticles):
-        coordinates = [x[j], y[j]]
-        print(coordinates, "before force field application")
-        (x[j], y[j]) = pDynamics.dynamicsInertionless(
-            coordinates, dip.thermoFieldCalc(x[j], y[j], decayPower), diffusionPower, tStep, precision_digits)
-        print(x[j], y[j], "after applied force field")
+# for i in range(2):
+#     for j in range(nParticles):
+#         coordinates = [x[j], y[j]]
+#         print(coordinates, "before force field application")
+#         (x[j], y[j]) = pDynamics.dynamicsInertionless(
+#             coordinates, dip.thermoFieldCalc(x[j], y[j], decayPower), diffusionPower, tStep, precision_digits)
+#         print(x[j], y[j], "after applied force field")
