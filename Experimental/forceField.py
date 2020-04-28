@@ -52,15 +52,17 @@ class dipole():
     def thermoFieldCalc(self, x: float, y: float, decayPower: float) -> tuple:
         """Mimicking the force field (thermo flow) created by scanning laser in liquid medium.
         Charge gives the estimate of force tension. The parameter decayPower helps to calculate decay power (^ - power)
-        in the thermofield (not on the central line). """
+        in the thermofield (not on the central line). The dipole axis has the h approximately 1 pixel."""
         x1 = self.coordinatesMinusCharge[0]; x2 = self.coordinatesPlusCharge[0]  # To mark equations
         y1 = self.coordinatesMinusCharge[1]; y2 = self.coordinatesPlusCharge[1]
+        widthOfFlow = 1  # Important parameter that defines the the width of a flow field
+        decayDistance = 10
         A = y1 - y2
         B = x2 - x1
         C = x1*y2 - x2*y1
-        r = euclidean([x1, y1], [x, y2])
+        r = euclidean([x1, y1], [x2, y2])
         # d - distance from the point to the central part of thermoflow
-        d = np.absolute(A*x + B*y + C)/r  # Distance from point of interest to axis between "two charges"
+        d = np.absolute(A*x + B*y + C)/r  # Distance from point of interest to the main axis between "two charges"
         xPlusField = x - x2
         xMinusField = x1 - x
         yPlusField = y - y2
@@ -80,36 +82,85 @@ class dipole():
             yMin = y1
         # For making always right direction - the orientation depends on the orientations of minus / plus charges
         # This is central part of thermoflow
-        if (d <= 1.05) and (x <= xMax) and (x >= xMin):
+        if (d <= (widthOfFlow + 0.05)) and (x <= xMax) and (x >= xMin):
             xThermoField = self.charge*np.sign(xPlusField + xMinusField)
+
+        # Below - the attempt to reduce decay parralel to the flow field axis by multiplying to the emperic function
+        # elif (d > (widthOfFlow + 0.05)) and (x < xMax) and (x > xMin):
+        #     distancePlus = euclidean(self.coordinatesPlusCharge, [x, y])  # Distance between + charge and point in 2D
+        #     plusFieldModule = self.charge
+        #     thermoFieldAdjustment = 1  # To correct strong decay out of flow axis
+        #     if distancePlus > 1:
+        #         plusFieldModule *= 1/(np.power(distancePlus, decayPower))
+        #     minusFieldModule = self.charge
+        #     distanceMinus = euclidean(self.coordinatesMinusCharge, [x, y])
+        #     if distanceMinus > 1:
+        #         minusFieldModule *= 1/(np.power(distanceMinus, decayPower))
+        #     if (distanceMinus > 4) and (distancePlus > 4):
+        #         thermoFieldAdjustment = 1/(np.sqrt(abs(d-widthOfFlow)))
+        #     xPlusField *= plusFieldModule
+        #     xMinusField *= minusFieldModule
+        #     xThermoField = -(xPlusField + xMinusField)
+        #     xThermoField *= thermoFieldAdjustment
+
         else:
             distancePlus = euclidean(self.coordinatesPlusCharge, [x, y])  # Distance between + charge and point in 2D
             plusFieldModule = self.charge
             if distancePlus > 1:
                 plusFieldModule *= 1/(np.power(distancePlus, decayPower))
-            minusFieldModule = self.charge  # Modulus of field tension (mimicking r^(-2) decay)
+            minusFieldModule = self.charge
             distanceMinus = euclidean(self.coordinatesMinusCharge, [x, y])  # Distance between + charge and point in 2D
             if distanceMinus > 1:
                 minusFieldModule *= 1/(np.power(distanceMinus, decayPower))
             xPlusField *= plusFieldModule
             xMinusField *= minusFieldModule
             xThermoField = -(xPlusField + xMinusField)
+            xThermoField = round(xThermoField, 1)
+            # if np.absolute(xThermoField) < self.charge:
+            #     xThermoField *= 3*np.exp(-(d)/decayDistance)
+            #     if np.absolute(xThermoField) >= self.charge:
+            #         xThermoField = np.sign(xThermoField)*0.95*self.charge
+
         # d <= 1.05 due to rounding error in the distance calculations (it's especially a case in pixels calculations)
-        if (d <= 1.05) and (y <= yMax) and (y >= yMin):
+        if (d <= (widthOfFlow + 0.05)) and (y <= yMax) and (y >= yMin):
             yThermoField = self.charge*np.sign(yPlusField + yMinusField)
+
+        # Attempt to reduce decay
+        # elif (d > (widthOfFlow + 0.05)) and (y < yMax) and (y > yMin):
+        #     distancePlus = euclidean(self.coordinatesPlusCharge, [x, y])  # Distance between + charge and point in 2D
+        #     plusFieldModule = self.charge
+        #     thermoFieldAdjustment = 1  # To correct strong decay out of flow axis
+        #     if distancePlus > 1:
+        #         plusFieldModule *= 1/(np.power(distancePlus, decayPower))
+        #     minusFieldModule = self.charge
+        #     distanceMinus = euclidean(self.coordinatesMinusCharge, [x, y])
+        #     if distanceMinus > 1:
+        #         minusFieldModule *= 1/(np.power(distanceMinus, decayPower))
+        #     if (distanceMinus > 4) and (distancePlus > 4):
+        #         thermoFieldAdjustment = 1/(np.sqrt(abs(d-widthOfFlow)))
+        #     yPlusField *= plusFieldModule
+        #     yMinusField *= minusFieldModule
+        #     yThermoField = -(yPlusField + yMinusField)
+        #     yThermoField *= thermoFieldAdjustment
+
         # Here the field should resemble the dipole far field
         else:
             distancePlus = euclidean(self.coordinatesPlusCharge, [x, y])  # Distance between + charge and point in 2D
             plusFieldModule = self.charge
             if distancePlus > 1:
-                plusFieldModule *= 1/(np.power(distancePlus, 1.5))
-            minusFieldModule = self.charge  # Modulus of field tension (mimicking r^(-2) decay)
+                plusFieldModule *= 1/(np.power(distancePlus, decayPower))
+            minusFieldModule = self.charge
             distanceMinus = euclidean(self.coordinatesMinusCharge, [x, y])  # Distance between + charge and point in 2D
             if distanceMinus > 1:
-                minusFieldModule *= 1/(np.power(distanceMinus, 1.5))
+                minusFieldModule *= 1/(np.power(distanceMinus, decayPower))
             yPlusField *= plusFieldModule
             yMinusField *= minusFieldModule
             yThermoField = -(yPlusField + yMinusField)
+            yThermoField = round(yThermoField, 1)
+            # if np.absolute(yThermoField) < self.charge:
+            #     yThermoField *= 3*np.exp(-(d)/decayDistance)
+            #     if np.absolute(yThermoField) >= self.charge:
+            #         yThermoField = np.sign(yThermoField)*0.95*self.charge
 
         return (xThermoField, yThermoField)
 
@@ -152,3 +203,21 @@ class dipole():
         fig2.tight_layout()
         plt.quiver(x, y, Ex, Ey)  # Over type of force field mapping
         return (Ex, Ey)
+
+    def simpleScalingFactor(self, maxDisplacement: float) -> float:
+        """
+        Attempt to provide some scaling factor (time step) for making a simulations with pixel values in the case of
+        non-physical simulations (not real diffusion coefficients, )
+        Parameters
+        ----------
+        maxDisplacement : float
+            maximum desired displacements in pixels for simulations
+
+        Returns
+        -------
+        scaling_factor(or time step):
+            the value that could be provided for a simple dynamic equation: dx = force[x,y]*scaling_factor
+
+        """
+        scaling_factor = maxDisplacement / self.charge
+        return scaling_factor

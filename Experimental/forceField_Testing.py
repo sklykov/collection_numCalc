@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Testing of forceField class capabilities.
-The 'main' file for testing forceField.py,...
+The 'main' file for testing forceField.py, particlesDynamics.py
 @author: ssklykov
 """
 # %% Imports
@@ -9,14 +9,14 @@ from forceField import dipole
 from particlesDynamics import pDynamics
 
 # %% Parameters
-charge = 100
+charge = 150
 xPlusCharge = 4
 yPlusCharge = 4
 xMinusCharge = 36
 yMinusCharge = 36
 size = 40
 nPoints = size
-decayPower = 1.5
+decayPower = 2
 nParticles = 2
 diffusionPower = 1
 # If particle is located on the main dipole / thermofield axis, then each maximum step equal to it
