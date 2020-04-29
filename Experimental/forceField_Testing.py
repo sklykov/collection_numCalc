@@ -30,8 +30,9 @@ dip = dipole(charge, [xPlusCharge, yPlusCharge], [xMinusCharge, yMinusCharge])
 particles = pDynamics(size, nParticles)
 x = particles.coordinatesX
 y = particles.coordinatesY
-print(dip.equalPotentialApprox(14, 14), " - correction coefficient")
-print(dip.equalPotentialApprox(15, 17), " - correction coefficient")
+# print(dip.equalPotentialApprox(18, 22, decayPower), " - correction coefficient")
+# print(dip.equalPotentialApprox(16, 16), " - correction coefficient")
+# print(dip.equalPotentialApprox(19, 23, decayPower), " - correction coefficient")
 
 # for i in range(2):
 #     for j in range(nParticles):
