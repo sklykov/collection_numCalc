@@ -85,8 +85,29 @@ class pDynamics():
         # Force pushing particle directly, without approximation of time interval (regulated by the calling function)
         x += force[0]*time_step
         x += pDynamics.diffusionStep(diffusionPower, 2)
-        y += force[0]*time_step
+        y += force[1]*time_step
         y += pDynamics.diffusionStep(diffusionPower, 2)
         x = round(x, precision_digits)
         y = round(y, precision_digits)
         return (x, y)
+
+    @staticmethod
+    def unpackCoordinates(coordinates: list) -> tuple:
+        """Unpacking coordinates from a list [x1, y1, ...] to two separate arrays."""
+        nParticles = len(coordinates) // 2
+        x = np.ndarray(nParticles, dtype='float')
+        y = np.ndarray(nParticles, dtype='float')
+        for i in range(nParticles):
+            x[i] = coordinates[2*i]
+            y[i] = coordinates[2*i + 1]
+        return (x, y)
+
+    @staticmethod
+    def packCoordinates(x, y) -> list:
+        """Unpacking coordinates from arrays like [x1, x2, ...], [y1, y2, ...] to an one merged list."""
+        n = 2*len(x)
+        composedList = [0]*n
+        for i in range(len(x)):
+            composedList[2*i] = x[i]
+            composedList[2*i + 1] = y[i]
+        return composedList

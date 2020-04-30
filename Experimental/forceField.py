@@ -49,7 +49,7 @@ class dipole():
         yDipoleField = yPlusField + yMinusField
         return (xDipoleField, yDipoleField)
 
-    def thermoFieldCalc(self, x: float, y: float, decayPower: float) -> tuple:
+    def thermoFieldCalc(self, x: float, y: float, decayPower: float, widthOfFlow: float) -> tuple:
         """Mimicking the force field (thermo flow) created by scanning laser in liquid medium.
         Charge gives the estimate of force tension. The parameter decayPower helps to calculate decay power (^ - power)
         in the thermofield (not on the central line). The dipole axis has the h approximately 1 pixel.
@@ -59,6 +59,8 @@ class dipole():
             coordinates of a point of interest
         decayPower:
             power in decay power in (1/(r**(-decayPower)))
+        widthOfFlow:
+            property of a central flow - regulates the width of central main flow with constant force along
         Return
         -------
         (Ex, Ey):
@@ -66,12 +68,12 @@ class dipole():
         """
         x1 = self.coordinatesMinusCharge[0]; x2 = self.coordinatesPlusCharge[0]  # To mark equations
         y1 = self.coordinatesMinusCharge[1]; y2 = self.coordinatesPlusCharge[1]
-        widthOfFlow = 1  # Important parameter that defines the the width of a flow field
+        # widthOfFlow = 1  # Important parameter that defines the the width of a flow field
         A = y1 - y2
         B = x2 - x1
         C = x1*y2 - x2*y1
         r = euclidean([x1, y1], [x2, y2])  # Length of a dipole
-        decayDistance = r/2  # Characteristical decay distance = quarter of a dipole length
+        decayDistance = r  # Characteristical decay distance regulates the characteristical decay away from flow axis
         # d - distance from the point to the central part of thermoflow
         d = np.absolute(A*x + B*y + C)/r  # Distance from point of interest to the main axis between "two charges"
         xPlusField = x - x2
@@ -169,7 +171,8 @@ class dipole():
         yThermoField = round(yThermoField, 1)
         return (xThermoField, yThermoField)
 
-    def createFieldMap(self, size: int, nPoints: int, fieldType: str = "dipole", decayPower: float = 1.5):
+    def createFieldMap(self, size: int, nPoints: int, fieldType: str = "dipole",
+                       decayPower: float = 1.5, widthOfFlow: float = 2):
         """Shows the map of created by a dipole the force field (can be calculated by using 'forceFieldCalc' method
         The map itself is a square with sizes [dimension x dimension]. Two types of force fields: 'dipole'
         (default) and 'thermo'.
@@ -200,7 +203,7 @@ class dipole():
                 if fieldType == "dipole":
                     (Ex[i][j], Ey[i][j]) = self.forceFieldCalc(xP, yP)
                 elif fieldType == "thermo":
-                    (Ex[i][j], Ey[i][j]) = self.thermoFieldCalc(xP, yP, decayPower)
+                    (Ex[i][j], Ey[i][j]) = self.thermoFieldCalc(xP, yP, decayPower, widthOfFlow)
         fig1 = plt.figure(figsize=(8, 8))  # Empty figure
         fig1.tight_layout()
         plt.streamplot(x, y, Ex, Ey, linewidth=1)  # Creation of map of force field (streamlines of a vector flow)
@@ -252,7 +255,7 @@ class dipole():
         L = euclidean([x1, y1], [x2, y2])
         # print(L, "- dipole length")
         # All cryptic names like A, B, k belongs to equations of a line in 2D space: y = k*x + b; A*x + B*x + C = 0
-        maxMultiplicator = 2*np.power(L, decayPower) / (self.charge*np.power(2, decayPower))
+        maxMultiplicator = 3.5*np.power(L, decayPower) / (self.charge*np.power(2, decayPower))
         Aline = float(yDipoleCenter - y)
         Bline = float(x - xDipoleCenter)
         if (Bline != 0):  # It means that line connecting center of a dipole and a point is parallel to X axis
@@ -274,6 +277,9 @@ class dipole():
                 gamma = np.arctan(kLine)
                 thermoFieldAdjustment = 1 + np.absolute(np.sin(gamma))*(maxMultiplicator - 1)  # Perpendiculars enhance
                 thermoFieldAdjustment += np.absolute(np.cos(gamma))*((L/4)/distanceCenterPoint)*(maxMultiplicator - 1)
+                # Below - an attempt to exclude steep gap between perpendicular and inclination field
+                if np.cos(gamma) == 1:
+                    thermoFieldAdjustment += 0.01*((L/4)/distanceCenterPoint)*(maxMultiplicator - 1)
             else:
                 # Both dipole and line are parallel to some axis
                 if (Aline == 0 and Bdipole == 0) or (Bline == 0 and Adipole == 0):
@@ -301,3 +307,14 @@ class dipole():
                 thermoFieldAdjustment += np.absolute(np.cos(gamma))*((L/4)/distanceCenterPoint)*(maxMultiplicator - 1)
 
         return thermoFieldAdjustment
+
+    def updateCoordinates(self, decayPower: float, coordinatesX, coordinatesY, diffusionPower: float,
+                          time_step: float, precision_digits: int, widthOfFlow: float) -> tuple:
+        """Updating of all coordinates all at one operation. """
+        from particlesDynamics import pDynamics  # For using simple dynamic equation
+        for i in range(len(coordinatesX)):
+            (coordinatesX[i], coordinatesY[i]) = pDynamics.dynamicsInertionless(
+                [coordinatesX[i], coordinatesY[i]], self.thermoFieldCalc(coordinatesX[i], coordinatesY[i], decayPower,
+                                                                         widthOfFlow),
+                diffusionPower, time_step, precision_digits)
+        return (coordinatesX, coordinatesY)
