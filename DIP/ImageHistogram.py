@@ -23,6 +23,7 @@ if "Win" in osName:
 elif "nux" in osName:
     pathToSample = "/resources/nesvizh.jpg"
 overallPath = currentPath + pathToSample
+pathToResources = os.path.join(os.getcwd(), "resources")
 # print(overallPath)  # Debugging
 
 # %% Open and display the images
@@ -30,11 +31,13 @@ sample = io.imread(overallPath)
 # plt.figure(1)
 # plt.imshow(sample)  # Show the original image (suppresed - too many images)
 graySample = img_as_ubyte(rgb2gray(sample))  # Two step conversion: RGB -> float_img -> uint8 image
+# io.imsave(os.path.join(pathToResources, "nesvizh_grey.jpg"), graySample)
 plt.figure(2)
 plt.imshow(graySample, cmap=plt.cm.gray)  # The tip from the scikit-image webpage
 
 # %% Calculation of histogram
 hist = exs.histogram(graySample)  # get image histogram as 2 tuples
+
 # %% Histogram normalization
 maxCount = max(hist[0])  # Max count
 countsNorm = np.asarray(hist[0], 'float')  # Conversion to np.array
