@@ -40,7 +40,7 @@ def loadSampleImage(identifier: str = "castle"):
     """
     # Some blank image for default return
     sample = np.zeros((10, 10), dtype='int')
-    sample = img_as_ubyte(sample)
+    sample = img_as_ubyte(sample, force_copy=True)
     # Default image return
     if identifier == "castle":
         resources = getResourceFolder()
