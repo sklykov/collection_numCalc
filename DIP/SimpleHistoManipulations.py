@@ -12,6 +12,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from skimage.util import img_as_ubyte
+# from skimage.util import img_as_uint  # It's smartly converting U8 to U16 by transfer 255 -> 65535 (max values)
 from skimage import io
 from numpy.random import randint
 
@@ -30,7 +31,10 @@ sample_img = LoaderFile.loadSampleImage()
 # %% Calculation of negative for U8 images
 def negativeUbyteImage(img, test: bool = False):
     """
-    Calculates negative of an input U8 image. "test" - boolean to display or not results of this operation.
+    Calculates negative of an input U8 image usng slow pixelwise loops.
+    Inputs:
+        img - 2D image
+        test - boolean flag to display or not results of this operation
     """
     MAX_VAL = 255  # Default maximum value for U8 images
     (rows, cols) = img.shape
@@ -39,12 +43,24 @@ def negativeUbyteImage(img, test: bool = False):
     if test:
         print("The input image size is:", cols, "x", rows)
         print('The input image type:', img.dtype)
+    # Performance measure
+    if test:
+        # start_time = time.clock()  # Complains about deprecation
+        start_time = time.perf_counter()
+    else:
+        start_time = 0
     negative_img = np.zeros((rows, cols), dtype='uint8')
-    # Single core calculations
+    # Single core, pixelwise calculations
     for i in range(rows):
         for j in range(cols):
             negative_img[i, j] = MAX_VAL - img[i, j]
     negative_img = img_as_ubyte(negative_img)
+    # Performance measure
+    if test:
+        finish_time = time.perf_counter()
+        print("The algoritm takes to perform:", round(finish_time - start_time, 3), "s")
+    else:
+        finish_time = 0
     if test:
         plt.figure("Sample")
         io.imshow(img)  # Also works in collabaration with matplotlib library
@@ -53,26 +69,61 @@ def negativeUbyteImage(img, test: bool = False):
     return negative_img
 
 
+def negativeVectorizedUbyteImg(img, test: bool = False):
+    """Attempt to speed up the function above by using vectorization of substraction operation on an image.
+
+    Inputs:
+        img - 2D image
+        test - boolean flag for displaying info about performed tests
+    Returns:
+        2D U8 negative to an input image
+    """
+    MAX_VAL = 255  # Default maximum value for U8 images
+    (rows, cols) = img.shape
+    # Performance measure
+    if test:
+        start_time = time.perf_counter()
+    else:
+        start_time = 0
+    negative_img = np.zeros((rows, cols), dtype='uint8')
+    # Vectorized operation
+    negative_img = MAX_VAL + np.uint8(np.multiply(img, -1))  # really fast and simple operation over image
+    negative_img = img_as_ubyte(negative_img)
+    if test:
+        finish_time = time.perf_counter()
+        print("The algoritm takes to perform:", round(finish_time - start_time, 3), "s")
+    else:
+        finish_time = 0
+    if test:
+        # plt.figure("Sample")
+        # io.imshow(img)  # Also works in collabaration with matplotlib library
+        plt.figure("Negative")
+        io.imshow(negative_img)
+    return negative_img
+
+
 # %% Log function calculation for U8 images
-def logUbyteImage(img, test: bool = False, maxConstant: bool = True, c: float = 1.0):
+def logUbyteImage(img, test: bool = False, vectorized: bool = True, maxConstant: bool = True, c: float = 1.0):
     """Calculate results of linear logarithm application to image intensities.
 
     Input:
         img - image (preferablly U8)
         test - boolean for displaying test results or not
-        c: constant of log conversion, will be checked for consistency (0 < c < max)
+        c - constant of log conversion, will be checked for consistency (0 < c < max)
+        vectorized - flag to use pixelwise or vectorized form of operation
     Output:
         U8 type image wit recalculated pixel values
     """
+    start_time = time.perf_counter()
     (rows, cols) = img.shape
     if img.dtype != 'uint8':
         img = img_as_ubyte(img, force_copy=True)
-    if test:
-        print("The input image size is:", cols, "x", rows)
-        print('The input image type:', img.dtype)
+    # if test:
+    #     print("The input image size is:", cols, "x", rows)
+    #     print('The input image type:', img.dtype)
     log_img = np.zeros((rows, cols), dtype='uint8')
     maxPixelInImg = np.max(img)
-    cMax = np.log(maxPixelInImg)
+    cMax = np.log(maxPixelInImg + 1)
     cMax = 255/cMax  # Making maximum value of pixels equal to 255
     if c < 0 or c == 0.0:
         c = cMax
@@ -82,11 +133,19 @@ def logUbyteImage(img, test: bool = False, maxConstant: bool = True, c: float = 
         print("Just warning: constant c - inconsistent, used one c =", c)
     elif maxConstant:
         c = cMax
-        print("Max constant used: ", c)
+        print("Max constant used: ", round(c, 3))
     # Calculation of linear logarithm + conversion of pixel values
-    for i in range(rows):
-        for j in range(cols):
-            log_img[i, j] = np.uint8(c*np.log(1+img[i, j]))
+    if vectorized:
+        shifted_img = np.uint16(img)  # Needed trick because 255 + 1 operation below automatically converts to 0 for U8 img
+        shifted_img = np.add(shifted_img, 1)
+        # print("Min pixel value in a shifted image:", np.min(shifted_img))
+        log_img = np.uint8(np.multiply(c, np.log(shifted_img)))
+    else:
+        for i in range(rows):
+            for j in range(cols):
+                log_img[i, j] = np.uint8(c*np.log(1 + img[i, j]))
+    log_img = img_as_ubyte(log_img)
+    finish_time = time.perf_counter()
     if test:
         unique_id = randint(0, 101) + randint(0, 11)  # Dirty hack to avoid overwriting of results for multiple calls in test
         unique_id = str(unique_id)
@@ -94,11 +153,12 @@ def logUbyteImage(img, test: bool = False, maxConstant: bool = True, c: float = 
         io.imshow(img)  # Also works in collabaration with matplotlib library
         plt.figure("c*ln(Sample)" + unique_id)
         io.imshow(log_img)
+        print("The algoritm takes to perform:", round(finish_time - start_time, 3), "s")
     return log_img
 
 
 # %% Gamma-correction of U8 images
-def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0):
+def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0, vectorized: bool = True):
     """
     Applying gamma correction to pixel values in the form of new_pixel = a*((sample_pixel)**gamma)
     Input:
@@ -107,6 +167,7 @@ def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0)
     Returns:
         gamma-corrected U8 image
     """
+    start_time = time.perf_counter()
     (rows, cols) = img.shape
     if img.dtype != 'uint8':
         img = img_as_ubyte(img, force_copy=True)
@@ -117,10 +178,20 @@ def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0)
         print("Warning: a can't be zero")
     cMax = a*np.power(maxPixelInImg, gamma)
     cMax = 255/cMax  # Making maximum value of pixels equal to 255
-    for i in range(rows):
-        for j in range(cols):
-            gamma_img[i, j] = np.uint8(cMax*a*np.power(img[i, j], gamma))
+    if vectorized:
+        coeff = np.multiply(cMax, a)
+        # print("coeff:", coeff)
+        interimFloatImg = np.float16(img)  # Again, avoid rounding in operation np.power(img, gamma)
+        interimFloatImg = np.multiply(coeff, np.power(interimFloatImg, gamma))
+        gamma_img = np.uint8(interimFloatImg)
+    else:
+        for i in range(rows):
+            for j in range(cols):
+                gamma_img[i, j] = np.uint8(cMax*a*np.power(img[i, j], gamma))
+    # gamma_img = img_as_ubyte(gamma_img)
+    finish_time = time.perf_counter()
     if test:
+        print("The algoritm takes to perform:", round(finish_time - start_time, 3), "s")
         # unique_id = randint(0, 101) + randint(0, 11)  # Diry hack to avoid overwriting of results for multiple calls in test
         # unique_id = str(unique_id)
         unique_id = " a: " + str(a) + ", " + "gamma: " + str(gamma)
@@ -133,10 +204,11 @@ def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0)
 
 # %% Testing of written functions
 # negative = negativeUbyteImage(sample_img, test=True)  # Testing of calculation of negative of an image
-# logImage = logUbyteImage(sample_img, test=True)
-# logImage2 = logUbyteImage(sample_img, True, False, 24.0)
-gammaImg = gammaUbyteImage(sample_img, True, 10, 0.5)
-gammaImg = gammaUbyteImage(sample_img, True, 0.5, 2)
+# negative2 = negativeVectorizedUbyteImg(sample_img, True)
+logImage = logUbyteImage(sample_img, True)
+# logImage2 = logUbyteImage(sample_img, True, False)
+gammaImg = gammaUbyteImage(sample_img, True, 0.5, 2, True)
+# gammaImg2 = gammaUbyteImage(sample_img, True, 0.5, 2, False)
 
 # %% Testing minor functionality (simple calculations)
 ident = "some wrong identifier"
