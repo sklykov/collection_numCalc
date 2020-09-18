@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Wrapper classes (?) with some repeatable functionality for U8 (...) images
+Wrapper class with some repeatable functionality for U8 (...) images
 
 @author: ssklykov
 """
