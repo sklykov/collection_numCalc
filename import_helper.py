@@ -20,6 +20,10 @@ class projectImport():
     containingFolder = ""
     projectPath = ""
     osSpecificSeparator = ""
+    listOFAllPathsToDirs = []
+    listOfFilesNames = []
+    listOfDirs = []
+    default_excluded_dirs = []
 
     def __init__(self, anchorFolder: str = ".git"):
         """
@@ -54,12 +58,14 @@ class projectImport():
             if len(folderTree) > 0:  # If project tree is non-empty
                 folderTree = projectImport.deleteGitFolders(folderTree)
             else:
-                self.projectTree["Project"] = "Empty"
+                self.projectTree[self.projectPath] = "Empty"
             # Again, checking that it's not an empty git project
             if len(folderTree) > 0:
-                self.projectTree["Project"] = folderTree
+                self.projectTree[self.projectPath] = folderTree
             else:
-                self.projectTree["Project"] = "Empty"
+                self.projectTree[self.projectPath] = "Empty"
+            if anchorFolder == ".git":
+                self.default_excluded_dirs = [".git", ".gitignore"]
 
     def includeFileToSearchPath(self, fileName: str) -> bool:
         """
@@ -72,53 +78,115 @@ class projectImport():
             boolean operation result. False in case of file not found, class initialized in empty project, not such
             file found in a project structure. Otherwise - True.
         """
-        if len(fileName) == 0:
-            print("NoFileSpecified")
-            return False
-        folderTree = self.projectTree["Project"]
-        if type(folderTree) == str:
-            print("Class contains info about empty project")
-            return False
-        # if type(folderTree) == list:
-        #     print("folder tree is a list type")
-        if (type(folderTree) == list) and (len(folderTree)) > 0:
-            for obj in folderTree:
-                absPathObj = os.path.join(self.projectPath, obj)
-                if os.path.isfile(absPathObj):
-                    if obj == fileName:
-                        projectImport.includeFileToSysPath(absPathObj)
-                        return True
         return False
 
     def makeDirectoryGraph(self):
         # TODO: make a recursively call function for built directory graph
         # Assuming that initial list of files and folders in the project directory is non-empty
-        for obj in self.folderTree["Project"]:
-            # for all files and directories in the root project:
-            absPathObj = os.path.join(self.projectPath, obj)  # get an absolute path
-            # If it's a directory, then build another dictionary entry
-            if os.path.isdir(absPathObj):
-                (dirPath, dirList, fileList) = os.walk(absPathObj)
+        for paths, dirs, files in os.walk(self.projectPath):
+            self.listOfFilesNames.append(files)
+            if (dirs != []):
+                self.listOfDirs.append(dirs)
 
+    def recursiveBuildDirGraph(self):
+        # First step - checking project structure (ASSUMING that project is non-empty)
+        # TODO: Now it isn't recursive!
+        currentPath = self.projectPath
+        rootPath = self.projectPath
+        pathsCollection = []
+        walkDone = False
+        pathsCollection.append(currentPath)
+        dirList = projectImport.getDirList(currentPath)
+        firstIteration = True
+        numDirsInRoot = 0
+        jFolderInRoot = 0
+        while (not walkDone):
+            if len(dirList) > 0:
+                parentPath = currentPath
+                for folder in dirList:
+                    path_to_append = os.path.join(parentPath, folder)
+                    flag = True
+                    if path_to_append not in pathsCollection:
+                        pathsCollection.append(path_to_append)
+                        # Exchanging of the currentPath only once below
+                        if flag:
+                            currentPath = path_to_append
+                            flag = False
+                        # Counting how many folders in the root directory
+                        if firstIteration:
+                            numDirsInRoot += 1
+                firstIteration = False
+                # print("new path:", currentPath)
+                dirList = projectImport.getDirList(currentPath)
+            else:
+                if len(pathsCollection) > 1:
+                    (parentPath, tail) = os.path.split(currentPath)
+                    if (parentPath == rootPath):
+                        pass
+
+                else:
+                    walkDone = True
+                walkDone = True  # preventing infinite loop because the behaviour not implemented
+                self.listOFAllPathsToDirs = pathsCollection
+
+    def buildProjectDirGraph(self):
+        # Second attempt to write recursive iterator building the project folder graph
+        currentPath = self.projectPath
+        rootPath = self.projectPath
+        ignored_folders = self.default_excluded_dirs
+        pathsCollection = []
+        nodesCollection = []  # for accounting number and place of nodes visiting
+        nodesVisited = []
+        walkDone = False
+        # First iteration not in the loop:
+        numberOfDirs = len(projectImport.getDirList(rootPath))
+        nodesVisited = [0 for i in range(numberOfDirs)]
+        node = {}
+        (root, tail) = os.path.split(rootPath)
+        node[tail] = projectImport.getDirList(rootPath)
+        nodesCollection.append(node)
+        print(node)
+        print(nodesVisited)
+        # while (not walkDone):
+        #     pass
         pass
 
-    def makeDictEntryForFolder(folderName: str, folderPath: str):
-        pass
+    # For testing capabilities below is narrowing of output
+    default_excluded_folders = [".git", ".gitignore", "Matricies_Manipulation", "Sorting", "Plotting",
+                                "Experimental", "LinearSystems", "Interpolation", "FunctionRoots", "__pycashe__",
+                                "MonteCarlo"]
 
-    # DEPRECATED METHOD (for reference)
-    # @staticmethod
-    # def isFileInDirectoryTree(fileName: str, absPathEntry: str) -> str:
-    #     walkDone = False
-    #     foundOnPath = ""
-    #     while not walkDone:
-    #         (dirPath, dirList, fileList) = os.walk(absPathEntry)
-    #         if len(fileList) > 0:
-    #             for file in fileList:
-    #                 if fileName == file:
-    #                     foundOnPath = dirPath
-    #                     walkDone = True
-    #                     break
-    #         if (len(dirList) > 0) and (not walkDone):
+    @staticmethod
+    def getDirList(rootPath: str, excludingFolders: list = default_excluded_folders) -> list:
+        """
+        Returns of list of dirs down from specified path (specified path should point to some folder).
+
+        Parameters
+        ----------
+        rootPath : str
+            Path to the root directory
+        excludingFolders : list, optional
+            List with names of folders that must be excluded from returning list.
+            The default is [".git, .gitignore"].
+
+        Returns
+        -------
+        list
+            List with folder names that the root directory contains.
+
+        """
+        if os.path.exists(rootPath):
+            listOfDirs = os.listdir(rootPath)
+            i = 0
+            while i < len(listOfDirs):
+                pathToObj = os.path.join(rootPath, listOfDirs[i])
+                if (not os.path.isdir(pathToObj)) or (listOfDirs[i] in excludingFolders):
+                    listOfDirs.pop(i)
+                else:
+                    i += 1
+            return listOfDirs
+        else:
+            return []
 
     @staticmethod
     def includeFileToSysPath(absPathToFolder: str):
@@ -145,17 +213,22 @@ class projectImport():
 
     def printAllSelfValues(self):
         """
-        For debugging / testing
+        For debugging / testing - enabling it for get output
         """
-        print("The folder containing this script:", self.containingFolder)
+        print("*********************************")
+        # print("The folder containing this script:", self.containingFolder)
         # print("specific folder separator:", self.osSpecificSeparator)
-        print("Expected project tree containing the anchor:", self.projectPath)
+        # print("Expected project tree containing the anchor:", self.projectPath)
+        print("Collected paths to folders: ", self.listOFAllPathsToDirs)
 
 
 # %% Testing some capabilities
 if __name__ == "__main__":
     demo_instance = projectImport()
-    demo_instance.printAllSelfValues()
-    included = demo_instance.includeFileToSearchPath("LICENSE")
+    # demo_instance.recursiveBuildDirGraph()
+    # demo_instance.makeDirectoryGraph()
+    # demo_instance.printAllSelfValues()
+    demo_instance.buildProjectDirGraph()
+    # included = demo_instance.includeFileToSearchPath("LICENSE")
     # demo_instance2 = projectImport("Some non-exist folder")
     # demo_instance2.printAllSelfValues()

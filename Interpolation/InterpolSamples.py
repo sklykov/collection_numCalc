@@ -7,11 +7,15 @@ Developed in the Spyder IDE
 import numpy as np
 import math
 
+
+# %% Holding class
 class InterpolSamples():
-    n = 10 # Default number of sampling points for performing interpolation
+    n = 10  # Default number of sampling points for performing interpolation
     percentError = 5  # Default maximum percentage for deviations of function values from tabulated ones
-    lowestVal = 0; highestVal = 5;
-    def __init__(self,n:int,percentError:int,lowestVal:float,highestVal:float):
+    lowestVal = 0
+    highestVal = 5
+
+    def __init__(self, n: int, percentError: int, lowestVal: float, highestVal: float):
         if (n > 1):
             self.n = n
         else:
@@ -21,28 +25,27 @@ class InterpolSamples():
             self.percentError = percentError
         else:
             print("The Specified number of points less than 1")
-            self.percentError = 5 # Default value remains
-        self.lowestVal = lowestVal; self.highestVal = highestVal  # [a,b] interval
-
+            self.percentError = 5  # Default value remains
+        self.lowestVal = lowestVal
+        self.highestVal = highestVal  # [a,b] interval
 
     def valuesForInterpol(self):
         """ The main function for sample values generation that returns x values (evenly spaced values in [a,b] range),\
             yPure - tabulated values of y(x), yErrors - yPure + errors"""
-        yError = np.zeros(self.n) # Initialization of returning values with errors
-        yPure = np.zeros(self.n) # Initialization of returning values without errors
-        x = np.linspace(self.lowestVal,self.highestVal,self.n)  # Number of points + 1 because of including starting point
+        yError = np.zeros(self.n)  # Initialization of returning values with errors
+        yPure = np.zeros(self.n)  # Initialization of returning values without errors
+        x = np.linspace(self.lowestVal, self.highestVal, self.n)  # Number of points + 1 because of including starting point
         for i in range(self.n):
             yPure[i] = InterpolSamples.sampleFunction(x[i])
-            yError[i] = round(InterpolSamples.sampleFunction(x[i])*(1 + 0.01*
-                  (np.random.randint(-self.percentError,self.percentError+1))),3)
-        return (x,yPure,yError)
+            yError[i] = round(InterpolSamples.sampleFunction(x[i])*(1 + 0.01 *
+                  (np.random.randint(-self.percentError, self.percentError+1))), 3)
+        return (x, yPure, yError)
 
     @staticmethod
-    def sampleFunction(x:float):
+    def sampleFunction(x: float):
         """Sample function (x**2)*exp(-0.5*x). Returning rounded float number with 3 digits"""
-        return round(pow(x,3)*math.exp(-x),3)
+        return round(pow(x, 3)*math.exp(-x), 3)
 
     # Only for testing the class creation
     def printValues(self):
-        print(self.n,self.percentError,self.lowestVal,self.highestVal,"- values associated with class")
-
+        print(self.n, self.percentError, self.lowestVal, self.highestVal, "- values associated with class")
