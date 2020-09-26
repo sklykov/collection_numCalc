@@ -67,93 +67,67 @@ class projectImport():
             if anchorFolder == ".git":
                 self.default_excluded_dirs = [".git", ".gitignore"]
 
-    def includeFileToSearchPath(self, fileName: str) -> bool:
-        """
-        DEPRECATED!
-        Make a walk along project tree and include specified file to import searching path.
-        This feature is utilizing os.walk() functionality.
-        Returns
-        -------
-        status:
-            boolean operation result. False in case of file not found, class initialized in empty project, not such
-            file found in a project structure. Otherwise - True.
-        """
-        return False
-
-    def makeDirectoryGraph(self):
-        # TODO: make a recursively call function for built directory graph
-        # Assuming that initial list of files and folders in the project directory is non-empty
-        for paths, dirs, files in os.walk(self.projectPath):
-            self.listOfFilesNames.append(files)
-            if (dirs != []):
-                self.listOfDirs.append(dirs)
-
-    def recursiveBuildDirGraph(self):
-        # First step - checking project structure (ASSUMING that project is non-empty)
-        # TODO: Now it isn't recursive!
-        currentPath = self.projectPath
-        rootPath = self.projectPath
-        pathsCollection = []
-        walkDone = False
-        pathsCollection.append(currentPath)
-        dirList = projectImport.getDirList(currentPath)
-        firstIteration = True
-        numDirsInRoot = 0
-        jFolderInRoot = 0
-        while (not walkDone):
-            if len(dirList) > 0:
-                parentPath = currentPath
-                for folder in dirList:
-                    path_to_append = os.path.join(parentPath, folder)
-                    flag = True
-                    if path_to_append not in pathsCollection:
-                        pathsCollection.append(path_to_append)
-                        # Exchanging of the currentPath only once below
-                        if flag:
-                            currentPath = path_to_append
-                            flag = False
-                        # Counting how many folders in the root directory
-                        if firstIteration:
-                            numDirsInRoot += 1
-                firstIteration = False
-                # print("new path:", currentPath)
-                dirList = projectImport.getDirList(currentPath)
-            else:
-                if len(pathsCollection) > 1:
-                    (parentPath, tail) = os.path.split(currentPath)
-                    if (parentPath == rootPath):
-                        pass
-
-                else:
-                    walkDone = True
-                walkDone = True  # preventing infinite loop because the behaviour not implemented
-                self.listOFAllPathsToDirs = pathsCollection
-
+    # %% Attempts to make a project structure with folders as nodes of graphs
     def buildProjectDirGraph(self):
         # Second attempt to write recursive iterator building the project folder graph
-        currentPath = self.projectPath
         rootPath = self.projectPath
         ignored_folders = self.default_excluded_dirs
-        pathsCollection = []
-        nodesCollection = []  # for accounting number and place of nodes visiting
+        folders_to_visit = []  # for accounting number and place of nodes visiting
         nodesVisited = []
         walkDone = False
-        # First iteration not in the loop:
-        numberOfDirs = len(projectImport.getDirList(rootPath))
-        nodesVisited = [0 for i in range(numberOfDirs)]
+        # First iteration not in the loop (for making clear for myself mostly):
+        numberOfDirs = len(projectImport.getDirList(rootPath))  # in a root folder
+        nodesVisited = [0 for i in range(numberOfDirs)]  # for calculating the number of visits in each node
         node = {}
         (root, tail) = os.path.split(rootPath)
-        node[tail] = projectImport.getDirList(rootPath)
-        nodesCollection.append(node)
-        print(node)
-        print(nodesVisited)
-        # while (not walkDone):
-        #     pass
-        pass
+        node[tail] = projectImport.getDirList(rootPath)  # Representation of a node - folder
+        folders_to_visit = projectImport.getDirList(rootPath)
+        # print(node, "- project node (minus avoided dirs)")
+        # print(folders_to_visit, " - folders to visit")
+        j = 0
+        current_path = self.projectPath
+        nodes_to_visit = folders_to_visit
+        current_node = tail
+        project_structure = node
+        rootName = tail  # For keeping the name of a root directory
+        while (not walkDone) and (j < 1):
+            (updated_node, folders_to_visit) = projectImport.update_dirs_structure(current_path, nodes_to_visit)
+            if len(folders_to_visit) > 0:
+                # print("node should be updated")
+                # The complex path in folders forming by a string like root_folder/subfold/subsubfold
+                if current_node != rootName:
+                    current_node = rootName + "/" + current_node
+                project_structure = projectImport.update_project_structure(current_node,
+                                                                           updated_node, project_structure, rootName)
+            print("updated project structure:", project_structure)
+            j += 1
 
+    @staticmethod
+    def update_dirs_structure(node_path: str, array_of_folders: list) -> tuple:
+        i = 0
+        folders_to_visit = []
+        for i in range(len(array_of_folders)):
+            pathToFolder = os.path.join(node_path, array_of_folders[i])
+            possible_new_dirs = projectImport.getDirList(pathToFolder)
+            if len(possible_new_dirs) > 0:
+                new_node = {}
+                new_node[array_of_folders[i]] = possible_new_dirs
+                array_of_folders[i] = new_node
+                for folder in possible_new_dirs:
+                    folders_to_visit.append(folder)
+        return (array_of_folders, folders_to_visit)
+
+    @staticmethod
+    def update_project_structure(node_name: str, updated_node: list, project_struct: dict, rootName: str) -> dict:
+        found_updated = False
+        if node_name == rootName:
+            project_struct[rootName] = updated_node
+        return project_struct
+
+    # %% Useful methods - used somewhere else in this script
     # For testing capabilities below is narrowing of output
     default_excluded_folders = [".git", ".gitignore", "Matricies_Manipulation", "Sorting", "Plotting",
-                                "Experimental", "LinearSystems", "Interpolation", "FunctionRoots", "__pycashe__",
+                                "Experimental", "LinearSystems", "Interpolation", "FunctionRoots", "__pycache__",
                                 "MonteCarlo"]
 
     @staticmethod

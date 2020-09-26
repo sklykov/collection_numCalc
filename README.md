@@ -6,7 +6,8 @@ As the reference for the DIP section - "Digital Image Processing" by Gonzalez R.
 - **This project is for training and implementation-refernce only purposes**
 - There is no real need to extensively clone it for anyone, except the case if somebody is really interested in any particular
 implementation or algorithm. Moreover, all of the implemented here algorithms are well-known and have been implemented already
-in all popular packages for numerical calculations.
-- All scripts have been developed in the Spyder IDE (4th generation) with major dependecies: Scipy(Numpy), Matplotlib, Scikit-Image
-I don't see any necessity to specify it now in any "requirements" file.
-Renamed because of enourmous traffic interested in something connected with SciPy
+in all popular packages for numerical calculations. I guess that many guests of this repo was confused in the past by its name.
+Hope that renaming will solve this issue.
+- All scripts have been developed in the Spyder IDE (4th generation) with common dependecies for numerical calculations:
+Scipy(Numpy), Matplotlib, Scikit-Image. I don't see any necessity to specify it now in any "requirements" file for installition
+from a scratch.

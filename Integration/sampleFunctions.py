@@ -8,21 +8,23 @@ by calling method "sampleF" with number_of_sample function
 # %% Import section
 import math
 
+
 # Class definition - with sample functions realised as non-static methods
 class SampleFuncIntegr():
     nOfSample = 1; nDigits = 3
-    def __init__(self,nDigits:int=3,nOfSample:int=1):
-        self.nDigits = nDigits; self.nOfSample = nOfSample
 
-    def sampleF(self,x:float):
+    def __init__(self, nDigits: int = 3, nOfSample: int = 1):
+        self.nDigits = nDigits
+        self.nOfSample = nOfSample
+
+    def sampleF(self, x: float):
         y = 0
         if (self.nOfSample == 1):
-            y = 3*math.pow(x,2) - 2*x - 1.5 # F(x) = x^3 - x^2 - 1.5*x - analytical integral
+            y = 3*math.pow(x, 2) - 2*x - 1.5 # F(x) = x^3 - x^2 - 1.5*x - analytical integral
         elif(self.nOfSample == 2):
-            x2 = math.pow(x,2)
+            x2 = math.pow(x, 2)
             y = x2*math.exp(-x2)  # difficult for analytical integration
         elif(self.nOfSample == 3):
-            y = math.pow(x,3)*math.exp(-math.pow(x,2))
+            y = math.pow(x, 3)*math.exp(-math.pow(x, 2))
 
-        return round(y,self.nDigits)
-
+        return round(y, self.nDigits)
