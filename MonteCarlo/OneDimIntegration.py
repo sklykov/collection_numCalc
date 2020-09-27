@@ -4,7 +4,6 @@ One dimensional integration using the Monte Carlo sampling method (Integral ~= V
 
 @author: ssklykov
 """
-
 # %% Import section + Adding a path to import module to sys.path
 import os  # for getting cwd
 # import platform  # for getting name of a running platform
@@ -36,12 +35,13 @@ def MonteCarloInt1D(a: float, b: float, y, nSamples: int = 100):
     # Checking input parameters
     if (a >= b):
         print("Incosistent interval assigning [a,b]")
-        return None # returning null object instead of any result, even equal to zero
+        interim = a; a = b; b = interim
     elif not((inspect.isfunction(y)) or (inspect.ismethod(y))):
         print("Passed function y(x) isn't the defined (callable) method or function")
         return None
     elif (nSamples <= 0):
         print("Please specify positive number of samples for generation")
+        n = 100  # default value
 
     # Implementation itself
     sumF = 0.0; sumSquaredF = 0.0
@@ -50,26 +50,26 @@ def MonteCarloInt1D(a: float, b: float, y, nSamples: int = 100):
         sumF += y((b-a)*xRandom + a)  # summation of f(x) values randomly distributed in the interval [a,b]
         sumSquaredF += y((b-a)*xRandom + a)*y((b-a)*xRandom + a)
     integralValue = 0.0; integralValue = ((b-a)/nSamples)*sumF
-    meanFValue = sumF/nSamples; variance = math.sqrt((sumSquaredF/nSamples) - math.pow(meanFValue,2))
+    meanFValue = sumF/nSamples; variance = math.sqrt((sumSquaredF/nSamples) - math.pow(meanFValue, 2))
     std = ((b-a)/math.sqrt(nSamples))*variance
-    return(integralValue,std)
+    return(integralValue, std)
 
 # %% Testing features
 nDigits = 3; nFunction = 1; a = 0; b = 2; nSamples = 1000
-y1 = yClass(nDigits,nFunction)
+y1 = yClass(nDigits, nFunction)
 print("exact value of the integral is 1")
 (integral, std) = MonteCarloInt1D(a, b, y1.sampleF, nSamples)
 integral = round(integral, nDigits); std = round(std, nDigits)
 print("integral value = ", integral, "with standard deviation", std, "calculated with", nSamples, "# of used x[i] points")
 nSamples *= 10
 (integral, std) = MonteCarloInt1D(a,b,y1.sampleF,nSamples)
-integral = round(integral,nDigits); std = round(std,nDigits)
-print("integral value = ",integral,"with standard deviation",std,"calculated with",nSamples,"# of used x[i] points")
+integral = round(integral, nDigits); std = round(std,nDigits)
+print("integral value = ", integral, "with standard deviation", std, "calculated with", nSamples, "# of used x[i] points")
 nSamples *= 10
 (integral, std) = MonteCarloInt1D(a,b,y1.sampleF,nSamples)
 integral = round(integral,nDigits); std = round(std,nDigits)
-print("integral value = ",integral,"with standard deviation",std,"calculated with",nSamples,"# of used x[i] points")
+print("integral value = ", integral, "with standard deviation", std, "calculated with", nSamples, "# of used x[i] points")
 nSamples *= 5
 (integral, std) = MonteCarloInt1D(a, b, y1.sampleF, nSamples)
 integral = round(integral,nDigits); std = round(std,nDigits)
-print("integral value = ",integral,"with standard deviation",std,"calculated with",nSamples,"# of used x[i] points")
+print("integral value = ", integral, "with standard deviation", std, "calculated with", nSamples, "# of used x[i] points")

@@ -12,6 +12,40 @@ import os
 # import sys
 
 
+# %% Holding attributes for a folder in class (maybe, redundant)
+class folder():
+    absolute_path = ""
+    relative_path = ""
+    subfolders = []
+    files = []
+    size = 0
+    default_excluded_dirs = []
+    # For testing capabilities below is narrowing of output
+    default_excluded_folders = [".git", ".gitignore", "Matricies_Manipulation", "Sorting", "Plotting",
+                                "Experimental", "LinearSystems", "Interpolation", "FunctionRoots", "__pycache__",
+                                "MonteCarlo"]
+
+    def __init__(self, absolute_path: str, relative_path: str, default_excluded_dirs: list = default_excluded_folders):
+        self.absolute_path = absolute_path
+        self.relative_path = relative_path
+        self.default_excluded_dirs = default_excluded_dirs
+        self.subfolders = projectImport.getDirList(absolute_path, default_excluded_dirs)
+        entries = os.listdir(absolute_path)
+        self.files = []
+        for entry in entries:
+            if os.path.isfile(os.path.join(absolute_path, entry)):
+                self.files.append(entry)
+
+    def __str__(self):
+        overall_description = "Extended by OOP folder on the path: \n"
+        overall_description += (self.absolute_path + " \n")
+        overall_description += "Contains following subfolders: \n"
+        overall_description += (str(self.subfolders) + "\n")
+        overall_description += "And also contains following files: \n"
+        overall_description += (str(self.files) + "\n")
+        return overall_description
+
+
 # %% Class implementation
 class projectImport():
     """Class for holding all support methods for importing / searching."""
@@ -71,50 +105,63 @@ class projectImport():
     def buildProjectDirGraph(self):
         # Second attempt to write recursive iterator building the project folder graph
         rootPath = self.projectPath
-        ignored_folders = self.default_excluded_dirs
         folders_to_visit = []  # for accounting number and place of nodes visiting
-        nodesVisited = []
         walkDone = False
         # First iteration not in the loop (for making clear for myself mostly):
-        numberOfDirs = len(projectImport.getDirList(rootPath))  # in a root folder
-        nodesVisited = [0 for i in range(numberOfDirs)]  # for calculating the number of visits in each node
         node = {}
         (root, tail) = os.path.split(rootPath)
         node[tail] = projectImport.getDirList(rootPath)  # Representation of a node - folder
         folders_to_visit = projectImport.getDirList(rootPath)
-        # print(node, "- project node (minus avoided dirs)")
-        # print(folders_to_visit, " - folders to visit")
         j = 0
         current_path = self.projectPath
         nodes_to_visit = folders_to_visit
         current_node = tail
         project_structure = node
         rootName = tail  # For keeping the name of a root directory
-        while (not walkDone) and (j < 2):
-            if j == 0:
-                # First iteration - update all folders in a project tree
-                (updated_node, folders_to_visit) = projectImport.update_dirs_structure(current_path, nodes_to_visit)
-                project_structure = projectImport.update_project_structure(current_node, updated_node,
-                                                                           project_structure, rootName, [rootName])
-                if len(folders_to_visit) > 0:
-                    # More folders should be visited
-                    current_node = folders_to_visit[0]
-                    # The complex path in folders forming by a string like root_folder/subfold/subsubfold
-                    relative_path = rootName + "/" + current_node
-                    print("initial relative path", relative_path)
-                else:
-                    # There is nothing to visit
-                    waklDone = True
-            elif j == 1:
-                # TODO: make project structure not so complex to iterate!!!
-                path_in_project_struct = projectImport.split_relative_path(relative_path)
-                # current_path = projectImport.make_abs_path(path_in_project_struct)
-                nodes_to_visit = projectImport.getDirList(current_path)
-                if len(nodes_to_visit) == 0:
-                    updated_node = [None]
 
-            print("updated project structure:", project_structure)
-            print("folders_to_visit:", folders_to_visit)
+        projectFolder = folder(rootPath, "/")
+        # print(projectFolder)
+        self.listOfDirs.append(projectFolder)
+        dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(rootPath, projectFolder.subfolders)
+        # print("dirs_to_visit: ", dirs_to_visit)
+
+        while (not walkDone) and (j < 10):
+            # if j == 0:
+            #     # First iteration - update all folders in a project tree
+            #     (updated_node, folders_to_visit) = projectImport.update_dirs_structure(current_path, nodes_to_visit)
+            #     project_structure = projectImport.update_project_structure(current_node, updated_node,
+            #                                                                project_structure, rootName, [rootName])
+            #     if len(folders_to_visit) > 0:
+            #         # More folders should be visited
+            #         current_node = folders_to_visit[0]
+            #         # The complex path in folders forming by a string like root_folder/subfold/subsubfold
+            #         relative_path = rootName + "/" + current_node
+            #         print("initial relative path", relative_path)
+            #     else:
+            #         # There is nothing to visit
+            #         waklDone = True
+            # elif j == 1:
+            #     # TODO: make project structure not so complex to iterate!!!
+            #     path_in_project_struct = projectImport.split_relative_path(relative_path)
+            #     # current_path = projectImport.make_abs_path(path_in_project_struct)
+            #     nodes_to_visit = projectImport.getDirList(current_path)
+            #     if len(nodes_to_visit) == 0:
+            #         updated_node = [None]
+
+            # print("updated project structure:", project_structure)
+            # print("folders_to_visit:", folders_to_visit)
+            if len(dirs_to_visit) > 0:
+                current_path = dirs_to_visit[0]
+                rel_path = projectImport.make_rel_path(rootName, current_path)
+                new_dir = folder(current_path, rel_path)
+                self.listOfDirs.append(new_dir)
+                dirs_to_visit.pop(0)  # delete visited folder
+                if len(new_dir.subfolders) > 0:
+                    new_dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(current_path, new_dir.subfolders)
+                    dirs_to_visit += new_dirs_to_visit
+                # print(new_dir)
+            else:
+                walkDone = True
             j += 1
 
     @staticmethod
@@ -137,6 +184,14 @@ class projectImport():
         return (array_of_folders, folders_to_visit)
 
     @staticmethod
+    def convert_subfolds_to_abs_paths(root: str, subfolders: list) -> list:
+        converted = []
+        for subfolder in subfolders:
+            updated_path = root + "/" + subfolder
+            converted.append(updated_path)
+        return converted
+
+    @staticmethod
     def make_abs_path(rootPath, path_in_project_struct: list) -> str:
         absolute_path = rootPath
         for folder in path_in_project_struct:
@@ -147,6 +202,18 @@ class projectImport():
     @staticmethod
     def split_relative_path(relative_path: str) -> list:
         all_nodes = relative_path.split("/")
+        return all_nodes
+
+    @staticmethod
+    def make_rel_path(rootPath: str, current_path: str):
+        all_folders = os.path.split("/")
+        for i in range(len(all_folders)):
+            if rootPath == all_folders[i]:
+                break
+        root = ""
+        for j in range(i+1, len(all_folders)):
+            root += "/" + all_folders[j]
+        return root
 
     @staticmethod
     def update_project_structure(node_name: str, updated_node: list, project_struct: dict,
@@ -168,8 +235,6 @@ class projectImport():
             #         new_node[node_name] = updated_node
             #         all_nodes[i] = new_node
             #         break
-
-
         return project_struct
 
     # %% Useful methods - used somewhere else in this script
