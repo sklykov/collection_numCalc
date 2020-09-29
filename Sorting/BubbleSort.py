@@ -43,7 +43,7 @@ def BubbleSort(xIn, t0):
 
         # Checking correctness and timing
         isSortingPerformedCorrect = CheckSortArray(x)
-        t1 = time.process_time() # Tick time
+        t1 = time.process_time()  # Tick time
         t = round((t1-t0), 3)  # rounding to seconds for completion of the sorting operation
         return (x, t, isSortingPerformedCorrect)
 
@@ -55,13 +55,15 @@ def BubbleSort(xIn, t0):
 # %% Bubble sorting and benchmarking of this operation
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr1, t, res) = BubbleSort(ar1, t0)
-print('Initial array for demo', ar1); print("Sorted array for demo", sortedAr1)
+print('Initial array for demo', ar1)
+print("Sorted array for demo", sortedAr1)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr2, t, res) = BubbleSort(ar2, t0)
 # Showing unsorted and sorted arrays as bar plots
-plt.figure(); plt.bar(arI2,ar2)
-plt.figure(); plt.bar(arI2,sortedAr2)
-print("Sorting of a unsorted array takes s = ", t); print("Is sorting correct?", res)
+plt.figure(); plt.bar(arI2, ar2)
+plt.figure(); plt.bar(arI2, sortedAr2)
+print("Sorting of a unsorted array takes s = ", t)
+print("Is sorting correct?", res)
 # Testing sorting of a presorted array for making benchmark
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr3, t, res) = BubbleSort(ar3, t0)

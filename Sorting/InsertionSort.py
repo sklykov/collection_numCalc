@@ -54,10 +54,12 @@ def InsertSort(xIn, t0):
 # %% Insertion sorting and benchmarking of this operation
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr1, t, res) = InsertSort(ar1, t0)
-print('Initial array for demo',ar1); print("Sorted array for demo",sortedAr1)
+print('Initial array for demo', ar1)
+print("Sorted array for demo", sortedAr1)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr2, t, res) = InsertSort(ar2, t0)
-print("Sorting of an unsorted array takes s = ",t); print('Is sorting correct?',res)
+print("Sorting of an unsorted array takes s = ", t)
+print('Is sorting correct?', res)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
 (sortedAr3, t, res) = InsertSort(ar3, t0)
 print("Sorting of a presorted array takes s = ", t)
