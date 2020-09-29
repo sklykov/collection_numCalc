@@ -13,7 +13,7 @@ import os
 
 
 # %% Holding attributes for a folder in class (maybe, redundant)
-class folder():
+class folderClass():
     absolute_path = ""
     relative_path = ""
     subfolders = []
@@ -45,8 +45,27 @@ class folder():
         overall_description += (str(self.files) + "\n")
         return overall_description
 
+    def file_in_this_dir(self, fileName: str) -> bool:
+        """
+        Checking if files is presented in this folder.
 
-# %% Class implementation
+        Parameters
+        ----------
+        fileName : str
+            Just name of a file.
+        Returns
+        -------
+        bool
+            Files in a folder or not.
+        """
+        for someFile in self.files:
+            if someFile == fileName:
+                return True
+                break
+        return False
+
+
+# %% Main class implementation - for handling all helpful methods
 class projectImport():
     """Class for holding all support methods for importing / searching."""
     projectTree = {}
@@ -54,8 +73,7 @@ class projectImport():
     containingFolder = ""
     projectPath = ""
     osSpecificSeparator = ""
-    listOFAllPathsToDirs = []
-    listOfFilesNames = []
+    # listOfFiles = []  # No need now
     listOfDirs = []
     default_excluded_dirs = []
 
@@ -93,26 +111,60 @@ class projectImport():
                 folderTree = projectImport.deleteGitFolders(folderTree)
             else:
                 self.projectTree[self.projectPath] = "Empty"
+                projectFolder = folderClass(self.projectPath, self.default_excluded_dirs)
+                self.listOfDirs.append(projectFolder)
             # Again, checking that it's not an empty git project
             if len(folderTree) > 0:
-                self.projectTree[self.projectPath] = folderTree
+                (rootpath, rootName) = os.path.split(self.projectPath)
+                self.projectTree[rootName] = folderTree
+                self.listOfDirs = projectImport.buildProjectDirList(self.projectPath, self.default_excluded_dirs)
             else:
                 self.projectTree[self.projectPath] = "Empty"
 
-    # %% Attempts to make a project structure with folders as nodes of graphs
-    def buildProjectDirGraph(self):
-        # Second attempt to write recursive iterator building the project folder graph
-        rootPath = self.projectPath
+    def make_file_importable(self, fileName: str) -> str:
+        file_found = [False]*len(self.listOfDirs)
+        pathToFolderWithFile = ""
+        count = 0
+        for i in range(len(self.listOfDirs)):
+            if self.listOfDirs[i].file_in_this_dir(fileName):
+                file_found[i] = True
+                pathToFolderWithFile = self.listOfDirs[i].absolute_path
+                count += 1
+        if count > 1:
+            print("There are more then 1 file in the entire project with such file name")
+        return pathToFolderWithFile
+
+    # %% Making of folders structure as a list containing instances of "folder" classes
+    @staticmethod
+    def buildProjectDirList(projectPath: str, excludedFolders: list) -> list:
+        """
+        Building of project directory structure as a list of "folder" classes. Each "folder" instance contains
+        list of subfolders and files located in this folder.
+        Parameters
+        ----------
+        projectPath : str
+            Path to the project / root - defined during class initialization.
+        excludedFolders : list
+            List with names of folders that will excluded from folders listing / counting / searching path.
+
+        Returns
+        -------
+        list
+            List with all classes "folder" equal to all folders in the project.
+
+        """
+        listOfDirs = []
+        rootPath = projectPath
         walkDone = False
         # First iteration not in the loop (for making clear for myself mostly):
         node = {}
         (root, tail) = os.path.split(rootPath)
-        node[tail] = projectImport.getDirList(rootPath, self.default_excluded_dirs)  # Representation of a node - folder
+        node[tail] = projectImport.getDirList(rootPath, excludedFolders)  # Representation of a node - folder
         j = 0
         rootName = tail  # For keeping the name of a root directory
-        projectFolder = folder(rootPath, "/")
+        projectFolder = folderClass(rootPath, "/")
         # print(projectFolder)
-        self.listOfDirs.append(projectFolder)
+        listOfDirs.append(projectFolder)
         dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(rootPath, projectFolder.subfolders)
         # print("dirs_to_visit: ", dirs_to_visit)
 
@@ -121,8 +173,8 @@ class projectImport():
             if len(dirs_to_visit) > 0:
                 current_path = dirs_to_visit[0]
                 rel_path = projectImport.make_rel_path(rootName, current_path)
-                new_dir = folder(current_path, rel_path)
-                self.listOfDirs.append(new_dir)
+                new_dir = folderClass(current_path, rel_path)
+                listOfDirs.append(new_dir)
                 dirs_to_visit.pop(0)  # delete visited folder
                 if len(new_dir.subfolders) > 0:
                     new_dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(current_path, new_dir.subfolders)
@@ -131,7 +183,9 @@ class projectImport():
             else:
                 walkDone = True
             j += 1
+        return listOfDirs
 
+    # %% Useful methods - used somewhere else in this script
     @staticmethod
     def convert_subfolds_to_abs_paths(root: str, subfolders: list) -> list:
         converted = []
@@ -164,8 +218,7 @@ class projectImport():
             root += "/" + all_folders[j]
         return root
 
-    # %% Useful methods - used somewhere else in this script
-
+    # %% Making a list of folders with some exclusion
     @staticmethod
     def getDirList(rootPath: str, excludingFolders: list) -> list:
         """
@@ -229,16 +282,17 @@ class projectImport():
         # print("The folder containing this script:", self.containingFolder)
         # print("specific folder separator:", self.osSpecificSeparator)
         # print("Expected project tree containing the anchor:", self.projectPath)
-        print("Collected paths to folders: ", self.listOFAllPathsToDirs)
+        print("Collected paths to folders:\n")
+        for folder in self.listOfDirs:
+            print(folder.absolute_path)
 
 
 # %% Testing some capabilities
 if __name__ == "__main__":
     demo_instance = projectImport()
-    # demo_instance.recursiveBuildDirGraph()
-    # demo_instance.makeDirectoryGraph()
-    # demo_instance.printAllSelfValues()
-    demo_instance.buildProjectDirGraph()
+    demo_instance.printAllSelfValues()
+    file = "NewtonMethod.py"
+    print(demo_instance.make_file_importable(file))
     # included = demo_instance.includeFileToSearchPath("LICENSE")
     # demo_instance2 = projectImport("Some non-exist folder")
     # demo_instance2.printAllSelfValues()
