@@ -34,6 +34,7 @@ def NewtonMethod(func, funcDeriv, a: float, b: float, epsilon: float, digitRound
         return None
     return float(round(x1, digitRound))
 
+
 # %% Testing of implemented methods
 xRoot = NewtonMethod(f.example3, f.example3Derivative, a, b, epsilon, digitRound, showIteration)
 print("The calculated real root is", xRoot)

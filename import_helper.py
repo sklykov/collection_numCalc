@@ -67,15 +67,17 @@ class folderClass():
 
 # %% Main class implementation - for handling all helpful methods
 class projectImport():
-    """Class for holding all support methods for importing / searching."""
+    """Class for holding all support methods for importing / searching for a file."""
     projectTree = {}
     anchorFolder = ""
     containingFolder = ""
     projectPath = ""
     osSpecificSeparator = ""
-    # listOfFiles = []  # No need now
+    listOfFiles = []  # For storing of file names in the project - possibly useful
+    setOfFiles = ()
     listOfDirs = []
     default_excluded_dirs = []
+    onlyFilesWithUniqueNames = True
 
     def __init__(self, anchorFolder: str = ".git", default_excluded_dirs: list = [".git", ".gitignore", "__pycache__"]):
         """
@@ -118,11 +120,27 @@ class projectImport():
                 (rootpath, rootName) = os.path.split(self.projectPath)
                 self.projectTree[rootName] = folderTree
                 self.listOfDirs = projectImport.buildProjectDirList(self.projectPath, self.default_excluded_dirs)
+                (self.listOfFiles, self.setOfFiles) = self.getAllFilesNames()
+                if len(self.listOfFiles) != len(self.setOfFiles):
+                    self.onlyFilesWithUniqueNames = False
             else:
                 self.projectTree[self.projectPath] = "Empty"
 
-    def make_file_importable(self, fileName: str) -> str:
-        file_found = [False]*len(self.listOfDirs)
+    def make_file_importable(self, fileName: str) -> bool:
+        """
+        Searching of specified file and make it importable to the calling script
+        Parameters
+        ----------
+        fileName : str
+            Name of file with extension
+
+        Returns
+        -------
+        bool
+            Result of an operation
+
+        """
+        file_found = [False]*len(self.listOfDirs)  # Possible hook for returning where is two files with the same name
         pathToFolderWithFile = ""
         count = 0
         for i in range(len(self.listOfDirs)):
@@ -132,7 +150,22 @@ class projectImport():
                 count += 1
         if count > 1:
             print("There are more then 1 file in the entire project with such file name")
-        return pathToFolderWithFile
+            return False
+        elif count == 1:
+            projectImport().includeFileToSysPath(pathToFolderWithFile)
+            return True
+        else:
+            print("File not found")
+            return False
+
+    def getAllFilesNames(self) -> tuple:
+        listOfFiles = []
+        setOfFiles = ()
+        for folderClass in self.listOfDirs:
+            for file in folderClass.files:
+                listOfFiles.append(file)
+        setOfFiles = set(listOfFiles)
+        return (listOfFiles, setOfFiles)
 
     # %% Making of folders structure as a list containing instances of "folder" classes
     @staticmethod
@@ -185,7 +218,7 @@ class projectImport():
             j += 1
         return listOfDirs
 
-    # %% Useful methods - used somewhere else in this script
+    # %% Useful static methods - used somewhere else in this script
     @staticmethod
     def convert_subfolds_to_abs_paths(root: str, subfolders: list) -> list:
         converted = []
@@ -293,6 +326,11 @@ if __name__ == "__main__":
     demo_instance.printAllSelfValues()
     file = "NewtonMethod.py"
     print(demo_instance.make_file_importable(file))
+    # import NewtonMethod  # demonstration that file could be imported
+    # Below - should be fixed the internal errors raised cause calling the import method in calling chain
+    # file2 = "SimpleHistoManipulations.py"
+    # demo_instance.make_file_importable(file2)
+    # import SimpleHistoManipulations
     # included = demo_instance.includeFileToSearchPath("LICENSE")
     # demo_instance2 = projectImport("Some non-exist folder")
     # demo_instance2.printAllSelfValues()
