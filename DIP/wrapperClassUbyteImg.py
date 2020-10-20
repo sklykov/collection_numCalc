@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Wrapper class with some repeatable functionality for U8 (...) images
+Wrapper class with some repeatable functionality for U8 (...) images.
 
 @author: ssklykov
 """
 
 
 class WrapUbyteImg():
-    """
-    Wrapper class for U8 image (for calculating some attributes all at once)
-    """
-    # %% Imports (denepndents)
+    """Wrapper class for U8 image (for calculating some attributes all at once)."""
+
+    # %% Imports - internal dependencies
     import numpy as np
     # %% Some attributes of the class pre-initialization
     maxPixelValue = np.uint8(0)
@@ -22,8 +21,9 @@ class WrapUbyteImg():
 
     def __init__(self, uByte_image):
         """
-        Constructing the sample of a class with some preloaded sample (maybe will be exchanged)
-        Calculating of image sizes, max and min pixel values in it
+        Construct the sample of a class with some preloaded sample (maybe will be exchanged).
+
+        Calculating of image sizes, max and min pixel values in it.
         """
         import numpy as np  # Also required locally
         from skimage.util import img_as_ubyte

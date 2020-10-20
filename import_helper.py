@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Attempt to create the  unified class for importing dependecies by compiling previously developed functionality
+Attempt to create the unified class for importing dependecies by compiling previously developed functionality.
+
 Reason behind - to make something functional to search / import modules if the containing it directory tree isn't
-included in any project
+included in any project (or to import modules from different places in a project)
 
 @author: ssklykov
 """
@@ -14,6 +15,8 @@ import os
 
 # %% Holding attributes for a folder in class (maybe, redundant)
 class folderClass():
+    """Collect all attributes of a folder - lists of subfolders, files. Size - yet to be implemented."""
+
     absolute_path = ""
     relative_path = ""
     subfolders = []
@@ -36,7 +39,7 @@ class folderClass():
                 self.files.append(entry)
 
     def __str__(self):
-        """For debugging by printing all info about folder after calling print(instance_this_class)"""
+        """For debugging by printing all info about folder after calling print(instance_this_class)."""
         overall_description = "Extended by OOP folder on the path: \n"
         overall_description += (self.absolute_path + " \n")
         overall_description += "Contains following subfolders: \n"
@@ -47,12 +50,13 @@ class folderClass():
 
     def file_in_this_dir(self, fileName: str) -> bool:
         """
-        Checking if files is presented in this folder.
+        Check if files is presented in this folder.
 
         Parameters
         ----------
         fileName : str
             Just name of a file.
+
         Returns
         -------
         bool
@@ -68,6 +72,7 @@ class folderClass():
 # %% Main class implementation - for handling all helpful methods
 class projectImport():
     """Class for holding all support methods for importing / searching for a file."""
+
     projectTree = {}
     anchorFolder = ""
     containingFolder = ""
@@ -81,13 +86,14 @@ class projectImport():
 
     def __init__(self, anchorFolder: str = ".git", default_excluded_dirs: list = [".git", ".gitignore", "__pycache__"]):
         """
-        Initialization along attempting to collect project structure.
+        Initialize along attempting to collect project structure.
 
         Parameters
         ----------
         anchorFolder : str, optional
             The anchor folder should be in the project main directory tree. The default is ".git" that is presented
             for version controlled projects in Git.
+
         Returns
         -------
         Sample of class, actually.
@@ -119,7 +125,8 @@ class projectImport():
             if len(folderTree) > 0:
                 (rootpath, rootName) = os.path.split(self.projectPath)
                 self.projectTree[rootName] = folderTree
-                self.listOfDirs = projectImport.buildProjectDirList(self.projectPath, self.default_excluded_dirs)
+                self.listOfDirs = projectImport.buildProjectDirList(self.projectPath, self.default_excluded_dirs,
+                                                                    self.osSpecificSeparator)
                 (self.listOfFiles, self.setOfFiles) = self.getAllFilesNames()
                 if len(self.listOfFiles) != len(self.setOfFiles):
                     self.onlyFilesWithUniqueNames = False
@@ -128,7 +135,8 @@ class projectImport():
 
     def make_file_importable(self, fileName: str) -> bool:
         """
-        Searching of specified file and make it importable to the calling script
+        Search of specified file and make it importable to the calling script.
+
         Parameters
         ----------
         fileName : str
@@ -159,6 +167,15 @@ class projectImport():
             return False
 
     def getAllFilesNames(self) -> tuple:
+        """
+        Get all names of files in a project the entire class created for.
+
+        Returns
+        -------
+        tuple
+            (list of all file names, set with only unique file names)
+
+        """
         listOfFiles = []
         setOfFiles = ()
         for folderClass in self.listOfDirs:
@@ -169,10 +186,12 @@ class projectImport():
 
     # %% Making of folders structure as a list containing instances of "folder" classes
     @staticmethod
-    def buildProjectDirList(projectPath: str, excludedFolders: list) -> list:
+    def buildProjectDirList(projectPath: str, excludedFolders: list, osSpecificSeparator: str) -> list:
         """
-        Building of project directory structure as a list of "folder" classes. Each "folder" instance contains
-        list of subfolders and files located in this folder.
+        Build of project directory structure as a list of "folder" classes.
+
+        Each "folder" instance contains list of subfolders and files located in this folder.
+
         Parameters
         ----------
         projectPath : str
@@ -196,21 +215,25 @@ class projectImport():
         j = 0
         rootName = tail  # For keeping the name of a root directory
         projectFolder = folderClass(rootPath, "/")
-        # print(projectFolder)
+        # print(projectFolder)  # debug
         listOfDirs.append(projectFolder)
-        dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(rootPath, projectFolder.subfolders)
-        # print("dirs_to_visit: ", dirs_to_visit)
+        # Using classes below for collecting all subfolders along walking by a project tree
+        dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(rootPath, projectFolder.subfolders, osSpecificSeparator)
+        # print("dirs_to_visit: ", dirs_to_visit)  # debug
 
         # j - for only preventing any unexpected infinite loops
         while (not walkDone) and (j < 100000):
             if len(dirs_to_visit) > 0:
-                current_path = dirs_to_visit[0]
+                current_path = dirs_to_visit[0]  # Get the path to a directory to visit
+                # print(current_path)  # debug
                 rel_path = projectImport.make_rel_path(rootName, current_path)
+                # print(rel_path)
                 new_dir = folderClass(current_path, rel_path)
                 listOfDirs.append(new_dir)
-                dirs_to_visit.pop(0)  # delete visited folder
+                dirs_to_visit.pop(0)  # delete visited folder - for exclude it from the list of folders that should be visited
                 if len(new_dir.subfolders) > 0:
-                    new_dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(current_path, new_dir.subfolders)
+                    new_dirs_to_visit = projectImport.convert_subfolds_to_abs_paths(current_path, new_dir.subfolders,
+                                                                                    osSpecificSeparator)
                     dirs_to_visit += new_dirs_to_visit
                 # print(new_dir)
             else:
@@ -220,42 +243,69 @@ class projectImport():
 
     # %% Useful static methods - used somewhere else in this script
     @staticmethod
-    def convert_subfolds_to_abs_paths(root: str, subfolders: list) -> list:
+    def convert_subfolds_to_abs_paths(root: str, subfolders: list, osSpecificSeparator: str) -> list:
+        """
+        Convert root path and names of subfolders to list with complete paths to these subfolders.
+
+        Parameters
+        ----------
+        root : str
+            Full root path (like C:/...).
+        subfolders : list
+            Names of subfolders.
+
+        Returns
+        -------
+        list
+            All created absolute paths to subfolders.
+
+        """
         converted = []
         for subfolder in subfolders:
-            updated_path = root + "/" + subfolder
+            updated_path = root + osSpecificSeparator + subfolder
             converted.append(updated_path)
         return converted
 
     @staticmethod
-    def make_abs_path(rootPath, path_in_project_struct: list) -> str:
-        absolute_path = rootPath
-        for folder in path_in_project_struct:
-            new_p = "/" + folder
-            absolute_path += new_p
-        return absolute_path
+    def make_rel_path(root_name: str, current_path: str) -> str:
+        """
+        Make a relative to a project name path like "/Some_folder/Some_subfolder/". "/" - means a project entry.
 
-    @staticmethod
-    def split_relative_path(relative_path: str) -> list:
-        all_nodes = relative_path.split("/")
-        return all_nodes
+        Parameters
+        ----------
+        root_name : str
+            Name of a project.
+        current_path : str
+            Absolute path of current folder.
 
-    @staticmethod
-    def make_rel_path(rootPath: str, current_path: str):
-        all_folders = os.path.split("/")
-        for i in range(len(all_folders)):
-            if rootPath == all_folders[i]:
-                break
-        root = ""
-        for j in range(i+1, len(all_folders)):
-            root += "/" + all_folders[j]
-        return root
+        Returns
+        -------
+        relative_path : str
+            Relative to a project name path.
+
+        """
+        splittingDone = False
+        relative_path = ""
+        j = 0
+        # j is only for preventing some bugs related to infinite looping over wrongly specified path
+        while (not splittingDone) and (j < 500):
+            (root, tail) = os.path.split(current_path)
+            current_path = root
+            if tail != root_name:
+                # Making relative path with UNIX path separator
+                relative_path = "".join([tail, "/", relative_path])
+            else:
+                splittingDone = True
+            j += 1
+        relative_path = "/" + relative_path
+        # print(relative_path)  # debug
+        return relative_path
 
     # %% Making a list of folders with some exclusion
     @staticmethod
     def getDirList(rootPath: str, excludingFolders: list) -> list:
         """
-        Returns of list of dirs down from specified path (specified path should point to some folder).
+        Return of list of dirs down from specified path (specified path should point to some folder).
 
         Parameters
         ----------
@@ -286,6 +336,19 @@ class projectImport():
 
     @staticmethod
     def includeFileToSysPath(absPathToFolder: str):
+        """
+        Include the absolute path to some folder in a system path for importing / searching.
+
+        Parameters
+        ----------
+        absPathToFolder : str
+            Absolute path to the requested folder.
+
+        Returns
+        -------
+        None.
+
+        """
         import sys
         # print("sys.path before: ", sys.path)
         if (sys.path.count(absPathToFolder) == 0):
@@ -297,7 +360,20 @@ class projectImport():
 
     @staticmethod
     def deleteGitFolders(folderTree: list) -> list:
-        """Deleting specific for git controlled projects folders .git and .gitignore from a project tree"""
+        """
+        Delete specific for git controlled projects folders .git and .gitignore from a project tree.
+
+        Parameters
+        ----------
+        folderTree : list
+            List with (sub-)folders names.
+
+        Returns
+        -------
+        list
+            Cleaned list of folders names.
+
+        """
         i = 0
         while i < len(folderTree):
             if (folderTree[i] == '.git') or (folderTree[i] == ".gitignore"):
@@ -308,9 +384,7 @@ class projectImport():
         return folderTree
 
     def printAllSelfValues(self):
-        """
-        For debugging / testing - enabling it for get output
-        """
+        """Print specified internal values for debugging / testing - enabling it for get output."""
         print("*********************************")
         # print("The folder containing this script:", self.containingFolder)
         # print("specific folder separator:", self.osSpecificSeparator)

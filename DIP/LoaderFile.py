@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Load / handle sample images for DIP samples
+Load / handle sample images for DIP samples.
 
 @author: ssklykov
 """
@@ -14,7 +14,8 @@ import numpy as np
 
 # %% Get the absolute path to the default folder with sample images
 def getResourceFolder(folder: str = "resources") -> str:
-    """The aim of this function - to return the absolute path to resource folder with sample images.
+    """Return the absolute path to resource folder with sample images.
+
     As default it returns the path to resources folder that should be in same directory as this helper script.
     Input:
         resource folder name: str
@@ -32,10 +33,12 @@ def getResourceFolder(folder: str = "resources") -> str:
 
 # %% The key function for loading images
 def loadSampleImage(identifier: str = "castle"):
-    """This function helps to fast load images and return them as pixels arrays.
-    Input:
+    """
+    Load images and return them as np.arrays.
+
+    Input: str
         Available identifiers as strings: "castle", "castle_rgb".
-    Return:
+    Return: image
         scikit-image object.
     """
     # Some blank image for default return
