@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Oct 17 2019
 'Getting started' with scikit-image library
 scikit-image demo: open RGB image / translate it to uint8 gray image / get its normalized histogram
 @author: ssklykov
@@ -16,9 +15,9 @@ import numpy as np
 
 # %% Path specifying to the sample image
 currentPath = os.getcwd()  # returned current path
-osInfo = os.uname()  # Infor in the format of a list with strings
-osName = osInfo[0]
-if "Win" in osName:
+# print(os.name)  # debugging - new way
+osName = os.name  # Information in the format of a list with strings (!: os.uname() seems deprecated)
+if "nt" in osName:
     pathToSample = "\\resources\\nesvizh.jpg"  # path to the sample picture. Windows-type path!
 elif "nux" in osName:
     pathToSample = "/resources/nesvizh.jpg"
