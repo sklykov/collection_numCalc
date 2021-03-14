@@ -96,7 +96,7 @@ class projectImport():
 
         Returns
         -------
-        Sample of class, actually.
+        Sample of the class, actually.
 
         """
         self.containingFolder = os.getcwd()
