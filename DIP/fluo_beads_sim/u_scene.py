@@ -23,6 +23,7 @@ class u_scene():
     scene_image = np.zeros((height, width), dtype=image_type)
     maxPixelValue = 255
 
+    # %% Constructor
     def __init__(self, width: int, height: int, image_type: str = 'uint8'):
         """
         Initialize the blank (dark) scene image with the specified type (800x600 8bit image as an example)
@@ -52,7 +53,7 @@ class u_scene():
             self.image_type = image_type
         else:
             self.image_type = 'uint8'
-            print("Image type isn't recognized, initialized default 8bit gray image")
+            print("Image type hasn't been recognized, initialized default 8bit gray image")
         if (width != 100) or (height != 100) or (image_type != 'uint8'):
             self.scene_image = np.zeros((height, width), dtype=self.image_type)
             if image_type == 'uint16':
@@ -60,6 +61,7 @@ class u_scene():
             else:
                 self.maxPixelValue = 1.0  # According to the specification of scikit-image
 
+    # %% Supportive functions
     def cast_pixels_sum(self, pixels_sum):
         """
         Casting of input result of pixel summing to conform with data type of the used image.
@@ -82,7 +84,7 @@ class u_scene():
             elif self.image_type == 'uint16':
                 value_returned = np.uint16(pixels_sum)
             else:
-                value_returned = np.float64(pixels_sum)
+                value_returned = float(pixels_sum)
         else:
             value_returned = self.maxPixelValue
         return value_returned
@@ -101,6 +103,7 @@ class u_scene():
             i_finish = self.height
         return i_finish
 
+    # %% Drawing of an object with mask
     def add_mask(self, i_start: int, j_start: int, mask):
         """
         Adding the "mask" - representation of the object (basically, less than the scene (background) image).
@@ -198,6 +201,7 @@ class u_scene():
                     pixels_sum = self.scene_image[i, j] + mask[i+i_mask_start, j+j_mask_start]
                     self.scene_image[i, j] = self.cast_pixels_sum(pixels_sum)
 
+    # %% Plotting the summurized image (scene)
     def plot_image(self):
         """
         Plotting the self.scene composed with added masks (objects) / noise.
