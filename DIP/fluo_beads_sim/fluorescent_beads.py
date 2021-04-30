@@ -7,6 +7,9 @@ Experiments with simulation of images of fluorescent beads
 # %% General imports
 import numpy as np
 import matplotlib.pyplot as plt
+# import scipy.ndimage.filters as filters
+import cv2
+print(cv2.__version__)
 # from u_scene import u_scene
 
 
@@ -22,6 +25,8 @@ class image_beads():
     bead_type = "even round"
     bead_img = np.zeros((height, width), dtype=image_type)
     bead_border = np.zeros((height, width), dtype=image_type)
+    maxPixelValue = 255
+    kernel_PSF = []
 
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
         if image_type in self.possible_img_types:
@@ -46,6 +51,19 @@ class image_beads():
                 self.maxPixelValue = 1.0  # According to the specification of scikit-image
 
     def get_centrelized_bead(self, max_pixel_val):
+        """
+        Generate centered image of a bead with specified type.
+
+        Parameters
+        ----------
+        max_pixel_val : uint8, uint16 or float
+            Maximum intensity value in the center of a bead (or just through a bead profile).
+
+        Returns
+        -------
+        None. Calculated 2D image and the border stored in class' attributes.
+
+        """
         i_center = (self.height // 2)
         j_center = (self.width // 2)
         if self.bead_type == "even round":
@@ -126,11 +144,42 @@ class image_beads():
                 img[i, j] = image_beads.calculate_PSF(max_intensity, NA, wavelength, pixel_dist, calibration)
                 img = np.uint8(img)
         plt.figure()
-        plt.imshow(img, cmap=plt.cm.gray, aspect='auto', origin='lower', extent=(0, size, 0, size))
+        plt.imshow(img, cmap=plt.cm.Spectral, aspect='auto', origin='lower', extent=(0, size, 0, size))
         plt.tight_layout()
 
+    def calculate_img_PSF(self, NA: float, wavelength: float, calibration: float):
+        if self.image_type == 'uint8':
+            min_pixel = 1
+            dimension = 0
+            intensity = self.maxPixelValue
+            while intensity >= min_pixel:
+                dimension += 1
+                intensity = image_beads.calculate_PSF(self.maxPixelValue, NA, dimension, wavelength, calibration)
+                intensity = np.uint8(intensity)
+            dimension = 2*dimension + 1
+            kernel = np.zeros((dimension, dimension), dtype=float)
+            i_center = dimension // 2
+            j_center = dimension // 2
+            for i in range(dimension):
+                for j in range(dimension):
+                    pixel_dist = np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))
+                    kernel[i, j] = image_beads.calculate_PSF(1, NA, wavelength, pixel_dist, calibration)
+            # print(kernel)
+            self.kernel_PSF = np.float32(kernel)
+
     def calc_border_extended_PSF(self):
-        pass
+        if np.max(self.bead_border) <= 0:
+            raise ValueError("Most probably there is the zero (empty) image of a bead")
+        border_coordinates = []
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.bead_border[i, j] > 0:
+                    border_coordinates.append([i, j])
+        # print(border_coordinates)
+        # convolved_borders = filters.convolve(self.bead_border, self.kernel_PSF, mode='reflect')
+        convolved_borders = cv2.filter2D(self.bead_border, -1, self.kernel_PSF)
+        self.bead_border = convolved_borders
+        # print(convolved_borders)
 
     def plot_bead(self):
         # plt.figure()
@@ -155,5 +204,8 @@ height = 1000
 if __name__ == '__main__':
     even_bead = image_beads(character_size=20)
     even_bead.get_centrelized_bead(200)
-    even_bead.plot_bead()
+    # even_bead.plot_bead()
     image_beads.show_PSF(255, 6, 1.25, 532, 110)
+    even_bead.calculate_img_PSF(1.25, 532, 110)
+    even_bead.calc_border_extended_PSF()
+    even_bead.plot_bead()

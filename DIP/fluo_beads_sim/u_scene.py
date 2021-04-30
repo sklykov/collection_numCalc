@@ -68,7 +68,7 @@ class u_scene():
 
         Parameters
         ----------
-        pixels_sum : TYPE
+        pixels_sum : uint8, uint16 or float
             Sum of pixels (mask + scene (background)).
 
         Returns
