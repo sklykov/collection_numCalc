@@ -7,9 +7,9 @@ Experiments with simulation of images of fluorescent beads
 # %% General imports
 import numpy as np
 import matplotlib.pyplot as plt
-# import scipy.ndimage.filters as filters
-import cv2
-print(cv2.__version__)
+import scipy.ndimage.filters as filters  # includes many filters
+# import cv2  # importing of OpenCV module (not used so far for simplicity)
+# print(cv2.__version__)  # checking the version of installed OpenCV
 # from u_scene import u_scene
 
 
@@ -27,6 +27,7 @@ class image_beads():
     bead_border = np.zeros((height, width), dtype=image_type)
     maxPixelValue = 255
     kernel_PSF = []
+    bead_conv_border = []
 
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
         if image_type in self.possible_img_types:
@@ -164,24 +165,43 @@ class image_beads():
                 for j in range(dimension):
                     pixel_dist = np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))
                     kernel[i, j] = image_beads.calculate_PSF(1, NA, wavelength, pixel_dist, calibration)
-            # print(kernel)
             self.kernel_PSF = np.float32(kernel)
+            # print(self.kernel_PSF)
 
     def calc_border_extended_PSF(self):
         if np.max(self.bead_border) <= 0:
-            raise ValueError("Most probably there is the zero (empty) image of a bead")
+            raise ValueError("Most probably, there is the zero (empty) image of the bead")
         border_coordinates = []
         for i in range(self.height):
             for j in range(self.width):
                 if self.bead_border[i, j] > 0:
                     border_coordinates.append([i, j])
         # print(border_coordinates)
-        # convolved_borders = filters.convolve(self.bead_border, self.kernel_PSF, mode='reflect')
-        convolved_borders = cv2.filter2D(self.bead_border, -1, self.kernel_PSF)
-        self.bead_border = convolved_borders
+
+        # Convolution using standard numpy function
+        convolved_borders = filters.convolve(np.float32(self.bead_border), self.kernel_PSF, mode='reflect')
+
+        # Convolution using OpenCV function
+        # "-1" parameter means the format of the output result (as I understand)
+        # convolved_borders = cv2.filter2D(np.float32(self.bead_border), -1, self.kernel_PSF)
+
+        # convolved_borders - using np.float32 format of pixel values
+        calibration_sum = np.sum(self.kernel_PSF)
+        # print(calibration_sum)
+        convolved_borders /= calibration_sum  # calibration because of positive sum of convolution matrix
+        if self.image_type == 'uint8':
+            self.bead_conv_border = np.uint8(convolved_borders)
         # print(convolved_borders)
 
     def plot_bead(self):
+        """
+        Plotting various class attributes as images.
+
+        Returns
+        -------
+        None.
+
+        """
         # plt.figure()
         # # Below - representation according to the documentation:
         # # plt.cm.gray - for representing gray values, aspect - for filling image values in a window
@@ -191,7 +211,7 @@ class image_beads():
         #            extent=(0, self.width, 0, self.height))
         # plt.tight_layout()
         plt.figure()
-        plt.imshow(self.bead_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
+        plt.imshow(self.bead_conv_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
                    extent=(0, self.width, 0, self.height))
         plt.tight_layout()
 
@@ -205,7 +225,7 @@ if __name__ == '__main__':
     even_bead = image_beads(character_size=20)
     even_bead.get_centrelized_bead(200)
     # even_bead.plot_bead()
-    image_beads.show_PSF(255, 6, 1.25, 532, 110)
+    # image_beads.show_PSF(255, 6, 1.25, 532, 110)
     even_bead.calculate_img_PSF(1.25, 532, 110)
     even_bead.calc_border_extended_PSF()
     even_bead.plot_bead()
