@@ -103,7 +103,7 @@ class u_scene():
             i_finish = self.height
         return i_finish
 
-    # %% Drawing of an object with mask
+    # %% Drawing of an object with some intensity mask (profile)
     def add_mask(self, i_start: int, j_start: int, mask):
         """
         Adding the "mask" - representation of the object (basically, less than the scene (background) image).
@@ -201,7 +201,7 @@ class u_scene():
                     pixels_sum = self.scene_image[i, j] + mask[i+i_mask_start, j+j_mask_start]
                     self.scene_image[i, j] = self.cast_pixels_sum(pixels_sum)
 
-    # %% Plotting the summurized image (scene)
+    # %% Plotting the summurized image (scene) with all objects
     def plot_image(self):
         """
         Plotting the self.scene composed with added masks (objects) / noise.

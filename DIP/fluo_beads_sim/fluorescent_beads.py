@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Experiments with simulation of images of fluorescent beads
+Experiments with simulation of images of fluorescent beads for evaluation of precision of their localization.
 
 @author: ssklykov
 """
@@ -23,13 +23,32 @@ class image_beads():
     image_type = 'uint8'
     bead_types = ["even round", "gaussian round", "uneven round"]
     bead_type = "even round"
-    bead_img = np.zeros((height, width), dtype=image_type)
-    bead_border = np.zeros((height, width), dtype=image_type)
-    maxPixelValue = 255
-    kernel_PSF = []
-    bead_conv_border = []
+    bead_img = np.zeros((height, width), dtype=image_type)  # intensity profile of a bead
+    bead_border = np.zeros((height, width), dtype=image_type)  # edge or border of a bead
+    maxPixelValue = 255  # default for a 8bit gray image
+    kernel_PSF = []  # for storing the kernel for convolution ("diffraction blurring of sharp edges")
+    bead_conv_border = []  # for storing blurred border
+    offsets = [0, 0]  # for storing global offset of a bead image (matrix with its profile)
 
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
+        """
+        Generate basis class with the image (representation) of fluorescent bead with various intensity profile.
+
+        Parameters
+        ----------
+        image_type : str, optional
+            Image type: 8bit, 16bit or float gray image. The default is 'uint8'.
+        character_size : int, optional
+            Characteristic size of a bead. For 'even round' bead - radius. The default is 5.
+        bead_type : str, optional
+            Type of fluorescent bead profile: 'even round', 'gaussian round', 'uneven round'.
+            The default is "even round".
+
+        Returns
+        -------
+        None.
+
+        """
         if image_type in self.possible_img_types:
             self.image_type = image_type
         else:
@@ -51,18 +70,18 @@ class image_beads():
             else:
                 self.maxPixelValue = 1.0  # According to the specification of scikit-image
 
-    def get_centrelized_bead(self, max_pixel_val):
+    def get_centralized_bead(self, max_pixel_val):
         """
-        Generate centered image of a bead with specified type.
+        Generate centared image of a bead with specified type.
 
         Parameters
         ----------
-        max_pixel_val : uint8, uint16 or float
-            Maximum intensity value in the center of a bead (or just through a bead profile).
+        max_pixel_val : int(uint8 or uint16) or float
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
 
         Returns
         -------
-        None. Calculated 2D image and the border stored in class' attributes.
+        None. Calculated 2D image and the border stored in class' attributes self.bead_img and self.bead_border.
 
         """
         i_center = (self.height // 2)
@@ -80,8 +99,51 @@ class image_beads():
                         # print(distance-radius)
                         self.bead_border[i, j] = max_pixel_val
 
-    def get_bead_img_arbit_center(self, i_center, j_center, max_pixel_val):
-        pass
+    def get_bead_img_arbit_center(self, i_offset: float, j_offset: float, max_pixel_val):
+        """
+        Generate shifted for less than 1 pixel centared before image of a bead with specified type.
+        Such splitting on even pixel shift and less than 1 pixel is performed because of even offset
+        could be applied only for integration the bead image on the larger scene there even shifts are
+        simply drawn by shifting entire bead image.
+
+        Parameters
+        ----------
+        i_offset : float
+            Arbitrary shift that will splitted on even pixel shift stored in self.offsets and less than 1 pixel
+            offset applied for an image calculation.
+        j_offset : float
+            Same as i_offset but in other direction.
+        max_pixel_val :  int(uint8 or uint16) or float
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
+
+        Returns
+        -------
+        None. Calculated 2D image and the border stored in class' attributes self.bead_img and self.bead_border
+
+        """
+        # The self.offsets will store even pixel offsets for bead for its further introducing to the scene (background)
+        if i_offset > 1.0:
+            self.offsets[0] += 1
+            i_offset -= 1.0
+        if j_offset > 1.0:
+            self.offsets[1] += 1
+            j_offset -= 1.0
+        # Calculating the profile of the sub-centralized bead - the bead that is shifted less than 1 pixel in any
+        # specified direction - because shifts more than that could be simply drawn on the scene
+        i_center = (self.height // 2) + i_offset
+        j_center = (self.width // 2) + j_offset
+        if self.bead_type == "even round":
+            radius = self.character_size*0.5
+            for i in range(self.width):
+                for j in range(self.height):
+                    distance = np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))
+                    # print(i, j, ":", distance - radius)
+                    if ((distance - radius) < 1):
+                        # print(distance-radius)
+                        self.bead_img[i, j] = max_pixel_val
+                    if ((distance - radius) < 1) and ((distance - radius) >= 0):
+                        # print(distance-radius)
+                        self.bead_border[i, j] = max_pixel_val
 
     @staticmethod
     def calculate_PSF(max_intensity, NA: float, wavelength: float, pixel_distance: float, calibration: float) -> float:
@@ -149,8 +211,26 @@ class image_beads():
         plt.tight_layout()
 
     def calculate_img_PSF(self, NA: float, wavelength: float, calibration: float):
+        """
+        Calculation PSF as kernel for convolution with automatically calculated size N (NxN convolution kernel).
+        PSF kernel is used for calculation of edges blurring due to diffraction.
+
+        Parameters
+        ----------
+        NA : float
+            NA of a microobjective.
+        wavelength : float
+            NA of a microobjective.
+        calibration : float
+            Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Returns
+        -------
+        None. Recorder PSF kernel is stored as the class attribute - np.float32 matrix.
+
+        """
         if self.image_type == 'uint8':
-            min_pixel = 1
+            min_pixel = 1  # the smallest meaningful pixel value for accounting of blurring
             dimension = 0
             intensity = self.maxPixelValue
             while intensity >= min_pixel:
@@ -169,14 +249,21 @@ class image_beads():
             # print(self.kernel_PSF)
 
     def calc_border_extended_PSF(self):
+        """
+        Calculation of blurred bead's border due to the diffraction blurring of sharp edges.
+
+        Raises
+        ------
+        ValueError
+            If self.bead_border hasn't been calculated before calling this function.
+
+        Returns
+        -------
+        None. The blurred border is stored in the class' attrubute self.bead_conv_border.
+
+        """
         if np.max(self.bead_border) <= 0:
             raise ValueError("Most probably, there is the zero (empty) image of the bead")
-        border_coordinates = []
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.bead_border[i, j] > 0:
-                    border_coordinates.append([i, j])
-        # print(border_coordinates)
 
         # Convolution using standard numpy function
         convolved_borders = filters.convolve(np.float32(self.bead_border), self.kernel_PSF, mode='reflect')
@@ -193,39 +280,230 @@ class image_beads():
             self.bead_conv_border = np.uint8(convolved_borders)
         # print(convolved_borders)
 
+    def get_centralized_blurred_bead(self, max_pixel_val, NA: float, wavelength: float, calibration: float):
+        """
+        Calculation of the intensity profile of the specified bead type with blurred edge due to the diffraction.
+
+        Parameters
+        ----------
+        max_pixel_val : int (uint8 or uint16) or float.
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
+        NA : float
+            NA of a microobjective.
+        wavelength : float
+            NA of a microobjective.
+        calibration : float
+            Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Returns
+        -------
+        None. Centralized and blurred bead is stored in the class' attribute self.bead_img.
+
+        """
+        self.get_centralized_bead(max_pixel_val)  # calculate unblurred centrelized bead
+        self.calculate_img_PSF(NA, wavelength, calibration)
+        self.calc_border_extended_PSF()
+        border_coordinates = []
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.bead_border[i, j] > 0:
+                    border_coordinates.append([i, j])
+        # print(border_coordinates)
+        for border_pair in border_coordinates:
+            [i, j] = border_pair
+            # increasing intensity on the bead border due to influence of inner bead surface
+            # the intensity value increased in 1.5 times in assumption that inner part contributes to the border
+            # intensity as well
+            if self.image_type == 'uint8':
+                self.bead_conv_border[i, j] = np.uint8(np.float32(self.bead_conv_border[i, j])*1.5)
+            self.bead_img[i, j] = self.bead_conv_border[i, j]
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.image_type == 'uint8':
+                    if self.bead_img[i, j] == 0 and self.bead_conv_border[i, j] > 0:
+                        self.bead_img[i, j] = self.bead_conv_border[i, j]
+
+    def get_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val,
+                                 NA: float, wavelength: float, calibration: float):
+        """
+        Composing the blurring of sub-centrilized image.
+
+        Parameters
+        ----------
+        i_offset : float
+            Arbitrary shift that will splitted on even pixel shift stored in self.offsets and less than 1 pixel
+            offset applied for an image calculation.
+        j_offset : float
+            Same as i_offset but in other direction.
+        max_pixel_val :  int(uint8 or uint16) or float
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
+        NA : float
+            NA of a microobjective.
+        wavelength : float
+            NA of a microobjective.
+        calibration : float
+            Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Returns
+        -------
+        None. The image stored in the class' attribute self.bead_img
+
+        """
+        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
+        self.calculate_img_PSF(NA, wavelength, calibration)
+        self.calc_border_extended_PSF()
+        border_coordinates = []
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.bead_border[i, j] > 0:
+                    border_coordinates.append([i, j])
+        # print(border_coordinates)
+        for border_pair in border_coordinates:
+            [i, j] = border_pair
+            # increasing intensity on the bead border due to influence of inner bead surface
+            # the intensity value increased in 1.5 times in assumption that inner part contributes to the border
+            # intensity as well
+            if self.image_type == 'uint8':
+                self.bead_conv_border[i, j] = np.uint8(np.float32(self.bead_conv_border[i, j])*1.5)
+            self.bead_img[i, j] = self.bead_conv_border[i, j]
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.image_type == 'uint8':
+                    if self.bead_img[i, j] == 0 and self.bead_conv_border[i, j] > 0:
+                        self.bead_img[i, j] = self.bead_conv_border[i, j]
+
+    def get_whole_centr_blurred_bead(self, max_pixel_val, NA: float, wavelength: float, calibration: float):
+        """
+        Calculate the blurred, centralized image of the specified bead.
+
+        Parameters
+        ----------
+        max_pixel_val : int (uint8 or uint16) or float.
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
+        NA : float
+            NA of a microobjective.
+        wavelength : float
+            NA of a microobjective.
+        calibration : float
+            Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Returns
+        -------
+        None. The calculated image of a bead stored in class' attribute self.bead_img
+
+        """
+        self.get_centralized_bead(max_pixel_val)  # calculate unblurred centrelized bead
+        self.calculate_img_PSF(NA, wavelength, calibration)
+        calibration_sum = np.sum(self.kernel_PSF)
+        # Calculate blurred image as whole ublurred image convolved with PSF kernel
+        convolved_bead = filters.convolve(np.float32(self.bead_img), self.kernel_PSF, mode='reflect')
+        convolved_bead /= calibration_sum  # calibrate to eliminate convolution matrix enhancing signal
+        correction = max_pixel_val/np.max(convolved_bead)
+        convolved_bead *= correction  # calibrate maximum value to the specified value by user
+        if self.image_type == 'uint8':
+            self.bead_img = np.uint8(convolved_bead)
+
+    def get_whole_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val,
+                                       NA: float, wavelength: float, calibration: float):
+        """
+        Calculate the blurred, shifted to less than 1 pixel from the center image of the specified bead.
+
+        Parameters
+        ----------
+        i_offset : float
+            Arbitrary shift that will splitted on even pixel shift stored in self.offsets and less than 1 pixel
+            offset applied for an image calculation.
+        j_offset : float
+            Same as i_offset but in other direction.
+        max_pixel_val :  int(uint8 or uint16) or float
+            Maximum intensity value in the center of a bead (or just through a bead intensity profile).
+        NA : float
+            NA of a microobjective.
+        wavelength : float
+            NA of a microobjective.
+        calibration : float
+            Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Returns
+        -------
+        None. The image stored in the class' attribute self.bead_img
+
+        """
+        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
+        self.calculate_img_PSF(NA, wavelength, calibration)
+        calibration_sum = np.sum(self.kernel_PSF)
+        # Calculate blurred image as whole ublurred image convolved with PSF kernel
+        convolved_bead = filters.convolve(np.float32(self.bead_img), self.kernel_PSF, mode='reflect')
+        convolved_bead /= calibration_sum  # calibrate to eliminate convolution matrix enhancing signal
+        correction = max_pixel_val/np.max(convolved_bead)
+        convolved_bead *= correction  # calibrate maximum value to the specified value by user
+        if self.image_type == 'uint8':
+            self.bead_img = np.uint8(convolved_bead)
+
     def plot_bead(self):
         """
-        Plotting various class attributes as images.
+        Plotting various class' matrix attributes (specified in the code) as images opened as matplotlib windows.
 
         Returns
         -------
         None.
 
         """
-        # plt.figure()
-        # # Below - representation according to the documentation:
-        # # plt.cm.gray - for representing gray values, aspect - for filling image values in a window
-        # # origin - for adjusting origin of pixels (0, 0), extent - regulation of axis values
-        # # extent = (-0.5, numcols-0.5, -0.5, numrows-0.5)) - for origin = 'lower' - documents
-        # plt.imshow(self.bead_img, cmap=plt.cm.gray, aspect='auto', origin='lower',
-        #            extent=(0, self.width, 0, self.height))
-        # plt.tight_layout()
         plt.figure()
-        plt.imshow(self.bead_conv_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
+        # Below - representation according to the documentation:
+        # plt.cm.gray - for representing gray values, aspect - for filling image values in a window
+        # origin - for adjusting origin of pixels (0, 0), extent - regulation of axis values
+        # extent = (-0.5, numcols-0.5, -0.5, numrows-0.5)) - for origin = 'lower' - documents
+        plt.imshow(self.bead_img, cmap=plt.cm.gray, aspect='auto', origin='lower',
                    extent=(0, self.width, 0, self.height))
         plt.tight_layout()
+        if np.size(self.bead_conv_border) > 0:
+            plt.figure()
+            plt.imshow(self.bead_conv_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
+                       extent=(0, self.width, 0, self.height))
+            plt.tight_layout()
 
+    def trim_image_for_scene(self):
+        if self.image_type == 'uint8':
+            min_pixel = 1  # minimal meaningful pixel value for this type of image
+            i_min = self.height
+            j_min = self.width
+            i_max = 0
+            j_max = 0
+            for i in range(self.height):
+                for j in range(self.width):
+                    if self.bead_img[i, j] >= min_pixel:
+                        if i < i_min:
+                            i_min = i
+                        if j < j_min:
+                            j_min = j
+                        if i > i_max:
+                            i_max = i
+                        if j > j_max:
+                            j_max = j
+            print(i_min, j_min, i_max, j_max)
+            self.bead_img = self.bead_img[i_min:i_max+1, j_min:j_max+1]
+            self.width = j_max + 1 - j_min
+            self.height = i_max + 1 - i_min
 
-# %% General parameters
-width = 1000
-height = 1000
 
 # %% Testing features
 if __name__ == '__main__':
     even_bead = image_beads(character_size=20)
-    even_bead.get_centrelized_bead(200)
+    # even_bead.get_centralized_bead(200)
     # even_bead.plot_bead()
     # image_beads.show_PSF(255, 6, 1.25, 532, 110)
-    even_bead.calculate_img_PSF(1.25, 532, 110)
-    even_bead.calc_border_extended_PSF()
+    # even_bead.calculate_img_PSF(1.25, 532, 110)
+    # even_bead.calc_border_extended_PSF()
+    # even_bead.plot_bead()
+    # even_bead.get_centralized_blurred_bead(200, 1.25, 532, 110)
+    # even_bead.plot_bead()
+
+    even_bead.get_whole_centr_blurred_bead(200, 1.25, 532, 110)
+    even_bead.trim_image_for_scene()
     even_bead.plot_bead()
+
+    # even_bead.get_whole_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
+    # even_bead.plot_bead()
+    # even_bead.get_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
+    # even_bead.plot_bead()
