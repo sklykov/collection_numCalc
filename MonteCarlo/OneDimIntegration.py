@@ -41,7 +41,7 @@ def MonteCarloInt1D(a: float, b: float, y, nSamples: int = 100):
         return None
     elif (nSamples <= 0):
         print("Please specify positive number of samples for generation")
-        n = 100  # default value
+        nSamples = 100  # default value
 
     # Implementation itself
     sumF = 0.0; sumSquaredF = 0.0

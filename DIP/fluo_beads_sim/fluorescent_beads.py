@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import scipy.ndimage.filters as filters  # includes many filters
 # import cv2  # importing of OpenCV module (not used so far for simplicity)
 # print(cv2.__version__)  # checking the version of installed OpenCV
-# from u_scene import u_scene
 
 
 # %% class definition
@@ -464,6 +463,14 @@ class image_beads():
             plt.tight_layout()
 
     def trim_image_for_scene(self):
+        """
+        Trimming (cutting out) the background (zero pixels) from the bead image.
+
+        Returns
+        -------
+        None. It works on the bead image - class attribute self.bead_img.
+
+        """
         if self.image_type == 'uint8':
             min_pixel = 1  # minimal meaningful pixel value for this type of image
             i_min = self.height
