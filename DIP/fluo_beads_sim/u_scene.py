@@ -220,6 +220,10 @@ class u_scene():
                    extent=(0, self.width, 0, self.height))
         plt.tight_layout()
 
+    # %% Clearing the scene
+    def clear_scene(self):
+        self.scene_image = np.zeros((self.height, self.width), dtype=self.image_type)
+
 
 # %% Testing class methods / construction
 if __name__ == '__main__':
