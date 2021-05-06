@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import scipy.ndimage.filters as filters  # includes many filters
 # import cv2  # importing of OpenCV module (not used so far for simplicity)
 # print(cv2.__version__)  # checking the version of installed OpenCV
-
+import os
+from skimage.io import imsave
 
 # %% class definition
 class image_beads():
@@ -521,6 +522,18 @@ class image_beads():
             self.width = j_max + 1 - j_min
             self.height = i_max + 1 - i_min
 
+    def save_bead_image(self, base_name: str = "001.jpg"):
+        scriptFolder = os.getcwd()
+        default_folder = "tests"
+        path = os.path.join(scriptFolder, default_folder)
+        # print(path)
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        if os.path.isdir(path):
+            # print(path)
+            path_for_bead = os.path.join(path, base_name)
+            imsave(path_for_bead, self.bead_img, quality=100)
+
 
 # %% Testing features
 if __name__ == '__main__':
@@ -540,5 +553,6 @@ if __name__ == '__main__':
 
     even_bead.get_whole_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
     even_bead.plot_bead()
+    even_bead.save_bead_image()
     # even_bead.get_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
     # even_bead.plot_bead()

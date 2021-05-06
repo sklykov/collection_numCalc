@@ -105,4 +105,6 @@ venv.bak/
 
 # My additions
 docs/
-documentation/ 
+documentation/
+Docs/ 
+DIP/fluo_beads_sim/ 

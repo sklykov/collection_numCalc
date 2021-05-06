@@ -8,6 +8,8 @@ Container for building a scene with fluorescent objects
 import numpy as np
 import matplotlib.pyplot as plt
 # from skimage.util import img_as_ubyte
+import os
+from skimage.io import imsave
 
 
 # %% class definition
@@ -22,6 +24,7 @@ class u_scene():
     image_type = 'uint8'
     scene_image = np.zeros((height, width), dtype=image_type)
     maxPixelValue = 255
+    counter = 1  # counting how many images saved along generation
 
     # %% Constructor
     def __init__(self, width: int, height: int, image_type: str = 'uint8'):
@@ -222,7 +225,30 @@ class u_scene():
 
     # %% Clearing the scene
     def clear_scene(self):
+        """
+        Clearing the scene (background) image by re-initialize it to zero values (completely dark).
+
+        Returns
+        -------
+        None.
+
+        """
         self.scene_image = np.zeros((self.height, self.width), dtype=self.image_type)
+
+    # %% Saving generated scene image
+    def save_scene(self, base_extension: str = "jpg"):
+        scriptFolder = os.getcwd()
+        default_folder = "tests"
+        path = os.path.join(scriptFolder, default_folder)
+        # print(path)
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        if os.path.isdir(path):
+            # print(path)
+            base_name = str(self.counter) + "." + base_extension
+            self.counter += 1
+            path_for_bead = os.path.join(path, base_name)
+            imsave(path_for_bead, self.scene_image, quality=100)
 
 
 # %% Testing class methods / construction
@@ -232,3 +258,4 @@ if __name__ == '__main__':
     mask = mask[:, :]*256
     uScene.add_mask(40, 40, mask)
     uScene.plot_image()
+    uScene.save_scene()
