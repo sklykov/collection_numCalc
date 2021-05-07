@@ -237,6 +237,19 @@ class u_scene():
 
     # %% Saving generated scene image
     def save_scene(self, base_extension: str = "jpg"):
+        """
+        Saving the scene (image) with all collected masks (objects) on it.
+
+        Parameters
+        ----------
+        base_extension : str, optional
+            The base extension for saving images (like jpg, png, tiff, etc). The default is "jpg".
+
+        Returns
+        -------
+        None.
+
+        """
         scriptFolder = os.getcwd()
         default_folder = "tests"
         path = os.path.join(scriptFolder, default_folder)

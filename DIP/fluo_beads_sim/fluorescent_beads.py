@@ -13,6 +13,7 @@ import scipy.ndimage.filters as filters  # includes many filters
 import os
 from skimage.io import imsave
 
+
 # %% class definition
 class image_beads():
     # default values
@@ -29,6 +30,11 @@ class image_beads():
     kernel_PSF = []  # for storing the kernel for convolution ("diffraction blurring of sharp edges")
     bead_conv_border = []  # for storing blurred border
     offsets = [0, 0]  # for storing global offset of a bead image (matrix with its profile)
+    # Since the PSF kernel is saved as the class attribute, the collection of following parameters also useful:
+    NA = 1.25
+    wavelength = 532  # in nanometers
+    calibration = 110  # in nanometer/pixel
+    max_pixel_value_bead = 255
 
     # %% Constructor
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
@@ -68,7 +74,7 @@ class image_beads():
             self.bead_border = np.zeros((self.height, self.width), dtype=self.image_type)
             if image_type == 'uint16':
                 self.maxPixelValue = 65535
-            else:
+            elif image_type == 'float':
                 self.maxPixelValue = 1.0  # According to the specification of scikit-image
 
     # %% Generate centralized profile
@@ -174,8 +180,9 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
-        pixel_distance : float
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
+        pixel_distance : float.
             Distance in pixels from the central one (the point source).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
@@ -207,7 +214,8 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
 
@@ -239,15 +247,26 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+
+        Raises
+        ------
+        ValueError
+            If some of the specified parameters (NA, wavelength, calibration) is negative!.
 
         Returns
         -------
         None. Recorder PSF kernel is stored as the class attribute - np.float32 matrix.
 
         """
+        self.NA = NA
+        self.wavelength = wavelength
+        self.calibration = calibration
+        if (NA <= 0.0) or (wavelength <= 0.0) or (calibration <= 0.0):
+            raise ValueError("Some of the specified parameters (NA, wavelength, calibration) is negative!")
         if self.image_type == 'uint8':
             min_pixel = 1  # the smallest meaningful pixel value for accounting of blurring
             dimension = 0
@@ -312,7 +331,8 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
 
@@ -362,7 +382,8 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
 
@@ -374,6 +395,7 @@ class image_beads():
         self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
         self.calculate_img_PSF(NA, wavelength, calibration)
         self.calc_border_extended_PSF()
+        self.max_pixel_value_bead = max_pixel_val
         border_coordinates = []
         for i in range(self.height):
             for j in range(self.width):
@@ -406,7 +428,8 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
 
@@ -445,7 +468,8 @@ class image_beads():
         NA : float
             NA of a microobjective.
         wavelength : float
-            NA of a microobjective.
+            Wavelength of fluorescence emitted by the object (Assumed monochromal case only!).
+            The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
 
@@ -522,7 +546,21 @@ class image_beads():
             self.width = j_max + 1 - j_min
             self.height = i_max + 1 - i_min
 
+    # %% Saving of generated bead's image (profile)
     def save_bead_image(self, base_name: str = "001.jpg"):
+        """
+        Saving the generated image of the bead.
+
+        Parameters
+        ----------
+        base_name : str, optional
+            The base name for an image saving. The default is "001.jpg".
+
+        Returns
+        -------
+        None.
+
+        """
         scriptFolder = os.getcwd()
         default_folder = "tests"
         path = os.path.join(scriptFolder, default_folder)
@@ -533,6 +571,21 @@ class image_beads():
             # print(path)
             path_for_bead = os.path.join(path, base_name)
             imsave(path_for_bead, self.bead_img, quality=100)
+
+    # %% Saving the used parameters in the default folder
+    def save_used_parameters(self, default_folder: str = "tests"):
+        scriptFolder = os.getcwd()
+        default_path_for_saving = os.path.join(scriptFolder, default_folder)
+        default_name = "parameters.txt"
+        with open(os.path.join(default_path_for_saving, default_name), 'a') as textfile:
+            string = "Maximum intensity through bead = " + str(self.max_pixel_value_bead) + "\n"
+            textfile.write(string)
+            string = "NA = " + str(self.NA) + "\n"
+            textfile.write(string)
+            string = "wavelength = " + str(self.wavelength) + "\n"
+            textfile.write(string)
+            string = "calibration = " + str(self.calibration) + "\n"
+            textfile.write(string)
 
 
 # %% Testing features
