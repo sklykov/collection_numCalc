@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Simulation of dynamics of the fluorescent bead
+Simulation of dynamics of the fluorescent bead undergoing diffusion with specified parameters
 
 @author: ssklykov
 """
@@ -19,7 +19,7 @@ wavelength = 486
 NA = 1.2
 calibration = 111
 bead_diameter = 28
-diffusion_coeff = 0.25
+diffusion_coeff = 0.5
 nFrames = 500
 
 # %% Simulation
@@ -40,7 +40,8 @@ for i in range(nFrames):
     # scene.plot_image()
     scene.save_scene()
     scene.clear_scene()  # clearing generated bead
-    [i_shift, j_shift] = diffusion_sim.get_next_point()
+    if i < (nFrames-1):
+        [i_shift, j_shift] = diffusion_sim.get_next_point()
     # print(i_shift, j_shift)
 diffusion_sim.save_generated_stat(save_figures=True)
 even_bead.save_used_parameters()

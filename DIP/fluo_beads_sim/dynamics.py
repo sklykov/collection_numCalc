@@ -123,8 +123,8 @@ class diffusion():
         iStep = float(4*sigma/nSteps)
         bins = [-2*sigma + iStep*i for i in range(nSteps+1)]
         # Plotting of histograms for checking of distrubition with defined size
-        plt.hist(self.x_steps, bins=bins, density=True, alpha=0.5, label='x')
-        plt.hist(self.y_steps, bins=bins, density=True, alpha=0.5, label='y')
+        plt.hist(self.x_steps, bins=bins, density=True, alpha=0.5, label='i')
+        plt.hist(self.y_steps, bins=bins, density=True, alpha=0.5, label='j')
         plt.legend(loc='upper right')
         plt.tight_layout()
         plt.figure()
@@ -164,6 +164,8 @@ class diffusion():
         plt.hist(self.x_generated_steps, bins=bins, alpha=0.5, label='i')
         plt.hist(self.y_generated_steps, bins=bins, alpha=0.5, label='j')
         plt.legend(loc='upper right')
+        plt.xlabel("pixels")
+        plt.ylabel("counts")
         plt.tight_layout()
         scriptFolder = os.getcwd()
         default_path_for_saving = os.path.join(scriptFolder, default_folder)
@@ -178,7 +180,7 @@ class diffusion():
         nSteps = 25
         iStep = float(2*sigma/nSteps)
         bins = [iStep*i for i in range(nSteps+1)]
-        plt.hist(self.r_generated, bins=bins, alpha=0.5, label='r')
+        plt.hist(self.r_generated, bins=bins, label='r')
         plt.legend(loc='upper right')
         plt.tight_layout()
         if save_figures:

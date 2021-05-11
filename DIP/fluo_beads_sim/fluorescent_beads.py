@@ -481,11 +481,12 @@ class image_beads():
         self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
         self.calculate_img_PSF(NA, wavelength, calibration)
         calibration_sum = np.sum(self.kernel_PSF)
-        # Calculate blurred image as whole ublurred image convolved with PSF kernel
+        # Calculate blurred image as whole unblurred image convolved with PSF kernel
         convolved_bead = filters.convolve(np.float32(self.bead_img), self.kernel_PSF, mode='reflect')
         convolved_bead /= calibration_sum  # calibrate to eliminate convolution matrix enhancing signal
         correction = max_pixel_val/np.max(convolved_bead)
         convolved_bead *= correction  # calibrate maximum value to the specified value by user
+        self.max_pixel_value_bead = max_pixel_val  # for saving this parameter in the report
         if self.image_type == 'uint8':
             self.bead_img = np.uint8(convolved_bead)
         self.trim_image_for_scene()
@@ -574,6 +575,20 @@ class image_beads():
 
     # %% Saving the used parameters in the default folder
     def save_used_parameters(self, default_folder: str = "tests"):
+        """
+        Saving some of the used for generation of the bead sample parameters in some specified folder that
+        is placed in the same folder where script is.
+
+        Parameters
+        ----------
+        default_folder : str, optional
+            Name of the folder for saving. The default is "tests".
+
+        Returns
+        -------
+        None.
+
+        """
         scriptFolder = os.getcwd()
         default_path_for_saving = os.path.join(scriptFolder, default_folder)
         default_name = "parameters.txt"
