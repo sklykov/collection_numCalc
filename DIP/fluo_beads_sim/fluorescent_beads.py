@@ -605,7 +605,7 @@ class image_beads():
 
 # %% Testing features
 if __name__ == '__main__':
-    even_bead = image_beads(character_size=20)
+    even_bead = image_beads(character_size=28)
     # even_bead.get_centralized_bead(200)
     # even_bead.plot_bead()
     # image_beads.show_PSF(255, 6, 1.25, 532, 110)

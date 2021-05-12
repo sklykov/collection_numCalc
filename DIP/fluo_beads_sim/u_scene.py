@@ -58,10 +58,13 @@ class u_scene():
             self.image_type = 'uint8'
             print("Image type hasn't been recognized, initialized default 8bit gray image")
         if (width != 100) or (height != 100) or (image_type != 'uint8'):
+            # non default values => re-initialization of the class attributes
             self.scene_image = np.zeros((height, width), dtype=self.image_type)
-            if image_type == 'uint16':
+            self.width = width
+            self.height = height
+            if self.image_type == 'uint16':
                 self.maxPixelValue = 65535
-            else:
+            elif self.image_type == 'float':
                 self.maxPixelValue = 1.0  # According to the specification of scikit-image
 
     # %% Supportive functions
@@ -93,6 +96,22 @@ class u_scene():
         return value_returned
 
     def get_j_finish(self, j_start: int, nCols: int) -> int:
+        """
+        Calculation of maximum j index for adding mask, preventing it to be for out of bounds.
+
+        Parameters
+        ----------
+        j_start : int
+            Starting index for filling mask in.
+        nCols : int
+            Number of columns in mask that should be added to the scene.
+
+        Returns
+        -------
+        int
+            Ending ("final") index j for filling mask into the scene.
+
+        """
         if ((j_start + nCols) < self.width):  # checking that starting/ending of summing are not out of bounds
             j_finish = j_start + nCols
         else:
@@ -100,6 +119,22 @@ class u_scene():
         return j_finish
 
     def get_i_finish(self, i_start: int, nRows: int) -> int:
+        """
+        Calculation of maximum i index for adding mask, preventing it to be for out of bounds
+
+        Parameters
+        ----------
+        i_start : int
+             Starting index for filling mask in.
+        nRows : int
+            Number of columns in mask that should be added to the scene.
+
+        Returns
+        -------
+        int
+            Ending ("final") index j for filling mask into the scene.
+
+        """
         if ((i_start + nRows) < self.height):  # checking that starting/ending of summing are not out of bounds
             i_finish = i_start + nRows
         else:
@@ -266,9 +301,10 @@ class u_scene():
 
 # %% Testing class methods / construction
 if __name__ == '__main__':
-    uScene = u_scene(100, 100, 'uint8')
+    uScene = u_scene(150, 150, 'uint8')
     mask = np.ones((20, 20), dtype='uint8')
     mask = mask[:, :]*256
     uScene.add_mask(40, 40, mask)
+    uScene.add_mask(80, 80, mask)
     uScene.plot_image()
     uScene.save_scene()

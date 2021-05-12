@@ -10,8 +10,8 @@ from fluorescent_beads import image_beads
 from dynamics import diffusion
 
 # %% General parameters
-width = 100
-height = 100
+width = 200
+height = 200
 i_initial = int(height / 2)
 j_initial = int(width / 2)
 bead_intensity = 204  # % of maximal value of 255 for 8bit gray image
@@ -19,8 +19,8 @@ wavelength = 486
 NA = 1.2
 calibration = 111
 bead_diameter = 28
-diffusion_coeff = 0.5
-nFrames = 500
+diffusion_coeff = 1
+nFrames = 1000
 
 # %% Simulation
 diffusion_sim = diffusion([i_initial, j_initial], D=diffusion_coeff)

@@ -161,8 +161,8 @@ class diffusion():
         nSteps = 50
         iStep = float(4*sigma/nSteps)
         bins = [-2*sigma + iStep*i for i in range(nSteps+1)]
-        plt.hist(self.x_generated_steps, bins=bins, alpha=0.5, label='i')
-        plt.hist(self.y_generated_steps, bins=bins, alpha=0.5, label='j')
+        plt.hist(self.y_generated_steps, bins=bins, alpha=0.5, label='j(x)')
+        plt.hist(self.x_generated_steps, bins=bins, alpha=0.5, label='i(y)')
         plt.legend(loc='upper right')
         plt.xlabel("pixels")
         plt.ylabel("counts")
@@ -170,7 +170,7 @@ class diffusion():
         scriptFolder = os.getcwd()
         default_path_for_saving = os.path.join(scriptFolder, default_folder)
         if save_figures:
-            default_name = "i,j histograms.png"
+            default_name = "i(y),j(x) histograms.png"
             path = os.path.join(default_path_for_saving, default_name)
             plt.savefig(path, dpi=300)
             plt.close()
@@ -182,6 +182,8 @@ class diffusion():
         bins = [iStep*i for i in range(nSteps+1)]
         plt.hist(self.r_generated, bins=bins, label='r')
         plt.legend(loc='upper right')
+        plt.xlabel("pixels")
+        plt.ylabel("counts")
         plt.tight_layout()
         if save_figures:
             default_name = "r histogram.png"
@@ -190,7 +192,7 @@ class diffusion():
             plt.close()
         # Saving all generated displacements as primitive txt files
         if save_stats:
-            default_name = "i.txt"
+            default_name = "i(y).txt"
             # Open and create the txt file if it didn't exist before opening and writing the generated files there
             with open(os.path.join(default_path_for_saving, default_name), 'w') as textfile:
                 string_numbers = str(self.x_generated_steps)
@@ -200,7 +202,7 @@ class diffusion():
                 string_numbers = string_numbers.replace(',', '')
                 # print(string_numbers)
                 textfile.write(string_numbers)
-            default_name = "j.txt"
+            default_name = "j(x).txt"
             # Open and create the txt file if it didn't exist before opening and writing the generated files there
             with open(os.path.join(default_path_for_saving, default_name), 'w') as textfile:
                 string_numbers = str(self.y_generated_steps)
