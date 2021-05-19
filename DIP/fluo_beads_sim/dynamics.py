@@ -104,7 +104,7 @@ class diffusion():
         self.coordinates.append([x_next, y_next])
         return [x_next, y_next]
 
-    # Visualize and check the histograms of x, y, r
+    # %% Visualize and check the histograms of x, y, r
     def get_statistics(self, size: int = 1000):
         """Plotting the example of generated x,y steps and displacements r."""
         # The equation for 1D random walk from the Chandrasekhar's paper (1943) is used for simulate 1D diffusion step
@@ -133,6 +133,65 @@ class diffusion():
         plt.hist(self.r, bins=bins, density=True, label='r')
         plt.legend(loc='upper right')
         plt.tight_layout()
+
+    # %% Recalculate origin's coordinates of a bead image according to coordinates of a center
+    @staticmethod
+    def get_i_origin(i_center: int, height: int) -> int:
+        """
+        Recalculates i coordinate of image origin.
+
+        Parameters
+        ----------
+        i_center : int
+            i coordinate of the bead center.
+        height : int
+            height of bead's image.
+
+
+        Returns
+        -------
+        i_origin : int
+            Calculated i coordinate of origin.
+
+        """
+        # TODO : possible remove in future. Kept for refernce
+        # if height_changed:
+        #     # it means that along i the bead is shifted less than 1 pixel
+        #     if i_step < 0:
+        #         additional_shift = -1
+        #     if i_step > 0:
+        #         additional_shift = 1
+        #     i_origin = i_center - ((height-1)//2) + additional_shift
+        # else:
+        #     i_origin = i_center - ((height-1)//2)
+
+        # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
+        # center, therefore, the origin should be the same as for centralized bead
+        i_origin = i_center - ((height-1)//2)
+        return i_origin
+
+    @staticmethod
+    def get_j_origin(j_center: int, width: int) -> int:
+        """
+        Recalculates j coordinate of image origin.
+
+        Parameters
+        ----------
+        j_center : int
+            i coordinate of the bead center.
+        width : int
+            width of bead's image.
+
+        Returns
+        -------
+        j_origin : int
+            Calculated j coordinate of origin.
+
+        """
+        # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
+        # center, therefore, the origin should be the same as for centralized bead
+        j_origin = j_center - ((width-1)//2)
+        return j_origin
 
     # %% Saving of all generated parameters
     def save_generated_stat(self, save_figures: bool = False, save_stats: bool = True, default_folder: str = "tests"):

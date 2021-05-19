@@ -296,7 +296,10 @@ class u_scene():
             base_name = str(self.counter) + "." + base_extension
             self.counter += 1
             path_for_bead = os.path.join(path, base_name)
-            imsave(path_for_bead, self.scene_image, quality=100)
+            if base_extension == "jpg" or base_extension == "jpeg":
+                imsave(path_for_bead, self.scene_image, quality=100)
+            else:
+                imsave(path_for_bead, self.scene_image)
 
 
 # %% Testing class methods / construction

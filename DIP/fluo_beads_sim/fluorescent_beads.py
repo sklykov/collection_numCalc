@@ -35,6 +35,11 @@ class image_beads():
     wavelength = 532  # in nanometers
     calibration = 110  # in nanometer/pixel
     max_pixel_value_bead = 255
+    first_call_shifted_bead = True
+    width_centrilized_trimmed_bead = 0
+    height_centrilized_trimmed_bead = 0
+    height_changed = False
+    width_changed = False
 
     # %% Constructor
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
@@ -141,15 +146,15 @@ class image_beads():
             self.width = int(self.character_size*2) + 1
             self.bead_img = np.zeros((self.height, self.width), dtype=self.image_type)
         # The self.offsets will store even pixel offsets for bead for its further introducing to the scene (background)
-        self.offsets[0] = 0  # reinitilization
-        self.offsets[1] = 0  # reinitilization
+        self.offsets[0] = 0  # reinitilization for repeating generation
+        self.offsets[1] = 0  # reinitilization for repeating generation
         while i_offset >= 1.0:
             self.offsets[0] += 1
             i_offset -= 1.0
         while j_offset >= 1.0:
             self.offsets[1] += 1
             j_offset -= 1.0
-        # print(i_offset, j_offset)
+        # print("i offset:", round(i_offset, 3), "j offset:", round(j_offset, 3))
         # Calculating the profile of the sub-centralized bead - the bead that is shifted less than 1 pixel in any
         # specified direction - because shifts more than that could be simply drawn on the scene
         i_center = (self.height // 2) + i_offset
@@ -201,7 +206,7 @@ class image_beads():
 
     # %% Plotting centralized profile of the calculated PSF
     @staticmethod
-    def show_PSF(max_intensity, size: int, NA: float, wavelength: float, calibration: float):
+    def show_PSF(max_intensity, size: int, NA: float, wavelength: float, calibration: float, save: bool = False):
         """
         Plotting calculated with the function 'calculate_PSF' above profile of the approximated PSF.
 
@@ -218,6 +223,8 @@ class image_beads():
             The units of wavelength MUST BE in agreement with calibration parameter: nm <=> nm/pixel(!).
         calibration : float
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
+        save: bool, optional
+            Saving in the default folder "tests" the calculated PSF accoring to specified properties.
 
         Returns
         -------
@@ -235,6 +242,19 @@ class image_beads():
         plt.figure()
         plt.imshow(img, cmap=plt.cm.Spectral, aspect='auto', origin='lower', extent=(0, size, 0, size))
         plt.tight_layout()
+        # saving in the default directory for representation
+        if save:
+            scriptFolder = os.getcwd()
+            default_folder = "tests"
+            path = os.path.join(scriptFolder, default_folder)
+            # print(path)
+            base_name = "PSF.png"
+            if not os.path.isdir(path):
+                os.mkdir(path)
+            if os.path.isdir(path):
+                # print(path)
+                path_for_bead = os.path.join(path, base_name)
+                imsave(path_for_bead, img)
 
     # %% Calculate PSF as the kernel for further convolution
     def calculate_img_PSF(self, NA: float, wavelength: float, calibration: float):
@@ -392,8 +412,9 @@ class image_beads():
         None. The image stored in the class' attribute self.bead_img
 
         """
-        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
-        self.calculate_img_PSF(NA, wavelength, calibration)
+        # Calculate profile of shifted less than 1 pixel ideal bead (not blurred by convolving with PSF)
+        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)
+        # Accounting of diffraction blurring
         self.calc_border_extended_PSF()
         self.max_pixel_value_bead = max_pixel_val
         border_coordinates = []
@@ -449,6 +470,9 @@ class image_beads():
         if self.image_type == 'uint8':
             self.bead_img = np.uint8(convolved_bead)
         self.trim_image_for_scene()
+        # For accounting of shifts in image size in comparison with shifted case
+        self.width_centrilized_trimmed_bead = self.width
+        self.height_centrilized_trimmed_bead = self.height
 
     # %% Calculation of centralized and shifted less than 1 pixel blurred bead by convolving its profile with PSF kernel
     def get_whole_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val,
@@ -478,7 +502,16 @@ class image_beads():
         None. The image stored in the class' attribute self.bead_img
 
         """
-        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)  # calculate unblurred centrelized bead
+        # Once calculating the trimmed centralized bead positions for further correction of issue with discrepancy
+        # between center of a bead and its picture origin
+        if (self.first_call_shifted_bead):
+            # This calculation is REDUNDANT, the discrepeancy already accounted in the calculation of image center
+            # print("called")
+            self.first_call_shifted_bead = False
+            self.get_whole_centr_blurred_bead(max_pixel_val, NA, wavelength, calibration)
+        # Calculate profile of shifted less than 1 pixel ideal bead (not blurred by convolving with PSF)
+        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)
+        # Accounting of diffraction blurring
         self.calculate_img_PSF(NA, wavelength, calibration)
         calibration_sum = np.sum(self.kernel_PSF)
         # Calculate blurred image as whole unblurred image convolved with PSF kernel
@@ -490,6 +523,7 @@ class image_beads():
         if self.image_type == 'uint8':
             self.bead_img = np.uint8(convolved_bead)
         self.trim_image_for_scene()
+        # print(self.height, self.width)
 
     # %% Plotting the bead's image or profile
     def plot_bead(self):
@@ -544,8 +578,24 @@ class image_beads():
                             j_max = j
             # print(i_min, j_min, i_max, j_max)  # debugging
             self.bead_img = self.bead_img[i_min:i_max+1, j_min:j_max+1]
-            self.width = j_max + 1 - j_min
-            self.height = i_max + 1 - i_min
+            # Subtle correction below for accounting the shifts of origin of a bead image occured due to changed
+            # sizes of its representation - its image; it needed for fixing discrepencies between shifted image center
+            # and origin of the image for placing it on the scene
+            # TIP : below is possibly redundant calculation of changing image size of shifted bead in comparison to
+            # precisely centralized bead
+            # Checking of width change
+            self.width = j_max + 1 - j_min  # IMPORTANT!
+            if self.width_centrilized_trimmed_bead != self.width:
+                self.width_changed = True
+            else:
+                self.width_changed = False
+            self.height = i_max + 1 - i_min  # IMPORTANT!
+            # Checking of height change
+            if self.height_centrilized_trimmed_bead != self.height:
+                self.height_changed = True
+            else:
+                self.height_changed = False
+            # print(self.height, self.width)
 
     # %% Saving of generated bead's image (profile)
     def save_bead_image(self, base_name: str = "001.jpg"):
@@ -555,7 +605,7 @@ class image_beads():
         Parameters
         ----------
         base_name : str, optional
-            The base name for an image saving. The default is "001.jpg".
+            The base name for an image saving, it should include extension of image. The default is "001.jpg".
 
         Returns
         -------
@@ -571,7 +621,13 @@ class image_beads():
         if os.path.isdir(path):
             # print(path)
             path_for_bead = os.path.join(path, base_name)
-            imsave(path_for_bead, self.bead_img, quality=100)
+            splitted_name = (base_name.split("."))
+            extension = splitted_name[len(splitted_name) - 1]  # extract extension from the base name
+            # print(extension)
+            if extension == "jpg" or extension == "jpeg":
+                imsave(path_for_bead, self.bead_img, quality=100)
+            else:
+                imsave(path_for_bead, self.bead_img)
 
     # %% Saving the used parameters in the default folder
     def save_used_parameters(self, default_folder: str = "tests"):
@@ -605,22 +661,25 @@ class image_beads():
 
 # %% Testing features
 if __name__ == '__main__':
-    even_bead = image_beads(character_size=28)
-    # even_bead.get_centralized_bead(200)
-    # even_bead.plot_bead()
-    # image_beads.show_PSF(255, 6, 1.25, 532, 110)
-    # even_bead.calculate_img_PSF(1.25, 532, 110)
+    # Common parameters:
+    bead_intensity = 255  # % of maximal value of 255 for 8bit gray image
+    wavelength = 486
+    NA = 1.2
+    calibration = 111
+    even_bead = image_beads(character_size=10)  # make the size of a bead bigger for representation
+    # even_bead.get_centralized_bead(bead_intensity)
+    # image_beads.show_PSF(bead_intensity, 6, NA, wavelength, calibration, save=True)
+    # even_bead.calculate_img_PSF(NA, wavelength, calibration)
+    # even_bead.get_bead_img_arbit_center(0.0, 0.5, bead_intensity)
     # even_bead.calc_border_extended_PSF()
-    # even_bead.plot_bead()
-    # even_bead.get_centralized_blurred_bead(200, 1.25, 532, 110)
-    # even_bead.plot_bead()
+    # even_bead.get_centralized_blurred_bead(bead_intensity, NA, wavelength, calibration)
+    # even_bead.get_whole_centr_blurred_bead(bead_intensity, NA, wavelength, calibration)
+    # # even_bead.trim_image_for_scene()
+    even_bead.get_whole_shifted_blurred_bead(0.01, 0.0, bead_intensity, NA, wavelength, calibration)
+    # print(even_bead.height_centrilized_trimmed_bead, even_bead.width_centrilized_trimmed_bead)
+    print(even_bead.height, even_bead.width)
+    # print(even_bead.height_changed, even_bead.width_changed)
+    # even_bead.get_shifted_blurred_bead(0.6, 0.3, bead_intensity, NA, wavelength, calibration)
 
-    even_bead.get_whole_centr_blurred_bead(200, 1.25, 532, 110)
-    # even_bead.trim_image_for_scene()
     even_bead.plot_bead()
-
-    even_bead.get_whole_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
-    even_bead.plot_bead()
-    even_bead.save_bead_image()
-    # even_bead.get_shifted_blurred_bead(0.6, 0.3, 200, 1.25, 532, 110)
-    # even_bead.plot_bead()
+    # even_bead.save_bead_image("even_trimmed_shifted_blurred_bead3.png")
