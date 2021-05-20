@@ -145,7 +145,10 @@ class u_scene():
     def add_mask(self, i_start: int, j_start: int, mask):
         """
         Adding the "mask" - representation of the object (basically, less than the scene (background) image).
-        Contradictory, i_start represents "y" coordinate, j_start - "x", due to array representation of column and row
+        Contradictory, i_start represents "y" coordinate, j_start - "x", due to array representation of column and row.
+        This function accepts coordinates of image origin - starting pixel for drawing (like zero pixel).
+        The coordinates (j_start, i_start) as (x, y) could be negative or exceeding the scene sizes - in such case
+        whenever it possible, only the part of an object image will be added.
 
         Parameters
         ----------
@@ -153,12 +156,13 @@ class u_scene():
             Start pixel (y coordinate) for drawing of an image ("mask").
         j_start : int
             Start pixel (x coordinate) for drawing of an image ("mask").
-        mask : TYPE
-            2D np.array ("mask") with pixel values which representing the object.
+        mask : np.array
+            2D np.array ("mask") with pixel values which represent the object.
 
         Returns
         -------
         None.
+        The scene collected as internal attribute of this class.
 
         """
         (nRows, nCols) = np.shape(mask)  # getting of sizes of mask

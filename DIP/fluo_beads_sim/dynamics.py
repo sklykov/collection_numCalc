@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Simulation of diffusion / motion of microbeads.
+Simulation of diffusion / motion of microbeads in medium. Calculates only coord
 
 @author: ssklykov
 """
@@ -15,7 +15,7 @@ class diffusion():
     D = 1.0  # Diffusion coefficient
     coordinates = []
     time_interval = 1.0  # could be in different physical values
-    calibration = 1.0
+    calibration = 1.0  # for compensate diffusion coefficient and time_interval units
     x_steps = np.zeros(1000, dtype=float)
     y_steps = np.zeros(1000, dtype=float)
     r = np.zeros(1000, dtype=float)
@@ -76,7 +76,7 @@ class diffusion():
         Returns
         -------
         list
-            Of coordinates [x, y] for the center of diffused bead or whatever coordinates were input.
+            Of coordinates [x, y] or [i,j] for the center of diffused bead or whatever coordinates were input.
 
         """
         # Simulation for each coordinate in the approximated relation: r ~= sqrt(2)*x or r ~= sqrt(2)*y
@@ -111,7 +111,19 @@ class diffusion():
 
     # %% Visualize and check the histograms of x, y, r
     def get_statistics(self, size: int = 1000):
-        """Plotting the example of generated x,y steps and displacements r."""
+        """
+        Plotting the example of generated x,y steps and displacements r as the example of calculations.
+
+        Parameters
+        ----------
+        size : int, optional
+            Number of generated sample points for making graphs (histograms). The default is 1000.
+
+        Returns
+        -------
+        None.
+
+        """
         # The equation for 1D random walk from the Chandrasekhar's paper (1943) is used for simulate 1D diffusion step
         sigma = np.sqrt(2.0*self.D*self.time_interval)
         k = 1/(np.sqrt(2))
@@ -139,67 +151,22 @@ class diffusion():
         plt.legend(loc='upper right')
         plt.tight_layout()
 
-    # %% Recalculate origin's coordinates of a bead image according to coordinates of a center
-    @staticmethod
-    def get_i_origin(i_center: int, height: int) -> int:
-        """
-        Recalculates i coordinate of image origin.
-
-        Parameters
-        ----------
-        i_center : int
-            i coordinate of the bead center.
-        height : int
-            height of bead's image.
-
-
-        Returns
-        -------
-        i_origin : int
-            Calculated i coordinate of origin.
-
-        """
-        # TODO : possible remove in future. Kept for refernce
-        # if height_changed:
-        #     # it means that along i the bead is shifted less than 1 pixel
-        #     if i_step < 0:
-        #         additional_shift = -1
-        #     if i_step > 0:
-        #         additional_shift = 1
-        #     i_origin = i_center - ((height-1)//2) + additional_shift
-        # else:
-        #     i_origin = i_center - ((height-1)//2)
-
-        # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
-        # center, therefore, the origin should be the same as for centralized bead
-        i_origin = int(i_center - ((height-1)//2))
-        return i_origin
-
-    @staticmethod
-    def get_j_origin(j_center: int, width: int) -> int:
-        """
-        Recalculates j coordinate of image origin.
-
-        Parameters
-        ----------
-        j_center : int
-            i coordinate of the bead center.
-        width : int
-            width of bead's image.
-
-        Returns
-        -------
-        j_origin : int
-            Calculated j coordinate of origin.
-
-        """
-        # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
-        # center, therefore, the origin should be the same as for centralized bead
-        j_origin = int(j_center - ((width-1)//2))
-        return j_origin
-
     # %% Saving the origin of bead image
     def save_bead_origin(self, origin_coordinates: list):
+        """
+        Created for saving statistics on the calculated origin coordinates for addressing the issue with wrong
+        drawing.
+
+        Parameters
+        ----------
+        origin_coordinates : list
+            Calculated origin coordinates.
+
+        Returns
+        -------
+        None.
+
+        """
         i_origin = origin_coordinates[0]
         j_origin = origin_coordinates[1]
         self.origin.append([i_origin, j_origin])
