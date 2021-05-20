@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Simulation of dynamics of the fluorescent bead undergoing diffusion with specified parameters
+Simulation of dynamics of the fluorescent bead undergoing diffusion with specified parameters.
+Each new position is drawn on the new image that is further saved in the default folder.
 
 @author: ssklykov
 """

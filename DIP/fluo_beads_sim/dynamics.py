@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Simulation of diffusion / motion of microbeads in medium. Calculates only coord
+Simulation of diffusion / motion of microbeads in medium. Calculates only 2D coordinates (center of a microbead).
 
 @author: ssklykov
 """

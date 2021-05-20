@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Container for building a scene with fluorescent objects
+Container for building a scene with fluorescent objects (i.e., scene plays a role of background or frame).
 
 @author: ssklykov
 """
