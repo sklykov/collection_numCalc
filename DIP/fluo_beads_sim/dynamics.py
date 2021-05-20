@@ -22,6 +22,7 @@ class diffusion():
     x_generated_steps = []
     y_generated_steps = []
     r_generated = []
+    origin = []
 
     # %% Initialization
     def __init__(self, initial_point: list, D: float = 1.0, time_interval: float = 1.0, calibration: float = 1.0):
@@ -60,7 +61,7 @@ class diffusion():
             raise ValueError("Initial point should contain initial coordinates of a bead in form like [x, y]")
 
     # %% Calculate coordinates for the next position
-    def get_next_point(self, round_precision: int = 3) -> list:
+    def get_next_point(self, round_precision: int = 3, debug: bool = False) -> list:
         """
         Calculates the next point in the generated sequence of the diffused bead according to the fundamental
         equation provided in the paper Chandrasekhar (1943) "Stochastic Problems in Physics and Astronomy"
@@ -69,6 +70,8 @@ class diffusion():
         ----------
         round_precision : int, optional
             The presicion of rounding output coordinates in pixels. The default is 3.
+        debug: bool, optional
+            Flag for activating some debugging logic below
 
         Returns
         -------
@@ -90,8 +93,10 @@ class diffusion():
         y_step = k*np.random.normal(0, sigma)
         y_step *= self.calibration
         # rounding for trimming unnecessary precision (the values provided in pixels, extra precision could be overkill)
-        x_step = np.round(x_step, round_precision)
-        y_step = np.round(y_step, round_precision)
+        x_step = np.round(x_step, round_precision-1)
+        y_step = np.round(y_step, round_precision-1)
+        if debug:
+            x_step = 0.9999
         self.x_generated_steps.append(x_step)
         self.y_generated_steps.append(y_step)
         r = np.round(np.sqrt(x_step**2 + y_step**2), round_precision)
@@ -167,7 +172,7 @@ class diffusion():
 
         # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
         # center, therefore, the origin should be the same as for centralized bead
-        i_origin = i_center - ((height-1)//2)
+        i_origin = int(i_center - ((height-1)//2))
         return i_origin
 
     @staticmethod
@@ -190,8 +195,14 @@ class diffusion():
         """
         # TIP : Independently of bead image height / width, the shift already accounted in the calculation of image
         # center, therefore, the origin should be the same as for centralized bead
-        j_origin = j_center - ((width-1)//2)
+        j_origin = int(j_center - ((width-1)//2))
         return j_origin
+
+    # %% Saving the origin of bead image
+    def save_bead_origin(self, origin_coordinates: list):
+        i_origin = origin_coordinates[0]
+        j_origin = origin_coordinates[1]
+        self.origin.append([i_origin, j_origin])
 
     # %% Saving of all generated parameters
     def save_generated_stat(self, save_figures: bool = False, save_stats: bool = True, default_folder: str = "tests"):
@@ -297,6 +308,12 @@ class diffusion():
                 for coordinate in self.coordinates:
                     string = str(coordinate[0]) + " " + str(coordinate[1]) + "\n"  # whitespace-delimited recording
                     textfile.write(string)
+            default_name = "origin coordinates.txt"
+            if len(self.origin) > 0:
+                with open(os.path.join(default_path_for_saving, default_name), 'w') as textfile:
+                    for coordinate in self.origin:
+                        string = str(coordinate[0]) + " " + str(coordinate[1]) + "\n"  # whitespace-delimited recording
+                        textfile.write(string)
 
 
 # %% Testing

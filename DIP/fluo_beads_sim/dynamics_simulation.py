@@ -20,8 +20,9 @@ wavelength = 486
 NA = 1.2
 calibration = 111
 bead_diameter = 28
-diffusion_coeff = 1
+diffusion_coeff = 0.1
 nFrames = 1000
+round_presicion = 4
 
 # %% Simulation
 diffusion_sim = diffusion([i_initial, j_initial], D=diffusion_coeff)
@@ -39,10 +40,12 @@ j_center = j_initial
 i_step = 0.0
 j_step = 0.0
 # print("i step:", i_step, "j step:", j_step)
+# print("initials", i_center, j_center)
 
 
 for i in range(nFrames):
-    even_bead.get_whole_shifted_blurred_bead(i_center, j_center, bead_intensity, NA, wavelength, calibration)
+    even_bead.get_whole_shifted_blurred_bead(i_center, j_center, bead_intensity, NA, wavelength, calibration,
+                                             round_presicion)
     # even_bead.plot_bead()
     i_center = even_bead.offsets[0]  # recalculate even pixel offset for adding the bead to the scene (background)
     j_center = even_bead.offsets[1]  # recalculate even pixel offset for adding the bead to the scene (background)
@@ -57,16 +60,18 @@ for i in range(nFrames):
     # coordinates of bead's center (i_center, j_center) and origin of its image (i_origin, j_origin) for further drawing
     i_origin = diffusion.get_i_origin(i_center, even_bead.height)
     j_origin = diffusion.get_i_origin(j_center, even_bead.width)
+    diffusion_sim.save_bead_origin([i_origin, j_origin])  # for possible debugging of the program
     # print("i new:", i_origin, "j new:", j_origin)
     # print()
 
     # Placing calculated image of a bead into background (scene)
     scene.add_mask(i_origin, j_origin, even_bead.bead_img)
     # scene.plot_image()
-    scene.save_scene("png")
+    scene.save_scene("png")  # regulates of extension of generated images
     scene.clear_scene()  # clearing generated bead for refreshing scene for the next frame
     if i < (nFrames-1):
-        [i_center, j_center] = diffusion_sim.get_next_point()
+        [i_center, j_center] = diffusion_sim.get_next_point(round_presicion)
+        # print("i center:", i_center, "j center:", j_center)
         # i_step = diffusion_sim.x_generated_steps[len(diffusion_sim.x_generated_steps)-1]
         # j_step = diffusion_sim.y_generated_steps[len(diffusion_sim.y_generated_steps)-1]
         # print("i step:", i_step, "j step:", j_step)
