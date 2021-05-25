@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 # from skimage.util import img_as_ubyte
 import os
 from skimage.io import imsave
+from scipy.ndimage import measurements
 
 
 # %% class definition
@@ -25,6 +26,7 @@ class u_scene():
     scene_image = np.zeros((height, width), dtype=image_type)
     maxPixelValue = 255
     counter = 1  # counting how many images saved along generation
+    centers_of_mass = []
 
     # %% Constructor
     def __init__(self, width: int, height: int, image_type: str = 'uint8'):
@@ -142,7 +144,7 @@ class u_scene():
         return i_finish
 
     # %% Drawing of an object with some intensity mask (profile)
-    def add_mask(self, i_start: int, j_start: int, mask):
+    def add_mask(self, i_start: int, j_start: int, mask, debug: bool = False):
         """
         Adding the "mask" - representation of the object (basically, less than the scene (background) image).
         Contradictory, i_start represents "y" coordinate, j_start - "x", due to array representation of column and row.
@@ -158,6 +160,9 @@ class u_scene():
             Start pixel (x coordinate) for drawing of an image ("mask").
         mask : np.array
             2D np.array ("mask") with pixel values which represent the object.
+        debug: bool, optional
+            Flag for saving some internal statistical values for checking of possible bugs during calculations.
+            The default is False.
 
         Returns
         -------
@@ -242,6 +247,11 @@ class u_scene():
                 for j in range(j_start, j_finish):
                     pixels_sum = self.scene_image[i, j] + mask[i+i_mask_start, j+j_mask_start]
                     self.scene_image[i, j] = self.cast_pixels_sum(pixels_sum)
+        # HINT: below is controlling of simulation - calculation of center of mass of added mask (generated scene)
+        if debug:
+            (i_mass_center, j_mass_center) = measurements.center_of_mass(self.scene_image)
+            self.centers_of_mass.append([i_mass_center, j_mass_center])
+        # print([i_mass_center, j_mass_center])
 
     # %% Plotting the summurized image (scene) with all objects
     def plot_image(self):

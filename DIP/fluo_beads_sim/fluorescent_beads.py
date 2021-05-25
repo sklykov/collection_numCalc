@@ -18,6 +18,7 @@ import math
 
 # %% class definition
 class image_beads():
+    """Collection of all methods related to generation of fluorescent beads in the microscope images."""
     # default values
     width = 11
     height = 11
@@ -31,12 +32,15 @@ class image_beads():
     maxPixelValue = 255  # default for a 8bit gray image
     kernel_PSF = []  # for storing the kernel for convolution ("diffraction blurring of sharp edges")
     bead_conv_border = []  # for storing blurred border
-    offsets = [int(0), int(0)]  # for storing global offset of a bead image (matrix with its profile)
+    offsets = [0, 0]  # for storing global offset of a bead image (matrix with its profile)
     # Since the PSF kernel is saved as the class attribute, the collection of following parameters also useful:
     NA = 1.25
     wavelength = 532  # in nanometers
     calibration = 110  # in nanometer/pixel
     max_pixel_value_bead = 255  # for 8bit image
+    debug_offsets = []
+    debug_centers = []
+    shifts = [0.0, 0.0, 1.0, 1.0]  # for fixing bug of wrong placing of images
 
     # %% Constructor
     def __init__(self, image_type: str = 'uint8', character_size: int = 5, bead_type: str = "even round"):
@@ -102,20 +106,32 @@ class image_beads():
         i_center = (self.height // 2)
         j_center = (self.width // 2)
         if self.bead_type == "even round":
-            radius = self.character_size*0.5
+            radius = np.round(self.character_size*0.5, 3)
             for i in range(self.width):
                 for j in range(self.height):
-                    distance = np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))
+                    distance = np.round((np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))), 3)
+                    position_diff = np.round((distance - radius), 3)
                     # print(i, j, ":", distance - radius)
-                    if ((distance - radius) < 1):
-                        # print(distance-radius)
+                    # (distance - radius) < 1
+                    # distance <= (radius - 0.0001)
+
+                    if (position_diff < 1.0):
                         self.bead_img[i, j] = max_pixel_val
+
+                    # HINT: attempt to calculate real even round bead profile with some smoothing of edge pixels
+                    # if ((position_diff) < 1.0) and ((position_diff) > 0.0):
+                    #     intensity_coefficient = 1.0 - (position_diff)
+                    #     intensity = int(float(max_pixel_val)*intensity_coefficient)
+                    #     self.bead_img[i, j] = intensity
+                    #     print(intensity)
+
                     if ((distance - radius) < 1) and ((distance - radius) >= 0):
                         # print(distance-radius)
                         self.bead_border[i, j] = max_pixel_val
 
     # %% Generate centralized with shift less 1 pixel profile
-    def get_bead_img_arbit_center(self, i_offset: float, j_offset: float, max_pixel_val, round_precision: int = 3):
+    def get_bead_img_arbit_center(self, i_offset: float, j_offset: float, max_pixel_val, round_precision: int = 3,
+                                  debug: bool = False):
         """
         Generate shifted for less than 1 pixel centared before image of a bead with specified type.
         Such splitting on even pixel shift and less than 1 pixel is performed because of even offset
@@ -134,6 +150,9 @@ class image_beads():
         round_precision: int, optional
             Restrict the precision of calculation of float differences to control (estimate) possible rounding errors.
             The default is 3.
+        debug: bool, optional
+            Flag for saving some internal statistical values for checking of possible bugs during calculations.
+            The default is False.
 
         Returns
         -------
@@ -146,41 +165,67 @@ class image_beads():
             self.width = int(self.character_size*2) + 1
             self.bead_img = np.zeros((self.height, self.width), dtype=self.image_type)
         # The self.offsets will store even pixel offsets for bead for its further introducing to the scene (background)
-        self.offsets[0] = int(0)  # reinitilization for repeating generation
-        self.offsets[1] = int(0)  # reinitilization for repeating generation
+        self.offsets[0] = 0  # reinitilization for repeating of generation
+        self.offsets[1] = 0  # reinitilization for repeating of generation
 
         # Attempt to avoid rounding errors - introducing delta_precision (difference between 0.0 - 0.0 != 0.0 always)
         if round_precision > 1:
-            delta_precision = 1/(pow(10, round_precision + 2))
-            delta_precision = round(delta_precision, round_precision + 3)
+            delta_precision = 1/(pow(10, round_precision + 3))
+            delta_precision = np.round(delta_precision, round_precision + 4)
         # print(delta_precision)
+        # print(round_precision)
 
         # Using the math module modf() instead of manually defining float and integer part of input float values
         (i_float_part, i_integer_part) = math.modf(i_offset)
         (j_float_part, j_integer_part) = math.modf(j_offset)
         self.offsets[0] = int(i_integer_part)
         self.offsets[1] = int(j_integer_part)
-        i_offset = round(i_float_part, round_precision)  # attempt to avoid rounding errors
-        j_offset = round(j_float_part, round_precision)  # attempt to avoid rounding errors
+        i_offset = np.round(i_float_part, round_precision)  # attempt to avoid rounding errors
+        j_offset = np.round(j_float_part, round_precision)  # attempt to avoid rounding errors
+
+        # Hunting for wrong placing bug
+        if (debug):
+            self.debug_offsets.append([i_offset, j_offset])
+
         # Calculating the profile of the sub-centralized bead - the bead that is shifted less than 1 pixel in any
         # specified direction - because shifts more than that could be simply drawn on the scene
         i_center = round((float(self.height // 2) + i_offset), round_precision)
         j_center = round((float(self.width // 2) + j_offset), round_precision)
-        # print(i_center, j_center)
+
+        # Hunting for wrong placing bug
+        if (debug):
+            self.debug_centers.append([i_center, j_center])
+
+        # Actual calculation of image matrix (assigning intensities from image center to borders of an bead's image)
         if self.bead_type == "even round":
-            radius = round(self.character_size*0.5, round_precision + 1)
+            radius = (self.character_size*0.5)
             for i in range(self.width):
                 for j in range(self.height):
-                    distance = np.round(np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2)),
-                                        round_precision + 1)
-                    # print(i, j, ":", distance - radius)
+                    distance = (np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2)))
+                    position_diff = np.round((distance-radius), round_precision + 2)
                     # !!! : Always in any calculation with floating points there may be comparison value problems
-                    # HACK below: use the comparison with some delta that depends on precision of calculations
-                    if ((distance - radius) < (1.0 - delta_precision)):
-                        # print(distance-radius)
+                    if (position_diff - 1.0) < 0:
+                        # Again, attempt to catch the bug with round error in definition of pixel placing
+                        if (position_diff - 1.0 + delta_precision) >= 0 and debug:
+                            print("Rounding bug", position_diff)
                         self.bead_img[i, j] = max_pixel_val
-                    if ((distance - radius) < (1.0 - delta_precision)) and ((distance - radius) >= 0):
+                    # Also, for catching the possible rounding bug
+                    if abs(position_diff - 1.0) <= 3*delta_precision and abs(position_diff - 1.0) > 0 and debug:
+                        print("Rounding bug", position_diff)
+                    if ((position_diff) < (1.0 - delta_precision)) and ((position_diff) >= 0.0):
                         self.bead_border[i, j] = max_pixel_val
+            # HINT: Fixing the bug with wrong placing the bead image on the scene (discrepency with placed coordinates
+            # and position of a bead). Found so far reason - discrepency between position close to 1 pixel shift,
+            # size of bead's image and coordinates of it place on the scene
+            if (round_precision > 1):
+                # subpixel_shift = np.round((1.0 - (1/pow(10, round_precision - 1))), round_precision)  # not working
+                subpixel_shift = 0.99  # HINT: in all experiments this is the minimal value for comparison
+                if i_offset >= subpixel_shift:
+                    # print(subpixel_shift, i_offset)
+                    self.shifts[0] = i_offset
+                if j_offset >= subpixel_shift:
+                    self.shifts[1] = j_offset
+                    # print(subpixel_shift, j_offset)
 
     # %% Calculation of PSF for any point depending on pixel distance to the central point
     @staticmethod
@@ -485,8 +530,9 @@ class image_beads():
         self.height_centrilized_trimmed_bead = self.height
 
     # %% Calculation of centralized and shifted less than 1 pixel blurred bead by convolving its profile with PSF kernel
-    def get_whole_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val,
-                                       NA: float, wavelength: float, calibration: float, round_precision: int = 3):
+    def get_whole_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val, NA: float,
+                                       wavelength: float, calibration: float, round_precision: int = 3,
+                                       debug: bool = False):
         """
         Calculate the blurred, shifted to less than 1 pixel from the center image of the specified bead.
 
@@ -508,7 +554,10 @@ class image_beads():
             Calibration: um/pixel or nm/pixel for recalculation pixels to the physical values um or nm.
         round_precision: int, optional
             Restrict the precision of calculation of float differences to control (estimate) possible rounding errors
-            The default is 3.
+            The default is 3
+        debug: bool, optional
+            Flag for saving some internal statistical values for checking of possible bugs during calculations.
+            The default is False.
 
         Returns
         -------
@@ -516,7 +565,7 @@ class image_beads():
 
         """
         # Calculate profile of shifted less than 1 pixel ideal bead (not blurred by convolving with PSF)
-        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val)
+        self.get_bead_img_arbit_center(i_offset, j_offset, max_pixel_val, round_precision, debug)
         # Accounting of diffraction blurring
         self.calculate_img_PSF(NA, wavelength, calibration)
         calibration_sum = np.sum(self.kernel_PSF)
@@ -529,12 +578,28 @@ class image_beads():
         if self.image_type == 'uint8':
             self.bead_img = np.uint8(convolved_bead)
         self.trim_image_for_scene()
+        # HINT: below is the code for fixing the error in placing bead with coordinates close to even pixel
+        if self.shifts[0] > 0.0:  # Not perfect way of comparison, maybe, but seems enough!
+            if (self.height % 2 != 0):
+                # print("Bug catched")
+                self.offsets[0] += 1
+            self.shifts[0] = 0.0
+        if self.shifts[1] > 0.0:
+            if (self.width % 2 != 0):
+                # print("Bug catched")
+                self.offsets[1] += 1
+            self.shifts[1] = 0.0
         # print(self.height, self.width)
 
     # %% Plotting the bead's image or profile
-    def plot_bead(self):
+    def plot_bead(self, plot_border: bool = False):
         """
         Plotting various class' matrix attributes (specified in the code) as images opened as matplotlib windows.
+
+        Parameters
+        ----------
+        plot_border : bool, optional
+            Plotting of calculated border. The default is False.
 
         Returns
         -------
@@ -549,9 +614,9 @@ class image_beads():
         plt.imshow(self.bead_img, cmap=plt.cm.gray, aspect='auto', origin='lower',
                    extent=(0, self.width, 0, self.height))
         plt.tight_layout()
-        if np.size(self.bead_conv_border) > 0:
+        if np.size(self.bead_border) > 0 and plot_border:
             plt.figure()
-            plt.imshow(self.bead_conv_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
+            plt.imshow(self.bead_border, cmap=plt.cm.gray, aspect='auto', origin='lower',
                        extent=(0, self.width, 0, self.height))
             plt.tight_layout()
 
@@ -674,6 +739,7 @@ if __name__ == '__main__':
     wavelength = 486
     NA = 1.2
     calibration = 111
+    round_precision = 3
     even_bead = image_beads(character_size=28)  # make the size of a bead bigger for representation
     # even_bead.get_centralized_bead(bead_intensity)
     # image_beads.show_PSF(bead_intensity, 6, NA, wavelength, calibration, save=True)
@@ -682,8 +748,10 @@ if __name__ == '__main__':
     # even_bead.calc_border_extended_PSF()
     # even_bead.get_centralized_blurred_bead(bead_intensity, NA, wavelength, calibration)
     # even_bead.get_whole_centr_blurred_bead(bead_intensity, NA, wavelength, calibration)
-    # # even_bead.trim_image_for_scene()
-    even_bead.get_whole_shifted_blurred_bead(0.0, 0.1, bead_intensity, NA, wavelength, calibration)
+    # even_bead.get_whole_shifted_blurred_bead(0.019, 0.0, bead_intensity, NA, wavelength, calibration, round_precision)
+    # even_bead.plot_bead()
+    # print(even_bead.height, even_bead.width)
+    even_bead.get_whole_shifted_blurred_bead(0.999, 0.0, bead_intensity, NA, wavelength, calibration, round_precision)
     origin = even_bead.get_origin_coordinates()
     # print(even_bead.height_centrilized_trimmed_bead, even_bead.width_centrilized_trimmed_bead)
     print(even_bead.height, even_bead.width)

@@ -2,25 +2,28 @@
 """
 Perform simple plotting and convey with comments style of the Numpy.
 
-This script has been created for performing simple plotting using the matplotlib library
+This script has been created for performing simple plotting using the matplotlib library.
 The main purpose is to collect commands for fast and fancy formatting of a produced graph
-WARNING: the autocompletion doesn't work in Spyder IDE that has been used for its creation
-Generally, the most useful information about the used above methods has been collected
-on the StackOverflow website, instead of using simple way of autocompletion / DocStrings reading
+NOTE (historical): the autocompletion doesn't work in Spyder IDE (ver. 4.0) that has been used for its creation.
+Generally, the most useful information about the used below methods has been collected
+on the StackOverflow website, instead of using simple way of autocompletion / DocStrings reading.
 @author: ssklykov
 """
 import matplotlib.pyplot as plt
 import numpy as np
 
 # preparing sample for plotting using np.arrays
-stepX = 0.1; maxX = 5.0; minX = -5.0;
+stepX = 0.1
+maxX = 5.0
+minX = -5.0
 x = np.arange(minX, maxX+stepX, stepX)  # More handful than np.linspace (maybe)
 x = np.around(x, 2)  # To guarantee values consistency (only 2 significant digits in float numbers)
 y = np.power(x, 2)  # Calculation of x**2 for guaranting consistency of results (np.array - in and out)
 y = np.around(y, 1)  # To guarantee values consistency (only 2 significant digits in float numbers)
 
 # Plotting and graph formatting - using OOP concepts
-wSize = 1.2*(9.0/2.54); hSize = (9.0/2.54)  # converting santimeters to inches
+wSize = 1.2*(9.0/2.54)  # converting centimeters to inches
+hSize = (9.0/2.54)
 plt.rc('font', family='serif')  # I give up to find it without autocompletion in 'figure' or 'Axes' properties
 fig = plt.figure(figsize=(wSize, hSize))  # fig itself... dpi only setting...
 # axes = fig.add_subplot(1,1,1) # axes class

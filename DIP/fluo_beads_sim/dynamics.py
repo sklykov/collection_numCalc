@@ -86,17 +86,16 @@ class diffusion():
         # k - because of coordinates x, y - independent and summed in the displacement vector r
         k = 1/(np.sqrt(2))
         # k = 1/(2*sigma*np.sqrt(np.pi))  # coefficient for conformity with the equation from Qian, et al. (1991) WRONG
-        # print(sigma, k)
         # NOTE: x and y here stand for i and j respectively in matrix (the scene image) (!)
         x_step = k*np.random.normal(0, sigma)
         x_step *= self.calibration
         y_step = k*np.random.normal(0, sigma)
         y_step *= self.calibration
         # rounding for trimming unnecessary precision (the values provided in pixels, extra precision could be overkill)
-        x_step = np.round(x_step, round_precision-1)
-        y_step = np.round(y_step, round_precision-1)
-        if debug:
-            x_step = 0.9999
+        x_step = np.round(x_step, round_precision)
+        y_step = np.round(y_step, round_precision)
+        # if debug:
+        #     x_step = 0.9999
         self.x_generated_steps.append(x_step)
         self.y_generated_steps.append(y_step)
         r = np.round(np.sqrt(x_step**2 + y_step**2), round_precision)
