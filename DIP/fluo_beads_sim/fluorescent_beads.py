@@ -25,7 +25,7 @@ class image_beads():
     possible_img_types = ['uint8', 'uint16', 'float']
     character_size = 5
     image_type = 'uint8'
-    bead_types = ["even round", "gaussian round", "uneven round"]
+    bead_types = ["even round", "gaussian round", "uneven round", "even improved round"]
     bead_type = "even round"
     bead_img = np.zeros((height, width), dtype=image_type)  # intensity profile of a bead
     bead_border = np.zeros((height, width), dtype=image_type)  # edge or border of a bead
@@ -112,18 +112,35 @@ class image_beads():
                     distance = np.round((np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))), 3)
                     position_diff = np.round((distance - radius), 3)
                     # print(i, j, ":", distance - radius)
-                    # (distance - radius) < 1
-                    # distance <= (radius - 0.0001)
+
+                    # HINT: Simple even round bead - all pixels laying in radius of a bead have the same intensity
+                    if (position_diff < 1.0):
+                        self.bead_img[i, j] = max_pixel_val
+
+                    if ((distance - radius) < 1) and ((distance - radius) >= 0):
+                        self.bead_border[i, j] = max_pixel_val
+
+        # HINT: attempt to calculate more real even round bead profile with some smoothing of edge pixels
+        if self.bead_type == "even improved round":
+            self.height = int(self.character_size*2) + 1
+            self.width = int(self.character_size*2) + 1
+            self.bead_img = np.zeros((self.height, self.width), dtype=self.image_type)
+            radius = np.round(self.character_size*0.5, 3)
+            for i in range(self.width):
+                for j in range(self.height):
+                    distance = np.round((np.sqrt(np.power((i - i_center), 2) + np.power((j - j_center), 2))), 3)
+                    position_diff = np.round((distance - radius), 3)
+                    # print(i, j, ":", position_diff)
 
                     if (position_diff < 1.0):
                         self.bead_img[i, j] = max_pixel_val
 
-                    # HINT: attempt to calculate real even round bead profile with some smoothing of edge pixels
-                    # if ((position_diff) < 1.0) and ((position_diff) > 0.0):
-                    #     intensity_coefficient = 1.0 - (position_diff)
-                    #     intensity = int(float(max_pixel_val)*intensity_coefficient)
-                    #     self.bead_img[i, j] = intensity
-                    #     print(intensity)
+                    if ((position_diff) < 1.0) and ((position_diff) > 0.0):
+                        # FIXME: is there more precise estimation for intensity reducement below?
+                        intensity_coefficient = 1.0 - (position_diff/2)
+                        intensity = int(float(max_pixel_val)*intensity_coefficient)
+                        self.bead_img[i, j] = intensity
+                        # print(intensity)
 
                     if ((distance - radius) < 1) and ((distance - radius) >= 0):
                         # print(distance-radius)
@@ -752,11 +769,13 @@ if __name__ == '__main__':
     # even_bead.plot_bead()
     # print(even_bead.height, even_bead.width)
     even_bead.get_whole_shifted_blurred_bead(0.999, 0.0, bead_intensity, NA, wavelength, calibration, round_precision)
-    origin = even_bead.get_origin_coordinates()
+    # origin = even_bead.get_origin_coordinates()
     # print(even_bead.height_centrilized_trimmed_bead, even_bead.width_centrilized_trimmed_bead)
     print(even_bead.height, even_bead.width)
     # print(even_bead.height_changed, even_bead.width_changed)
     # even_bead.get_shifted_blurred_bead(0.6, 0.3, bead_intensity, NA, wavelength, calibration)
-
-    even_bead.plot_bead()
+    # even_bead.plot_bead()
     # even_bead.save_bead_image("even_trimmed_shifted_blurred_bead3.png")
+    improved_bead = image_beads(character_size=28, bead_type="even improved round")
+    improved_bead.get_centralized_bead(bead_intensity)
+    improved_bead.plot_bead()
