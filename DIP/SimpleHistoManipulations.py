@@ -31,7 +31,8 @@ sample_img = LoaderFile.loadSampleImage()
 # %% Calculation of negative for U8 images
 def negativeUbyteImage(img, test: bool = False):
     """
-    Calculates negative of an input U8 image usng slow pixelwise loops.
+    Calculate negative of an input U8 image usng slow pixelwise loops.
+
     Inputs:
         img - 2D image
         test - boolean flag to display or not results of this operation
@@ -160,7 +161,8 @@ def logUbyteImage(img, test: bool = False, vectorized: bool = True, maxConstant:
 # %% Gamma-correction of U8 images
 def gammaUbyteImage(img, test: bool = False, a: float = 1.0, gamma: float = 1.0, vectorized: bool = True):
     """
-    Applying gamma correction to pixel values in the form of new_pixel = a*((sample_pixel)**gamma)
+    Apply gamma correction to pixel values in the form of new_pixel = a*((sample_pixel)**gamma).
+
     Input:
         a - coefficient (a > 0, will be assigned to 1 otherwise)
         gamma - power of transformation
