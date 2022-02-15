@@ -9,8 +9,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from matplotlib import cm
-iteration = 0
-plt.close()  # closing all opened and pending figures
+plt.close('all')  # closing all opened and pending figures
 
 
 # %% Functions definitions
@@ -56,14 +55,6 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
     float:
         Recursively calculated radial polynomial.
     """
-    global iteration  # for accounting number of iterations
-    if (iteration == 0):  # for starting calculation make coefficients > 0
-        m = abs(m)
-        n = abs(n)
-        iteration += 1
-    # iteration += 1  # Debugging
-    # print("iteration:", iteration)  # Debugging
-    # print("m:", m, "   ", "n:", n) # Debugging
     if (n == 0) and (m == 0):
         return 1.0
     elif (m > n):
@@ -71,7 +62,7 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
     else:
         # Recursion formula that should be more effective than direct calculation
         return (r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) -
-                radial_polynomial(m, n-2, r))
+                - radial_polynomial(m, n-2, r))
 
 
 def triangular_function(m: int, theta: float) -> float:
@@ -91,7 +82,6 @@ def triangular_function(m: int, theta: float) -> float:
         Calculated value.
 
     """
-    m = abs(m)
     if (m > 0):
         return math.cos(m*theta)
     elif (m < 0):
@@ -227,22 +217,76 @@ def plot_zps_rectangular(orders: list, step_xy: float = 0.02):
     plt.tight_layout()
 
 
+def radial_polynomial_derivative_dr(m: int, n: int, r: float) -> float:
+    """
+    Calculate derivative on radius of radial polynomial (like dR(m,n)/dr), that is calculated by the recurrence equation.
+
+    Parameters
+    ----------
+    m: int
+        Azimutal order.
+    n: int
+        Radial order.
+    r: float
+        Radius from the polar coordinate.
+
+    Returns
+    -------
+    float:
+        Recursively calculated derivative on radius from the radial polynomial.
+
+    """
+    if (n == 0) and (m == 0):
+        return 1.0
+    elif (m > n):
+        return 0.0
+    else:
+        # Recursion formula that should be more effective than direct calculation
+        return (radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r) -
+                - radial_polynomial_derivative_dr(m, n-2, r))
+
+
+def triangular_derivative_dtheta(m: int, theta: float) -> float:
+    """
+    Calculate derivative of triangular function on the angle theta (like dTriangular/dtheta).
+
+    Parameters
+    ----------
+    m : int
+        Azimutal order.
+    theta : float
+        Angle from polar coordinates associated with the unit circle .
+
+    Returns
+    -------
+    float
+        Calculated value.
+
+    """
+    if (m > 0):
+        return -m*math.sin(m*theta)
+    elif (m < 0):
+        return -m*math.cos(m*theta)
+    else:
+        return 1.0
+
+
 # %% Tests
 if __name__ == '__main__':
-    r = 1.0; m = 1; n = 1; theta = 0.0
+    r = 2.0; m = -2; n = 2; theta = 0.0
     # print(normalization_factor(0,0))
     print("radial polynomial:", radial_polynomial(m, n, r))
+    print("derivative of the radial polynomial: ", radial_polynomial_derivative_dr(m, n, r))
     print("zernike polynomial:", zernike_polynomial(m, n, r, theta))
     # print("sum of two polynomials 1, 1 and 0, 2:", zernike_polynomials_sum([(1, 1), (0, 2)], r, theta))
 
     # %% Plotting results over the surface
-    # Calculation of plotting points as 2D matrix
-    orders = [(-1, 1)]  # Y tilt
-    plot_zps_rectangular(orders)
     # Plotting as the radial surface - Y tilt and Defocus
     step_r = 0.005
     step_theta = 1  # in grads
     orders = [(-1, 1)]  # Y tilt
     plot_zps_polar(orders, step_r, step_theta, "Y tilt")
+    orders = [(-2, 2)]  # Y tilt
+    plot_zps_polar(orders, step_r, step_theta, "Oblique astigmatism")
     orders = [(0, 2)]  # Defocus
     plot_zps_polar(orders, step_r, step_theta, "Defocus")
