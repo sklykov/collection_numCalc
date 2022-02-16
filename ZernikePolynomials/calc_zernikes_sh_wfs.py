@@ -103,7 +103,7 @@ def get_localCoM_matrix(image: np.ndarray, min_dist_peaks: int = 15, threshold_a
 
 
 def get_integr_limits_circular_lenses(image: np.ndarray, aperture_radius: float = 15.0,
-                                      min_dist_peaks: int = 12, threshold_abs: float = 2,
+                                      min_dist_peaks: int = 15, threshold_abs: float = 2,
                                       unknown_geometry: bool = True, debug: bool = False):
     # Plotting the estimated circular apertures with the centers the same as found on the image local peaks
     # This is only for the unknown geometry applied
@@ -113,10 +113,44 @@ def get_integr_limits_circular_lenses(image: np.ndarray, aperture_radius: float 
         plt.plot(cols//2, rows//2, '+', color="red")  # Plotting the center of an input image
         plt.title("Estimated circular apertures of mircolenses array")
         detected_centers = peak_local_max(image, min_distance=min_dist_peaks, threshold_abs=threshold_abs)
+        rho0 = np.zeros(np.size(detected_centers, 0), dtype='float')
+        theta0 = np.zeros(np.size(detected_centers, 0), dtype='float')
+        theta1 = np.zeros(np.size(detected_centers, 0), dtype='float')
         for i in range(np.size(detected_centers, 0)):
             # Plot found regions for CoM calculations
             plt.gca().add_patch(Circle((detected_centers[i, 1], detected_centers[i, 0]), aperture_radius,
                                        edgecolor='green', facecolor='none'))
+            # Calculation of the boundaries of the integration intervals for equations from the thesis
+            # Maybe, mine interpretation is wrong or too direct
+            x_relative = detected_centers[i, 1] - cols//2  # relative to the center of an image
+            y_relative = detected_centers[i, 0] - rows//2   # relative to the center of an image
+            rho0[i] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
+            # Below - manual recalculation of angles
+            # !!!: axes X, Y => cols, rows on an image, center of polar coordinates - center of an image
+            # !!!: angles are calculated relative to swapped X and Y axes, calculation below in grads
+            if (x_relative > 0.0) and (y_relative > 0.0):
+                theta1[i] = np.arctan(x_relative/y_relative)*(180/np.pi)
+            elif (y_relative < 0.0) and (x_relative > 0.0):
+                theta1[i] = 180.0 - (np.arctan(x_relative/abs(y_relative))*(180/np.pi))
+            elif (y_relative < 0.0) and (x_relative < 0.0):
+                theta1[i] = 180.0 + (np.arctan(x_relative/y_relative)*(180/np.pi))
+            elif (y_relative > 0.0) and (x_relative < 0.0):
+                theta1[i] = 360.0 - (np.arctan(abs(x_relative)/y_relative)*(180/np.pi))
+            elif (y_relative == 0.0) and (x_relative > 0.0):
+                theta1[i] = 90.0
+            elif (y_relative == 0.0) and (x_relative < 0.0):
+                theta1[i] = 270.0
+            elif (x_relative == 0.0) and (y_relative > 0.0):
+                theta1[i] = 0.0
+            elif (x_relative == 0.0) and (y_relative < 0.0):
+                theta1[i] = 180.0
+
+        plt.figure()
+        plt.axes(projection='polar')
+        plt.plot(np.radians(theta1), rho0, '.')
+        # plt.axis('off')
+        plt.tight_layout()
+        return (theta1, rho0)
 
 
 # %% Open and process test images (from https://github.com/jacopoantonello/mshwfs)
@@ -140,4 +174,4 @@ coms_nonaberrated = np.sort(coms_nonaberrated, axis=0); coms_aberrated = np.sort
 diff_coms = coms_nonaberrated - coms_aberrated
 t2 = time.time()
 print("Shift of local center of masses between non- and aberrated images takes: ", np.round(t2-t1, 3), "s")
-get_integr_limits_circular_lenses(diff_nonaberrated, debug=True)
+(theta, rho) = get_integr_limits_circular_lenses(diff_nonaberrated, debug=True)
