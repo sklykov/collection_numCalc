@@ -17,6 +17,8 @@ from skimage.feature import peak_local_max
 import time
 from matplotlib.patches import Rectangle, Circle
 from scipy import ndimage
+from zernike_pol_calc import radial_polynomial, radial_polynomial_derivative_dr, triangular_function
+from zernike_pol_calc import triangular_derivative_dtheta
 plt.close('all')
 
 
@@ -113,9 +115,11 @@ def get_integr_limits_circular_lenses(image: np.ndarray, aperture_radius: float 
         plt.plot(cols//2, rows//2, '+', color="red")  # Plotting the center of an input image
         plt.title("Estimated circular apertures of mircolenses array")
         detected_centers = peak_local_max(image, min_distance=min_dist_peaks, threshold_abs=threshold_abs)
-        rho0 = np.zeros(np.size(detected_centers, 0), dtype='float')
-        theta0 = np.zeros(np.size(detected_centers, 0), dtype='float')
-        theta1 = np.zeros(np.size(detected_centers, 0), dtype='float')
+        rho0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate of a lens center
+        theta0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate of a lens center
+        theta_a = np.zeros(np.size(detected_centers, 0), dtype='float')  # integration limit on theta (1)
+        theta_b = np.zeros(np.size(detected_centers, 0), dtype='float')  # integration limit on theta (2)
+        integration_limits = [(0.0, 0.0) for i in range(np.size(detected_centers, 0))]
         for i in range(np.size(detected_centers, 0)):
             # Plot found regions for CoM calculations
             plt.gca().add_patch(Circle((detected_centers[i, 1], detected_centers[i, 0]), aperture_radius,
@@ -129,28 +133,98 @@ def get_integr_limits_circular_lenses(image: np.ndarray, aperture_radius: float 
             # !!!: axes X, Y => cols, rows on an image, center of polar coordinates - center of an image
             # !!!: angles are calculated relative to swapped X and Y axes, calculation below in grads
             if (x_relative > 0.0) and (y_relative > 0.0):
-                theta1[i] = np.arctan(x_relative/y_relative)*(180/np.pi)
+                theta0[i] = np.arctan(x_relative/y_relative)*(180/np.pi)
             elif (y_relative < 0.0) and (x_relative > 0.0):
-                theta1[i] = 180.0 - (np.arctan(x_relative/abs(y_relative))*(180/np.pi))
+                theta0[i] = 180.0 - (np.arctan(x_relative/abs(y_relative))*(180/np.pi))
             elif (y_relative < 0.0) and (x_relative < 0.0):
-                theta1[i] = 180.0 + (np.arctan(x_relative/y_relative)*(180/np.pi))
+                theta0[i] = 180.0 + (np.arctan(x_relative/y_relative)*(180/np.pi))
             elif (y_relative > 0.0) and (x_relative < 0.0):
-                theta1[i] = 360.0 - (np.arctan(abs(x_relative)/y_relative)*(180/np.pi))
+                theta0[i] = 360.0 - (np.arctan(abs(x_relative)/y_relative)*(180/np.pi))
             elif (y_relative == 0.0) and (x_relative > 0.0):
-                theta1[i] = 90.0
+                theta0[i] = 90.0
             elif (y_relative == 0.0) and (x_relative < 0.0):
-                theta1[i] = 270.0
+                theta0[i] = 270.0
             elif (x_relative == 0.0) and (y_relative > 0.0):
-                theta1[i] = 0.0
+                theta0[i] = 0.0
             elif (x_relative == 0.0) and (y_relative < 0.0):
-                theta1[i] = 180.0
-
+                theta0[i] = 180.0
+            theta_a[i] = np.round(theta0[i] - np.arctan(aperture_radius/rho0[i])*(180/np.pi), 3)
+            theta_b[i] = np.round(theta0[i] + np.arctan(aperture_radius/rho0[i])*(180/np.pi), 3)
+            integration_limits[i] = (theta_a[i], theta_b[i])
         plt.figure()
         plt.axes(projection='polar')
-        plt.plot(np.radians(theta1), rho0, '.')
-        # plt.axis('off')
+        plt.plot(np.radians(theta0), rho0, '.')
         plt.tight_layout()
-        return (theta1, rho0)
+        return (integration_limits, theta0, rho0)
+
+
+def rho_ab(rho0: float, theta: float, theta0: float, aperture_radius: float) -> float:
+    cosin = np.cos(theta-theta0)
+    cosin2 = np.cos((theta-theta0)*(theta-theta0))
+    rho_a = rho0*cosin - np.sqrt(rho0*(-cosin2 + 1) + aperture_radius)  # ??? BUG
+    rho_b = rho0*cosin + np.sqrt(rho0*(-cosin2 + 1) + aperture_radius)  # ???
+    return (rho_a, rho_b)
+
+
+def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> float:
+    derivRmn = radial_polynomial_derivative_dr(m, n, r)
+    Rmn = radial_polynomial(m, n, r)
+    Angularmn = triangular_function(m, theta)
+    derivAngularmn = triangular_derivative_dtheta(m, theta)
+    return ((derivRmn*r*Angularmn*np.sin(theta))-(Rmn*derivAngularmn*np.cos(theta)))
+
+
+def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> float:
+    derivRmn = radial_polynomial_derivative_dr(m, n, r)
+    Rmn = radial_polynomial(m, n, r)
+    Angularmn = triangular_function(m, theta)
+    derivAngularmn = triangular_derivative_dtheta(m, theta)
+    return ((derivRmn*r*Angularmn*np.cos(theta))+(Rmn*derivAngularmn*np.sin(theta)))
+
+
+def calc_integrals_on_apertures(integration_limits: list, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
+                                aperture_radius: float = 15.0, n_steps: int = 20):
+
+    # Integration on theta and rho - for X, Y integrals of Zernike polynonial made on the sub-aperture
+    integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
+    calibration = 1/(np.pi*aperture_radius*aperture_radius)
+
+    for i_subaperture in range(len(integration_limits)):
+
+        (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta
+        delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
+        theta = theta_a  # initial value
+        # Integration over theta (trapezoidal rule)
+        integral_sumX = 0.0; integral_sumY = 0.0
+        for j_theta in range(n_steps+1):
+            # Getting limits for integration on rho
+            (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
+
+            # Integration on rho for X and Y axis (trapezoidal formula)
+            delta_rho = (rho_b - rho_a)/n_steps
+            rho = rho_a
+            integral_sum_rhoX = 0.0; integral_sum_rhoY = 0.0
+            for j_rho in range(n_steps+1):
+                if (j_rho == 0) or (j_rho == n_steps):
+                    integral_sum_rhoX += 0.5*rho_integral_funcX(rho, theta, m, n)
+                    integral_sum_rhoY += 0.5*rho_integral_funcY(rho, theta, m, n)
+                else:
+                    integral_sum_rhoX += rho_integral_funcX(rho, theta, m, n)
+                    integral_sum_rhoY += rho_integral_funcY(rho, theta, m, n)
+                rho += delta_rho
+            integral_sum_rhoX *= delta_rho; integral_sum_rhoY *= delta_rho
+
+            if (j_theta == 0) and (j_theta == n_steps):
+                integral_sumX += 0.5*integral_sum_rhoX; integral_sumY += 0.5*integral_sum_rhoY
+            else:
+                integral_sumX += integral_sum_rhoX; integral_sumY += integral_sum_rhoY
+            theta += delta_theta
+
+        integral_sumX *= delta_theta; integral_sumY *= delta_theta
+
+        integral_values[i_subaperture, 0] = calibration*integral_sumX
+        integral_values[i_subaperture, 1] = calibration*integral_sumY
+    return integral_values
 
 
 # %% Open and process test images (from https://github.com/jacopoantonello/mshwfs)
@@ -174,4 +248,6 @@ coms_nonaberrated = np.sort(coms_nonaberrated, axis=0); coms_aberrated = np.sort
 diff_coms = coms_nonaberrated - coms_aberrated
 t2 = time.time()
 print("Shift of local center of masses between non- and aberrated images takes: ", np.round(t2-t1, 3), "s")
-(theta, rho) = get_integr_limits_circular_lenses(diff_nonaberrated, debug=True)
+(integration_limits, theta0, rho0) = get_integr_limits_circular_lenses(diff_nonaberrated, debug=True)
+theta0 = np.radians(theta0)
+integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, -1, 1)
