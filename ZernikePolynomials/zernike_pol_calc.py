@@ -61,8 +61,7 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
         return 0.0
     else:
         # Recursion formula that should be more effective than direct calculation
-        return (r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) -
-                - radial_polynomial(m, n-2, r))
+        return (r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) - radial_polynomial(m, n-2, r))
 
 
 def triangular_function(m: int, theta: float) -> float:
@@ -237,13 +236,14 @@ def radial_polynomial_derivative_dr(m: int, n: int, r: float) -> float:
 
     """
     if (n == 0) and (m == 0):
-        return 1.0
+        return 0.0
     elif (m > n):
         return 0.0
     else:
         # Recursion formula that should be more effective than direct calculation
-        return (radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r) -
-                - radial_polynomial_derivative_dr(m, n-2, r))
+        return ((radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) +
+                + r*(radial_polynomial_derivative_dr(abs(m-1), n-1, r) + radial_polynomial_derivative_dr(m+1, n-1, r)) +
+                -radial_polynomial_derivative_dr(m, n-2, r))
 
 
 def triangular_derivative_dtheta(m: int, theta: float) -> float:
@@ -271,14 +271,49 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
         return 1.0
 
 
+def test():
+    """
+    Perform tests of implemented recurrence equations.
+
+    Raise
+    -----
+    AssertionError
+
+    Returns
+    -------
+    None if all tests passed.
+
+    """
+    m = 1; n = 1; r = 1.5
+    assert radial_polynomial(m, n, r) == r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 1.0, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 0; n = 2
+    assert radial_polynomial(m, n, r) == 2*r*r-1, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 4*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 2; n = 2
+    assert radial_polynomial(m, n, r) == r*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 2*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 1; n = 3
+    assert radial_polynomial(m, n, r) == 3*r*r*r-2*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 9*r*r-2.0, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 3; n = 3
+    assert radial_polynomial(m, n, r) == r*r*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 3*r*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 0; n = 4
+    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial_derivative_dr(m, n, r) == 6*(4*r*r*r-2*r), f'Implemented dR{m, n} != to the calculated derivative'
+    print("All tests passed")
+
+
 # %% Tests
 if __name__ == '__main__':
-    r = 2.0; m = -2; n = 2; theta = 0.0
+    r = 2.0; m = 1; n = 3; theta = 0.0
     # print(normalization_factor(0,0))
     print("radial polynomial:", radial_polynomial(m, n, r))
     print("derivative of the radial polynomial: ", radial_polynomial_derivative_dr(m, n, r))
-    print("zernike polynomial:", zernike_polynomial(m, n, r, theta))
+    # print("zernike polynomial:", zernike_polynomial(m, n, r, theta))
     # print("sum of two polynomials 1, 1 and 0, 2:", zernike_polynomials_sum([(1, 1), (0, 2)], r, theta))
+    test()  # Testing implemented recurrence equations
 
     # %% Plotting results over the surface
     # Plotting as the radial surface - Y tilt and Defocus
@@ -288,5 +323,5 @@ if __name__ == '__main__':
     plot_zps_polar(orders, step_r, step_theta, "Y tilt")
     orders = [(-2, 2)]  # Y tilt
     plot_zps_polar(orders, step_r, step_theta, "Oblique astigmatism")
-    orders = [(0, 2)]  # Defocus
-    plot_zps_polar(orders, step_r, step_theta, "Defocus")
+    # orders = [(0, 2)]  # Defocus
+    # plot_zps_polar(orders, step_r, step_theta, "Defocus")
