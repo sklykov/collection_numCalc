@@ -146,8 +146,44 @@ def zernike_polynomials_sum(orders: list, r: float, theta: float) -> float:
     return s
 
 
+def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_coefficients: list) -> float:
+    """
+    Return sum of muliplied by alpha coefficient Zernike polynomials (m,n) for the particular point on the unit circle.
+
+    Parameters
+    ----------
+    orders : list
+        List of tuples like [(m,n), ...] with all Zernike polynomials orders for summing.
+    r : float
+        Radius on the unit circle.
+    theta : float
+        Angle on the unit circle.
+    alpha_coefficients : list
+        Tuning coefficients for calculation of Zernike polynomials mutliplied by specified coefficient.
+
+    Raises
+    ------
+    TypeError
+        If the input list doesn't contain tuples formatted as (m,n) AND if length of orders != alpha coefficients.
+
+    Returns
+    -------
+    float
+        Sum of all specified Zernike polynomials.
+    """
+    s = 0.0  # initial sum
+    for tuple_orders in orders:
+        if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
+            raise TypeError
+            break
+        else:
+            (m, n) = tuple_orders
+            s += zernike_polynomial(m, n, r, theta)
+    return s
+
+
 def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0,
-                   title: str = "Sum of few Zernike polynomials"):
+                   title: str = "Sum of few Zernike polynomials", tuned: bool = False, alpha_coefficients: list = []):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle.
 
@@ -173,7 +209,10 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0,
     Z = np.zeros((i_size, j_size), dtype='float')
     for i in range(i_size):
         for j in range(j_size):
-            Z[i, j] = zernike_polynomials_sum(orders, R[i], Theta[j])
+            if tuned:
+                Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
+            else:
+                Z[i, j] = zernike_polynomials_sum(orders, R[i], Theta[j])
     # Plotting and formatting - Polar projection + plotting the colormap as filled contour using "contourf"
     plt.figure()
     plt.axes(projection='polar')
@@ -300,7 +339,7 @@ def test():
     assert radial_polynomial(m, n, r) == r*r*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 3*r*r, f'Implemented dR{m, n} != to the calculated derivative'
     m = 0; n = 4
-    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated Zernike'
     assert radial_polynomial_derivative_dr(m, n, r) == 6*(4*r*r*r-2*r), f'Implemented dR{m, n} != to the calculated derivative'
     print("All tests passed")
 

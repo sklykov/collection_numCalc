@@ -183,7 +183,7 @@ def get_integr_limits_circular_lenses(image: np.ndarray, aperture_radius: float 
             theta_a[i] = np.round(theta0[i] - np.arctan(aperture_radius/rho0[i])*(180/np.pi), 3)
             theta_b[i] = np.round(theta0[i] + np.arctan(aperture_radius/rho0[i])*(180/np.pi), 3)
             integration_limits[i] = (theta_a[i], theta_b[i])
-        # Plotting the calculated coordinates in polar projection for checking that all sub-aperture centers defined correctly
+        # Plotting the calculated coordinates in polar projection for checking that all their centers defined correctly
         if debug:
             plt.figure()
             plt.axes(projection='polar')
@@ -520,8 +520,6 @@ if __name__ == '__main__':
 
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     # t1 = time.time()
-    # zernikes_set = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3)]
-    # zernikes_set = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2)]
     zernikes_set = [(-2, 2), (2, 2)]
     # zernikes_set = [(-1, 1), (1, 1)]
     integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0)
