@@ -405,6 +405,7 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
         (m, n) = zernike_polynomials_list[i]
         integral_matrix[:, 2*i] = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)[:, 0]
         integral_matrix[:, 2*i+1] = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)[:, 1]
+        print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
     return integral_matrix
 
 
@@ -512,12 +513,10 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
 if __name__ == '__main__':
     # Get the shifts in center of masses and aberrated image with extracted background
     (coms_shifts, diff_aberrated) = get_overall_coms_shifts(plot_found_focal_spots=True)
-
     t1 = time.time(); m = 1; n = 1
     (integration_limits, theta0, rho0) = get_integr_limits_circular_lenses(diff_aberrated, debug=True)
     # integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
     # t2 = time.time(); print(f"Integration of the single Zernike polynomial ({m},{n}) takes:", np.round(t2-t1, 3), "s")
-
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     # t1 = time.time()
     zernikes_set = [(-2, 2), (2, 2)]
