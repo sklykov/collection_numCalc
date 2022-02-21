@@ -488,7 +488,8 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     integral_matrix = np.zeros((n_rows, n_cols), dtype='float')
     for i in range(len(zernike_polynomials_list)):
         (m, n) = zernike_polynomials_list[i]
-        integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
+        integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n,
+                                                      aperture_radius=aperture_radius, n_steps=n_steps)
         integral_matrix[:, 2*i] = integral_values[:, 0]
         integral_matrix[:, 2*i+1] = integral_values[:, 1]
         print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
@@ -515,7 +516,7 @@ def get_polynomials_coefficients(integral_matrix: np.ndarray, coms_shifts: np.nd
 
     """
     # alpha_coefficientsXY  = lstsq(integral_matrix, coms_shifts, rcond=1E-6)[0]  # Provides with solutions more than 1E-6, that is "0"
-    # !!! The matrices should be changed in sizes for calculation the alpha coefficient for each Zernike polynomial
+    # The matrices should be changed in sizes for calculation the alpha coefficients for each Zernike polynomial.
     # This made according to suggestion in the paper Dai G.-M., 1994
     n_subapertures = np.size(coms_shifts, 0); n_polynomials = np.size(integral_matrix, 1) // 2
     integral_matrix_swapped = np.zeros((2*n_subapertures, n_polynomials), dtype='float')
@@ -632,7 +633,8 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
                                          region_size=region_size)
     # Found center of masses can be in different order and found CoMs can be different for non- and aberrated pictures
     if np.size(coms_nonaberrated, 0) == np.size(coms_aberrated, 0):
-        # Before the sorting is used, that can cause the errors. Now - more precise algorithm for searching for neighbours between 2 matrices
+        # Before the sorting is used, that can cause the errors
+        # Now - more precise algorithm for searching for neighbours between 2 matrices
         # Fixed: now the order of coms should be the same as the further calculation of integration limits
         coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')
         pic_integral_limits = diff_nonaberrated; coms_integral_limits = coms_nonaberrated
@@ -645,7 +647,8 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             else:
                 # Searching for the appropriate candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
                 for j in range(1, np.size(coms_nonaberrated, 0)):
-                    diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                    diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                    diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
                     if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
                         coms_shifts[i, 0] = diffX; coms_shifts[i, 1] = diffY; break  # Stop if the candidate found
     else:
@@ -673,6 +676,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             # !!!: Implement the logic if needed, no time now
 
     return (coms_shifts, coms_integral_limits, pic_integral_limits)
+
 
 # %% Tests of functionality
 # %% Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
