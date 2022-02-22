@@ -302,11 +302,19 @@ def rho_ab(rho0: float, theta: float, theta0: float, aperture_radius: float) -> 
 
     """
     cosin = np.cos(theta-theta0)
-    cosinsq = np.power(np.cos(theta-theta0), 2)
+    cosinsq = cosin*cosin
     rho0sq = rho0*rho0
     apertureRsq = aperture_radius*aperture_radius
-    rho_a = rho0*cosin - np.sqrt(rho0sq*(cosinsq - 1) + apertureRsq)
-    rho_b = rho0*cosin + np.sqrt(rho0sq*(cosinsq - 1) + apertureRsq)
+    # ???: for some reason, for big polar coordinates relative to radius aperture, the equation below becomes
+    # complex (negative under np.sqrt). As the workaround - assume that under sqrt operation the actual value is positive
+    if (rho0sq*(cosinsq - 1) + apertureRsq) < 0:
+        # print("angle diff:", np.round((theta-theta0)*(180/np.pi), 1),
+        #       "np.sqrt from", np.round((rho0sq*(cosinsq - 1) + apertureRsq), 2))  # Debugging
+        rho_a = rho0*cosin - np.sqrt(abs(rho0sq*(cosinsq - 1) + apertureRsq))
+        rho_b = rho0*cosin + np.sqrt(abs(rho0sq*(cosinsq - 1) + apertureRsq))
+    else:
+        rho_a = rho0*cosin - np.sqrt(rho0sq*(cosinsq - 1) + apertureRsq)
+        rho_b = rho0*cosin + np.sqrt(rho0sq*(cosinsq - 1) + apertureRsq)
     return (rho_a, rho_b)
 
 
@@ -412,7 +420,6 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
         for j_theta in range(n_steps+1):
             # Getting limits for integration on rho
             (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
-
             # Integration on rho for X and Y axis (trapezoidal formula)
             # !!!: Because of higher order Zernike start to depend heavily on the selected radius rho,
             # so the calibration should be performed depending on radius rho => calculate integral R(m, n) in the same interval
@@ -689,12 +696,12 @@ if __name__ == '__main__':
     t1 = time.time(); m = 1; n = 1
     # (integration_limits, theta0, rho0) = get_integr_limits_circular_lenses(diff_aberrated, debug=True)
     (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_integral_limits, coms=coms_integral_limits, debug=True)
-    integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
+    # integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
     t2 = time.time(); print(f"Integration of the single Zernike polynomial ({m},{n}) takes:", np.round(t2-t1, 3), "s")
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     t1 = time.time()
     zernikes_set = [(-2, 2), (2, 2)]
     # zernikes_set = [(-1, 1), (1, 1)]
-    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=80)
+    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=60)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)
