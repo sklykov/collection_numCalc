@@ -367,7 +367,7 @@ def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> float:
 
 
 def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
-                                aperture_radius: float = 15.0, n_steps: int = 50):
+                                n_polynomial: int = 1, aperture_radius: float = 15.0, n_steps: int = 50):
     """
     Calculate integrals using trapezodial rule specified in the mentioned thesis on X and Y axes for the specified Zernike polynomial.
 
@@ -382,7 +382,9 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
     m : int
         Azimutal order of the Zernike polynomial.
     n : int
-        Radial order of the Zernike polynomial..
+        Radial order of the Zernike polynomial.
+    n_polynomial: int
+        Number of polynomial for which the integration calculated. The default is 1.
     aperture_radius : float, optional
         Radius of sub-aperture in pixels on the image. The default is 15.0.
     n_steps : int, optional
@@ -398,9 +400,10 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
     # TODO: Calibration taking into account the wavelength, focal length should be implemented later
     calibration = 1
+    # print("# of used integration steps:", n_steps)
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
-        print(f"Integration started on {i_subaperture} subaperture out of {len(integration_limits)}")
+        print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
         (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta (radians)
         delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
         theta = theta_a  # initial value of theta
@@ -488,7 +491,7 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     integral_matrix = np.zeros((n_rows, n_cols), dtype='float')
     for i in range(len(zernike_polynomials_list)):
         (m, n) = zernike_polynomials_list[i]
-        integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n,
+        integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
                                                       aperture_radius=aperture_radius, n_steps=n_steps)
         integral_matrix[:, 2*i] = integral_values[:, 0]
         integral_matrix[:, 2*i+1] = integral_values[:, 1]
@@ -689,9 +692,9 @@ if __name__ == '__main__':
     integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
     t2 = time.time(); print(f"Integration of the single Zernike polynomial ({m},{n}) takes:", np.round(t2-t1, 3), "s")
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
-    # t1 = time.time()
-    # zernikes_set = [(-2, 2), (2, 2)]
-    # # zernikes_set = [(-1, 1), (1, 1)]
-    # integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0)
-    # t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
-    # alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)
+    t1 = time.time()
+    zernikes_set = [(-2, 2), (2, 2)]
+    # zernikes_set = [(-1, 1), (1, 1)]
+    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=80)
+    t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
+    alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)

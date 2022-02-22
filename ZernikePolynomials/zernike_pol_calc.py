@@ -172,13 +172,14 @@ def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_co
         Sum of all specified Zernike polynomials.
     """
     s = 0.0  # initial sum
-    for tuple_orders in orders:
+    for i in range(len(orders)):
+        tuple_orders = orders[i]
         if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
             raise TypeError
             break
         else:
             (m, n) = tuple_orders
-            s += zernike_polynomial(m, n, r, theta)
+            s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
     return s
 
 
@@ -310,6 +311,54 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
         return 1.0
 
 
+def get_classical_polynomial_name(mode: tuple) -> str:
+    """
+    Return the classical name of Zernike polynomial.
+
+    Parameters
+    ----------
+    mode : tuple
+        Zernike polynomial specification as (m, n).
+
+    Returns
+    -------
+    str
+        Classical name.
+
+    """
+    name = ""
+    (m, n) = mode
+    if (m == -1) and (n == 1):
+        name = "Vertical (Y) tilt"
+    if (m == 1) and (n == 1):
+        name = "Horizontal (X) tilt"
+    if (m == -2) and (n == 2):
+        name = "Oblique astigmatism"
+    if (m == 0) and (n == 2):
+        name = "Defocus"
+    if (m == 2) and (n == 2):
+        name = "Vertical astigmatism"
+    if (m == -3) and (n == 3):
+        name = "Vertical trefoil"
+    if (m == -1) and (n == 3):
+        name = "Vertical coma"
+    if (m == 1) and (n == 3):
+        name = "Horizontal coma"
+    if (m == 3) and (n == 3):
+        name = "Oblique trefoil"
+    if (m == -4) and (n == 4):
+        name = "Oblique quadrafoil"
+    if (m == -2) and (n == 4):
+        name = "Oblique secondary astigmatism"
+    if (m == 0) and (n == 4):
+        name = "Primary spherical"
+    if (m == 2) and (n == 4):
+        name = "Vertical secondary astigmatism"
+    if (m == 4) and (n == 4):
+        name = "Vertical quadrafoil"
+    return name
+
+
 def test():
     """
     Perform tests of implemented recurrence equations.
@@ -341,6 +390,15 @@ def test():
     m = 0; n = 4
     assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated Zernike'
     assert radial_polynomial_derivative_dr(m, n, r) == 6*(4*r*r*r-2*r), f'Implemented dR{m, n} != to the calculated derivative'
+    m = 2; n = 4
+    assert radial_polynomial(m, n, r) == 4*np.power(r, 4)-3*np.power(r, 2), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial_derivative_dr(m, n, r) == 16*r*r*r - 6*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 4; n = 4
+    assert radial_polynomial(m, n, r) == np.power(r, 4), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial_derivative_dr(m, n, r) == 4*r*r*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = 1; n = 5
+    assert radial_polynomial(m, n, r) == 10*np.power(r, 5) - 12*r*r*r + 3*r, f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial_derivative_dr(m, n, r) == 50*np.power(r, 4) - 36*r*r + 3, f'Implemented dR{m, n} != to the derivative'
     print("All tests passed")
 
 
@@ -358,9 +416,9 @@ if __name__ == '__main__':
     # Plotting as the radial surface - Y tilt and Defocus
     step_r = 0.005
     step_theta = 1  # in grads
-    orders = [(-1, 1)]  # Y tilt
-    plot_zps_polar(orders, step_r, step_theta, "Y tilt")
     orders = [(-2, 2)]  # Y tilt
     plot_zps_polar(orders, step_r, step_theta, "Oblique astigmatism")
-    # orders = [(0, 2)]  # Defocus
-    # plot_zps_polar(orders, step_r, step_theta, "Defocus")
+    orders = [(0, 2)]  # Y tilt
+    plot_zps_polar(orders, step_r, step_theta, "Defocus")
+    orders = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
+    plot_zps_polar(orders, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
