@@ -470,6 +470,8 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     """
     Wrap for calculation of integral values on sub-apertures performing on several Zernike polynomials.
 
+    For shortening time of calculation, use the increasing order of listing of polynomials coefficients (like [(-1, 1), (1, 1)])
+
     Parameters
     ----------
     integration_limits : np.ndarray
@@ -496,12 +498,32 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     n_rows = np.size(rho0, 0)
     n_cols = 2*len(zernike_polynomials_list)  # Because calculation needed for both X and Y axes
     integral_matrix = np.zeros((n_rows, n_cols), dtype='float')
+    # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
+    # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
+    symmetrical_substition = False; i_simmetry = -1
     for i in range(len(zernike_polynomials_list)):
         (m, n) = zernike_polynomials_list[i]
-        integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                      aperture_radius=aperture_radius, n_steps=n_steps)
-        integral_matrix[:, 2*i] = integral_values[:, 0]
-        integral_matrix[:, 2*i+1] = integral_values[:, 1]
+        if ((m == -1) and (n == 1)) or ((m == -2) and (n == 2)) or ((m == -3) and (n == 3)) or ((m == -4) and (n == 4)):
+            i_simmetry = i; symmetrical_substition = True
+        if symmetrical_substition:
+            if ((m == 1) and (n == 1)) or ((m == 2) and (n == 2)) or ((m == 3) and (n == 3)) or ((m == 4) and (n == 4)):
+                # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
+                # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
+                integral_matrix[:, 2*i+1] = -integral_matrix[:, 2*i_simmetry]
+                integral_matrix[:, 2*i] = integral_matrix[:, 2*i_simmetry+1]
+                print("Shortening of calculation used")
+            else:
+                # Normal integrals calculation
+                integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                              aperture_radius=aperture_radius, n_steps=n_steps)
+                integral_matrix[:, 2*i] = integral_values[:, 0]
+                integral_matrix[:, 2*i+1] = integral_values[:, 1]
+        else:
+            # Normal integrals calculation
+            integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                          aperture_radius=aperture_radius, n_steps=n_steps)
+            integral_matrix[:, 2*i] = integral_values[:, 0]
+            integral_matrix[:, 2*i+1] = integral_values[:, 1]
         print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
     return integral_matrix
 
