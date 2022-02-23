@@ -16,8 +16,8 @@ import numpy as np
 shwfs = True; repo_pics = False
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
-zernikes_set = [(-1, 1)]
-# zernikes_set = [(-1, 1), (1, 1)]
+# zernikes_set = [(-1, 1)]
+zernikes_set = [(-1, 1), (1, 1)]
 # zernikes_set = [(-2, 2), (0, 2), (2, 2)]
 # zernikes_set = [(-3, 3), (-1, 3), (1, 3), (3, 3)]
 # zernikes_set = [(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
@@ -26,8 +26,8 @@ zernikes_set = [(-1, 1)]
 # %% Tests on the recorded pictures from the Shack-Hartmann sensor
 # Manual change the working directory to the folder with stored pictures, outside the repository
 if shwfs:
-    os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs"); aberrated_pic_name = "DefocusPic0.png"
-    plot = False; debug = True; aperture_radius = 11.0
+    os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs"); aberrated_pic_name = "DefocusPic2.png"
+    plot = False; debug = False; aperture_radius = 11.0
     (coms_shifts, coms_integral_lim, pic_int_lim) = get_overall_coms_shifts(pics_folder=os.getcwd(),
                                                                             background_pic_name="backgroundPic2.png",
                                                                             nonaberrated_pic_name="nonAberrationPic2.png",
@@ -40,7 +40,7 @@ if shwfs:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")
     calibration_path = os.path.join(calibrations, calibration_file_name)
-    precalculated_zernikes = os.path.join(calibrations, "Calibration12ZernikesShH_wtTilts.npy")
+    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesShH.npy")
     if not(os.path.exists(precalculated_zernikes)):
         if not(os.path.exists(calibration_path)):
             t1 = time.time()
@@ -58,7 +58,7 @@ if shwfs:
                          (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         for i in range(len(set14zernikes)):
             print(get_classical_polynomial_name(set14zernikes[i]), ":", np.round(alpha_coefficients[i], 4))
-        plot_zps_polar(zernikes_set, title="reconstraction of " + aberrated_pic_name,
+        plot_zps_polar(set14zernikes, title="reconstraction of " + aberrated_pic_name,
                        tuned=True, alpha_coefficients=alpha_coefficients)
 
 # %% Calibration of pictures shared in the repository
@@ -90,5 +90,5 @@ if repo_pics:
                          (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         for i in range(len(set14zernikes)):
             print(get_classical_polynomial_name(set14zernikes[i]), ":", np.round(alpha_coefficients[i], 4))
-        plot_zps_polar(zernikes_set, title="reconstraction of pics from the open repository",
+        plot_zps_polar(set14zernikes, title="reconstraction of pics from the open repository",
                        tuned=True, alpha_coefficients=alpha_coefficients)

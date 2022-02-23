@@ -399,6 +399,9 @@ def test():
     m = 1; n = 5
     assert radial_polynomial(m, n, r) == 10*np.power(r, 5) - 12*r*r*r + 3*r, f'Implemented R{m, n} not equal to tabulated Zernike'
     assert radial_polynomial_derivative_dr(m, n, r) == 50*np.power(r, 4) - 36*r*r + 3, f'Implemented dR{m, n} != to the derivative'
+    m = 4; n = 6
+    assert radial_polynomial(m, n, r) == 6*np.power(r, 6) - 5*np.power(r, 4), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial_derivative_dr(m, n, r) == 36*np.power(r, 5) - 20*r*r*r, f'Implemented dR{m, n} != to the derivative'
     print("All tests passed")
 
 
@@ -420,5 +423,7 @@ if __name__ == '__main__':
     plot_zps_polar(orders, step_r, step_theta, "Oblique astigmatism")
     orders = [(0, 2)]  # Y tilt
     plot_zps_polar(orders, step_r, step_theta, "Defocus")
-    orders = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
-    plot_zps_polar(orders, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
+    zernikes_set = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
+    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
+    zernikes_set = [(-2, 2), (0, 2), (2, 2)]; coefficients = [1.0, 1.0, 1.0]  # 2nd orders
+    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)

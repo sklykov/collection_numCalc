@@ -41,11 +41,13 @@ print("60 -> 80 steps: ", np.max(diff_Z80_Z60))
 # print("10 -> 20 steps: ", np.max(diff_Z20_Z10))
 
 # %% Compose already calculated values
-Z1_name = "ZSHwfs[(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2)].npy"; Z1_path = os.path.join(calibration_folder, Z1_name)
-Z2_name = "ZSHwfs[(-3, 3), (-1, 3), (1, 3), (3, 3)].npy"; Z2_path = os.path.join(calibration_folder, Z2_name)
-Z3_name = "ZSHwfs[(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)].npy"; Z3_path = os.path.join(calibration_folder, Z3_name)
-Z1 = np.load(Z1_path); Z2 = np.load(Z2_path); Z3 = np.load(Z3_path)
+Z1_name = "ZSHwfs[(-1, 1), (1, 1)].npy"; Z1_path = os.path.join(calibration_folder, Z1_name)
+Z2_name = "ZSHwfs[(-2, 2), (0, 2), (2, 2)].npy"; Z2_path = os.path.join(calibration_folder, Z2_name)
+Z3_name = "ZSHwfs[(-3, 3), (-1, 3), (1, 3), (3, 3)].npy"; Z3_path = os.path.join(calibration_folder, Z3_name)
+Z4_name = "ZSHwfs[(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)].npy"; Z4_path = os.path.join(calibration_folder, Z4_name)
+Z1 = np.load(Z1_path); Z2 = np.load(Z2_path); Z3 = np.load(Z3_path); Z4 = np.load(Z4_path)
+diffZ2col = Z2[:, 0] + Z2[:, 5]; diffZ2col2 = Z2[:, 1] - Z2[:, 4]
 Z_overall_name = "Calibration14ZernikesShH.npy"; Z_overall_path = os.path.join(calibration_folder, Z_overall_name)
 if not(os.path.exists(Z_overall_path)):
-    Z_overall = np.concatenate((Z1, Z2, Z3), axis=1)
+    Z_overall = np.concatenate((Z1, Z2, Z3, Z4), axis=1)
     np.save(Z_overall_path, Z_overall)

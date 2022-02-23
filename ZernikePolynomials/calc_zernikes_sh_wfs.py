@@ -651,16 +651,21 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
         # Below - the algorithm for searching for the right pair between CoMs on non - and aberrated image
         for i in range(np.size(coms_aberrated, 0)):
             j = 0
+            # For finding real shift - only matching pair with minimum of shift between coordinates;
+            # But recorded shift should be with the sign!!!
             diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
             if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                coms_shifts[i, 0] = diffX; coms_shifts[i, 1] = diffY
+                coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign
             else:
                 # Searching for the appropriate candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
                 for j in range(1, np.size(coms_nonaberrated, 0)):
                     diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                    diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
                     diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                    diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
                     if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                        coms_shifts[i, 0] = diffX; coms_shifts[i, 1] = diffY; break  # Stop if the candidate found
+                        coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign; break  # Stop if the candidate found
     else:
         # If the number of detected peaks is different for aberrated and non-aberrated pictures
         if np.size(coms_nonaberrated, 0) > np.size(coms_aberrated, 0):
@@ -671,15 +676,19 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             for i in range(np.size(coms_aberrated, 0)):
                 j = 0
                 diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
                 if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                    coms_shifts[i, 0] = diffX; coms_shifts[i, 1] = diffY
+                    coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign
                 else:
-                    # Searching for the appropriate candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
+                    # Searching for the candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
                     for j in range(1, np.size(coms_nonaberrated, 0)):
                         diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                        diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
                         diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                        diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
                         if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                            coms_shifts[i, 0] = diffX; coms_shifts[i, 1] = diffY; break  # Stop if the candidate found
+                            coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign; break  # Stop if the candidate found
         else:
             coms_shifts = np.zeros((np.size(coms_nonaberrated, 0), 2), dtype='float')
             pic_integral_limits = diff_nonaberrated; coms_integral_limits = coms_nonaberrated
