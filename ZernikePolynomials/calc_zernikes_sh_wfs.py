@@ -230,8 +230,8 @@ def get_integr_limits_circles_coms(image: np.ndarray, coms: np.ndarray, aperture
         plt.title("Estimated circular apertures of mircolenses array")
     # Detected centers below are searched for on the aberrated image, so the shifts in CoMs should be calculated relatively to it
     detected_centers = coms
-    rho0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate of a lens center
-    theta0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate of a lens center
+    rho0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate r of a sub-aperture (lens)
+    theta0 = np.zeros(np.size(detected_centers, 0), dtype='float')  # polar coordinate theta of a sub-aperture (lens)
     theta_a = np.zeros(np.size(detected_centers, 0), dtype='float')  # integration limit on theta (1)
     theta_b = np.zeros(np.size(detected_centers, 0), dtype='float')  # integration limit on theta (2)
     integration_limits = [(0.0, 0.0) for i in range(np.size(detected_centers, 0))]
@@ -276,6 +276,120 @@ def get_integr_limits_circles_coms(image: np.ndarray, coms: np.ndarray, aperture
     theta0 = np.radians(theta0)
     integration_limits = np.radians(integration_limits)
     return (integration_limits, theta0, rho0)
+
+
+def get_integr_limits_centralized_subapertures(image: np.ndarray, coms: np.ndarray, coms_shifts: np.ndarray,
+                                               aperture_radius: float = 15.0, debug: bool = False) -> tuple:
+    """
+    Calculate integration limits on theta for sub-apertures and polar coordinates of their centers relatively to the found central aperture.
+
+    The found central aperture is calculated relatively to the center of the global image recorded by a sensor.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The image acquired by a Shack-Hartmann sensor.
+    coms : np.ndarray
+        Coordinates of found center of masses on the image around the defined local peaks (focal spots formed by sub-apertures).
+    coms_shifts : np.ndarray
+        Shifts of center of masses between non- and aberrated recorded iamges by Shack-Hartman sensor.
+    aperture_radius : float, optional
+        Of each sub-aperture of lens, in pixels on the image. The default is 15.0.
+    debug : bool, optional
+        For plotting some of the calculated values (sub-apertures, angels, etc.). The default is False.
+
+    Returns
+    -------
+    tuple
+        composed of (integration_limits, theta0, rho0, subapertures_wt_central, coms_shifts_wt_central).
+        integration_limits : ndarray of floats with size (N sub-apertures, 2)
+            Integration limits on theta.
+        theta0 : ndarray of floats (N sub-apertures, 1)
+            Angles theta of sub-aperture centers from the global polar coordinates on the frame (image).
+        rho0 : ndarray of floats (N sub-apertures, 1)
+            Radiuses r of sub-aperture centers from the global polar coordinates on the frame (image).
+        subapertures_wt_central: np.ndarray
+            Calculated of center of masses around the local peaks, but without the central sub-aperture.
+        coms_shifts_wt_central: np.ndarray
+            Shifts of center of masses, but without calculated for the central sub-aperture.
+    """
+    # Plotting the estimated circular apertures with the centers the same as found center of masses on non- or aberrated images
+    if debug:
+        plt.figure(); plt.imshow(image)  # Plot found regions for CoM calculations
+    (rows, cols) = image.shape
+    x_img_center = cols//2; y_img_center = rows//2
+    # The center for integration on sub-apertures - should be some central sub-aperture in their array
+    # Detected centers below are searched for on the aberrated image, so the shifts in CoMs should be calculated relatively to it
+    detected_centers = coms
+    rho0 = np.zeros(np.size(detected_centers, 0)-1, dtype='float')  # polar coordinate r of a sub-aperture (lens)
+    theta0 = np.zeros(np.size(detected_centers, 0)-1, dtype='float')  # polar coordinate theta of a sub-aperture (lens)
+    theta_a = np.zeros(np.size(detected_centers, 0)-1, dtype='float')  # integration limits (lower) on theta (1)
+    theta_b = np.zeros(np.size(detected_centers, 0)-1, dtype='float')  # integration limits (higher) on theta (2)
+    subapertures_wt_central = np.zeros((np.size(detected_centers, 0)-1, 2), dtype='float')
+    coms_shifts_wt_central = np.zeros((np.size(detected_centers, 0)-1, 2), dtype='float')
+    integration_limits = [(0.0, 0.0) for i in range(np.size(detected_centers, 0)-1)]
+    # From mine experience, the central sub-aperture should be close to the center of the image
+    x_min_dist = cols; y_min_dist = rows; i_center_subaperture = -1
+    min_distance = np.sqrt(np.power(x_min_dist, 2) + np.power(y_min_dist, 2))
+    # Looking for minimal distance between sub-aperture(detected center) and saving its index
+    for i in range(np.size(detected_centers, 0)):
+        distance = np.sqrt(np.power((detected_centers[i, 1] - x_img_center), 2) + np.power((detected_centers[i, 0] - y_img_center), 2))
+        if (min_distance > distance):
+            i_center_subaperture = i; min_distance = distance
+    x_central_subaperture = detected_centers[i_center_subaperture, 1]; y_central_subaperture = detected_centers[i_center_subaperture, 0]
+    # Plot the found central sub-aperture
+    if debug:
+        plt.plot(x_central_subaperture, y_central_subaperture, '+', color="red")
+        plt.plot(x_img_center, y_img_center, '+', color="blue")
+        plt.title("Estimated circular apertures of mircolenses array")
+    # Calculation of integration limits - below
+    j = 0
+    for i in range(np.size(detected_centers, 0)):
+        # Plot found regions for CoM calculations
+        if debug:
+            plt.gca().add_patch(Circle((detected_centers[i, 1], detected_centers[i, 0]), aperture_radius,
+                                       edgecolor='green', facecolor='none'))
+        if i == i_center_subaperture:  # Deleting the central subaperture from the calculations
+            continue
+        else:
+            # Calculation of the boundaries of the integration intervals for equations from the thesis
+            x_relative = detected_centers[i, 1] - x_central_subaperture  # relative to the central sub-aperture
+            y_relative = detected_centers[i, 0] - y_central_subaperture   # relative to the central sub-aperture
+            rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
+            # Below - manual recalculation of angles - I still more convince with these calculations
+            # !!!: axes X, Y => cols, rows on an image, center of polar coordinates - center of an image
+            # !!!: angles are calculated relative to swapped X and Y axes, calculation below in grads, after translated to radians
+            if (x_relative > 0.0) and (y_relative > 0.0):
+                theta0[j] = np.arctan(x_relative/y_relative)*(180/np.pi)
+            elif (y_relative < 0.0) and (x_relative > 0.0):
+                theta0[j] = 180.0 - (np.arctan(x_relative/abs(y_relative))*(180/np.pi))
+            elif (y_relative < 0.0) and (x_relative < 0.0):
+                theta0[j] = 180.0 + (np.arctan(x_relative/y_relative)*(180/np.pi))
+            elif (y_relative > 0.0) and (x_relative < 0.0):
+                theta0[j] = 360.0 - (np.arctan(abs(x_relative)/y_relative)*(180/np.pi))
+            elif (y_relative == 0.0) and (x_relative > 0.0):
+                theta0[j] = 90.0
+            elif (y_relative == 0.0) and (x_relative < 0.0):
+                theta0[j] = 270.0
+            elif (x_relative == 0.0) and (y_relative > 0.0):
+                theta0[j] = 0.0
+            elif (x_relative == 0.0) and (y_relative < 0.0):
+                theta0[j] = 180.0
+            theta_a[j] = np.round(theta0[j] - np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)
+            theta_b[j] = np.round(theta0[j] + np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)
+            integration_limits[j] = (theta_a[j], theta_b[j])
+            subapertures_wt_central[j, 0] = detected_centers[i, 0]; subapertures_wt_central[j, 1] = detected_centers[i, 1]
+            coms_shifts_wt_central[j, 0] = coms_shifts[i, 0]; coms_shifts_wt_central[j, 1] = coms_shifts[i, 1]
+            j += 1
+    # Plotting the calculated coordinates in polar projection for checking that all their centers defined correctly
+    if debug:
+        plt.figure()
+        plt.axes(projection='polar')
+        plt.plot(np.radians(theta0), rho0, '.')
+        plt.tight_layout()
+    theta0 = np.radians(theta0)
+    integration_limits = np.radians(integration_limits)
+    return (integration_limits, theta0, rho0, subapertures_wt_central, coms_shifts_wt_central)
 
 
 def rho_ab(rho0: float, theta: float, theta0: float, aperture_radius: float) -> tuple:
@@ -407,7 +521,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
     # Integration on theta and rho - for X, Y integrals of Zernike polynonial made on the sub-aperture
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
     # TODO: Calibration taking into account the wavelength, focal length should be implemented later
-    calibration = 1
+    calibration = 1.0
     # print("# of used integration steps:", n_steps)
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
@@ -608,6 +722,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
     """
     # Open images on some specified folder
     if pics_folder == "pics":
+        # Default folder in the repository
         absolute_path = os.path.join(os.getcwd(), pics_folder)
         backgroundPath = os.path.join(absolute_path, background_pic_name)
         nonaberratedPath = os.path.join(absolute_path, nonaberrated_pic_name)
@@ -619,6 +734,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             if not(os.path.isdir(pics_folder)):
                 raise Exception("Specified object isn't a directory")
             else:
+                # Looking for images on the specified path
                 backgroundPath = os.path.join(pics_folder, background_pic_name)
                 nonaberratedPath = os.path.join(pics_folder, nonaberrated_pic_name)
                 aberratedPath = os.path.join(pics_folder, aberrated_pic_name)
@@ -654,11 +770,13 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             threshold_abs_nonaber = np.round(np.mean(diff_nonaberrated), 0) + 1
             threshold_abs_aber = np.round(np.mean(diff_aberrated), 0) + 1
         else:
+            # Assign specified threshold values for searching of local peaks (including default values)
             threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
     else:
+        # If background substracted, then assign the specified threshold
         threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
-    # print(threshold_abs_nonaber, threshold_abs_aber)
     # Plotting of results on an image for debugging (for coms_nonaberrated)
+    # CoMs = center of masses, calculated in the areas around found local peaks
     coms_nonaberrated = get_localCoM_matrix(diff_nonaberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs_nonaber,
                                             region_size=region_size, plot=plot_found_focal_spots)
     coms_aberrated = get_localCoM_matrix(diff_aberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs_aber,
@@ -720,19 +838,18 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
 
 
 # %% Tests of functionality
-# %% Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
+# Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
 if __name__ == '__main__':
     # Get the shifts in center of masses and aberrated image with extracted background
-    (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=True)
-    t1 = time.time(); m = 1; n = 1
-    # (integration_limits, theta0, rho0) = get_integr_limits_circular_lenses(diff_aberrated, debug=True)
-    (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_integral_limits, coms=coms_integral_limits, debug=True)
-    # integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n)
-    t2 = time.time(); print(f"Integration of the single Zernike polynomial ({m},{n}) takes:", np.round(t2-t1, 3), "s")
+    (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False)
+    # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_integral_limits, coms=coms_integral_limits, debug=False)
+    (integration_limits, theta0, rho0,
+     subapertures, coms_shifts) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits,
+                                                                             coms_shifts, debug=True)
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     t1 = time.time()
     zernikes_set = [(-2, 2), (2, 2)]
     # zernikes_set = [(-1, 1), (1, 1)]
-    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=60)
+    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=40)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)
