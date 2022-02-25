@@ -573,14 +573,97 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
         # ???: How to make calibration on the angle and should it be done?
 
         # The final integral values should be also calibrated to focal and wavelengths
-        integral_values[i_subaperture, 0] = calibration*integral_sumX  # Partially calibration on the area of sub-aperture
-        integral_values[i_subaperture, 1] = calibration*integral_sumY  # Partially calibration on the area of sub-aperture
+        integral_values[i_subaperture, 1] = calibration*integral_sumX  # Partially calibration on the area of sub-aperture
+        integral_values[i_subaperture, 0] = calibration*integral_sumY  # Partially calibration on the area of sub-aperture
+        integral_values = np.round(integral_values, 8)
+    return integral_values
+
+
+def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
+                                            n_polynomial: int = 1, aperture_radius: float = 15.0, n_steps: int = 50):
+    """
+    Calculate integrals using trapezodial rule inside the sub-apertures, which lies inside the unit circle.
+
+    Parameters
+    ----------
+    integration_limits : np.ndarray
+        Calculated previously on theta polar coordinate.
+    theta0 : np.ndarray
+        Polar coordinates theta of sub-aperture centers.
+    rho0 : np.ndarray
+        Polar coordinates r of sub-aperture centers.
+    m : int
+        Azimutal order of the Zernike polynomial.
+    n : int
+        Radial order of the Zernike polynomial.
+    n_polynomial: int
+        Number of polynomial for which the integration calculated. The default is 1.
+    aperture_radius : float, optional
+        Radius of sub-aperture in pixels on the image. The default is 15.0.
+    n_steps : int, optional
+        Number of integration steps for both integrals. The default is 50.
+
+    Returns
+    -------
+    integral_values : ndarray with sizes (Number of sub-apertures, 2)
+        Resulting integration values for each sub-aperture, they are listed for Y and X axes (relatively to image coordinate system).
+
+    """
+    integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
+    calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
+    rho_unit_calibration = np.max(rho0) + aperture_radius  # For making integration on rho on unit circle
+    # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
+    for i_subaperture in range(len(integration_limits)):
+        print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
+        (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta (radians)
+        delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
+        theta = theta_a  # initial value of theta
+        # Integration over theta (trapezoidal rule)
+        integral_sumX = 0.0; integral_sumY = 0.0
+        for j_theta in range(n_steps+1):
+            # Getting limits for integration on rho
+            (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
+            # Integration on rho for X and Y axis (trapezoidal formula)
+            # !!!: Another approach to integration on rho: the entire picture with sub-apertures will be accounted as unit-radius circle
+            # For that, all rho values should be normilized to the maximum rho0 coordinate + radius_subaperture
+            rho_a /= rho_unit_calibration; rho_b /= rho_unit_calibration
+            rho = rho_a  # Lower integration boundary
+            delta_rho = (rho_b - rho_a)/n_steps
+            integral_sum_rhoX1 = 0.0; integral_sum_rhoX2 = 0.0; integral_sum_rhoY1 = 0.0; integral_sum_rhoY2 = 0.0
+            for j_rho in range(n_steps+1):
+                if (j_rho == 0) or (j_rho == n_steps):
+                    (X1, X2) = rho_integral_funcX(rho, theta, m, n)
+                    integral_sum_rhoX1 += 0.5*X1; integral_sum_rhoX2 += 0.5*X2  # on X axis
+                    (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
+                    integral_sum_rhoY1 += 0.5*Y1; integral_sum_rhoY2 += 0.5*Y2  # on Y axis
+                else:
+                    (X1, X2) = rho_integral_funcX(rho, theta, m, n)
+                    integral_sum_rhoX1 += X1; integral_sum_rhoX2 += X2
+                    (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
+                    integral_sum_rhoY1 += Y1; integral_sum_rhoY2 += Y2
+                rho += delta_rho
+            integral_sum_rhoX = (integral_sum_rhoX1 - integral_sum_rhoX2)  # From thesis equations
+            integral_sum_rhoY = (integral_sum_rhoY1 + integral_sum_rhoY2)
+            # End of integration on rho (i.e. r from polar coordinates)
+            integral_sum_rhoX *= delta_rho; integral_sum_rhoY *= delta_rho
+            if (j_theta == 0) and (j_theta == n_steps):
+                integral_sumX += 0.5*integral_sum_rhoX; integral_sumY += 0.5*integral_sum_rhoY
+            else:
+                integral_sumX += integral_sum_rhoX; integral_sumY += integral_sum_rhoY
+            theta += delta_theta
+        integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
+        # ???: integral values should be also calibrated to the areas of sub-apertures
+        integral_sumX /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
+        integral_sumY /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
+        # The final integral values should be also calibrated to focal and wavelengths
+        integral_values[i_subaperture, 1] = calibration*integral_sumX  # Not yet implemented calibration, not necessary now
+        integral_values[i_subaperture, 0] = calibration*integral_sumY
         integral_values = np.round(integral_values, 8)
     return integral_values
 
 
 def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_limits: np.ndarray, theta0: np.ndarray,
-                                 rho0: np.ndarray, aperture_radius: float = 15.0, n_steps: int = 50):
+                                 rho0: np.ndarray, aperture_radius: float = 15.0, n_steps: int = 50, on_unit_circle: bool = False):
     """
     Wrap for calculation of integral values on sub-apertures performing on several Zernike polynomials.
 
@@ -602,6 +685,8 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
         Radius of sub-aperture in pixels on the image. The default is 15.0.
     n_steps : int, optional
         Number of integration steps for both integrals. The default is 50
+    on_unit_circle: bool, optional
+        If True, then integration goes on the unit circle, in attempt to reproduce the thesis results. The default is False.
 
     Returns
     -------
@@ -618,24 +703,32 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     for i in range(len(zernike_polynomials_list)):
         (m, n) = zernike_polynomials_list[i]
         if ((m == -1) and (n == 1)) or ((m == -2) and (n == 2)) or ((m == -3) and (n == 3)) or ((m == -4) and (n == 4)):
-            i_simmetry = i; symmetrical_substition = True
+            i_simmetry = i; symmetrical_substition = False
         if symmetrical_substition:
             if ((m == 1) and (n == 1)) or ((m == 2) and (n == 2)) or ((m == 3) and (n == 3)) or ((m == 4) and (n == 4)):
                 # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
                 # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
-                integral_matrix[:, 2*i+1] = -integral_matrix[:, 2*i_simmetry]
-                integral_matrix[:, 2*i] = integral_matrix[:, 2*i_simmetry+1]
+                integral_matrix[:, 2*i+1] = integral_matrix[:, 2*i_simmetry]
+                integral_matrix[:, 2*i] = -integral_matrix[:, 2*i_simmetry+1]
                 print("Shortening of calculation used")
             else:
                 # Normal integrals calculation
-                integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                              aperture_radius=aperture_radius, n_steps=n_steps)
+                if on_unit_circle:
+                    integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                                              aperture_radius=aperture_radius, n_steps=n_steps)
+                else:
+                    integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                                  aperture_radius=aperture_radius, n_steps=n_steps)
                 integral_matrix[:, 2*i] = integral_values[:, 0]
                 integral_matrix[:, 2*i+1] = integral_values[:, 1]
         else:
             # Normal integrals calculation
-            integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                          aperture_radius=aperture_radius, n_steps=n_steps)
+            if on_unit_circle:
+                integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                                          aperture_radius=aperture_radius, n_steps=n_steps)
+            else:
+                integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
+                                                              aperture_radius=aperture_radius, n_steps=n_steps)
             integral_matrix[:, 2*i] = integral_values[:, 0]
             integral_matrix[:, 2*i+1] = integral_values[:, 1]
         print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
@@ -787,25 +880,25 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
         # Now - more precise algorithm for searching for neighbours between 2 matrices
         # Fixed: now the order of coms should be the same as the further calculation of integration limits
         coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')
-        pic_integral_limits = diff_nonaberrated; coms_integral_limits = coms_nonaberrated
+        pic_integral_limits = diff_aberrated; coms_integral_limits = coms_aberrated
         # Below - the algorithm for searching for the right pair between CoMs on non - and aberrated image
         for i in range(np.size(coms_aberrated, 0)):
             j = 0
             # For finding real shift - only matching pair with minimum of shift between coordinates;
             # But recorded shift should be with the sign!!!
-            diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-            diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-            if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign
+            diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            if (diffX < (min_dist_peaks - 2) and diffY < (min_dist_peaks - 2)):
+                coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign
             else:
                 # Searching for the appropriate candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
                 for j in range(1, np.size(coms_nonaberrated, 0)):
-                    diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
-                    diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
-                    diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                    diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                    if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                        coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign; break  # Stop if the candidate found
+                    diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                    diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                    diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                    diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                    if (diffX < (min_dist_peaks - 2) and diffY < (min_dist_peaks - 2)):
+                        coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign; break  # Stop if the candidate found
     else:
         # If the number of detected peaks is different for aberrated and non-aberrated pictures
         if np.size(coms_nonaberrated, 0) > np.size(coms_aberrated, 0):
@@ -815,20 +908,20 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
                 print("# of calculated local center of masses on non-aberrated > than on aberrated")
             for i in range(np.size(coms_aberrated, 0)):
                 j = 0
-                diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
-                diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                    coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign
+                diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                if (diffX < (min_dist_peaks - 2) and diffY < (min_dist_peaks - 2)):
+                    coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign
                 else:
                     # Searching for the candidate (actual shift should lay in the ranges on both axes) from nonaberrated CoMs
                     for j in range(1, np.size(coms_nonaberrated, 0)):
-                        diffX = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
-                        diffX_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
-                        diffY = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                        diffY_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-                        if (diffX < (min_dist_peaks - 1) and diffY < (min_dist_peaks - 1)):
-                            coms_shifts[i, 0] = diffX_sign; coms_shifts[i, 1] = diffY_sign; break  # Stop if the candidate found
+                        diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                        diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0])
+                        diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                        diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+                        if (diffX < (min_dist_peaks - 2) and diffY < (min_dist_peaks - 2)):
+                            coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign; break  # Stop if the candidate found
         else:
             coms_shifts = np.zeros((np.size(coms_nonaberrated, 0), 2), dtype='float')
             pic_integral_limits = diff_nonaberrated; coms_integral_limits = coms_nonaberrated
@@ -844,12 +937,13 @@ if __name__ == '__main__':
     (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False)
     # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_integral_limits, coms=coms_integral_limits, debug=False)
     (integration_limits, theta0, rho0,
-     subapertures, coms_shifts) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits,
-                                                                             coms_shifts, debug=True)
+     subapertures, coms_shifts) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits, coms_shifts,
+                                                                             aperture_radius=18.0, debug=True)
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     t1 = time.time()
-    zernikes_set = [(-2, 2), (2, 2)]
-    # zernikes_set = [(-1, 1), (1, 1)]
-    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, n_steps=40)
+    zernikes_set = [(-2, 2), (0, 2)]
+    # zernikes_set = [(-1, 1)]
+    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
+                                                   aperture_radius=18.0, n_steps=40, on_unit_circle=True)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)

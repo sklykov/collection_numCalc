@@ -419,10 +419,10 @@ if __name__ == '__main__':
     # Plotting as the radial surface - Y tilt and Defocus
     step_r = 0.005
     step_theta = 1  # in grads
-    orders = [(-2, 2)]  # Y tilt
-    plot_zps_polar(orders, step_r, step_theta, "Oblique astigmatism")
-    orders = [(0, 2)]  # Y tilt
-    plot_zps_polar(orders, step_r, step_theta, "Defocus")
+    orders = [(-1, 1)]  # Y tilt
+    plot_zps_polar(orders, step_r, step_theta, "Y tilt")
+    orders = [(1, 1)]  # X tilt
+    plot_zps_polar(orders, step_r, step_theta, "X tilt")
     zernikes_set = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
     plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
     zernikes_set = [(-2, 2), (0, 2), (2, 2)]; coefficients = [1.0, 1.0, 1.0]  # 2nd orders
