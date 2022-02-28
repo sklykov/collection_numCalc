@@ -934,7 +934,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
 # Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
 if __name__ == '__main__':
     # Get the shifts in center of masses and aberrated image with extracted background
-    (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False)
+    (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=True)
     # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_integral_limits, coms=coms_integral_limits, debug=False)
     (integration_limits, theta0, rho0,
      subapertures, coms_shifts) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits, coms_shifts,
