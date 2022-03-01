@@ -50,4 +50,4 @@ def generate_noise_picture(height: int, width: int, pixel_type: str = 'uint8') -
 if __name__ == "__main__":
     plt.close('all')
     img = generate_noise_picture(200, 200)
-    plt.imshow(img); plt.axis('off'); plt.tight_layout()
+    plt.imshow(img, cmap='gray'); plt.axis('off'); plt.tight_layout()
