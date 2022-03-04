@@ -6,7 +6,7 @@ Simple GUI for representing of generated noisy image using PyQT.
 """
 # %% Imports
 # import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout, QSpinBox, QCheckBox
 import numpy as np
 from generate_noise_pic import generate_noise_picture
 from threading import Thread
@@ -58,16 +58,17 @@ class ContinuousImageGenerator(Thread):
         None.
 
         """
-        global flag_generation
-        i = 0
+        global flag_generation  # Dirty way of synchronizing of button clicked in the GUI with this indepent thread process
+        i = 0  # for adding the elements into preinitilized array for further mean generation time calculation
         while(flag_generation):
             if self.testPerformance:
                 t1 = time.time()
+                # Below - the workaround for preventing kernel diying during continuous generation without any delays
                 if self.refresh_delay_ms == 0:  # if the delay between frames is 0, than the generation is unstable
                     self.refresh_delay_ms += 1  # make the delay at least 1 ms
-            image = generate_noise_picture(self.height, self.width)
-            self.imageWidget.setImage(image)
-            time.sleep(self.refresh_delay_ms/1000)
+            image = generate_noise_picture(self.height, self.width)  # Get the noisy picture
+            self.imageWidget.setImage(image)  # Set the image for representation by passed ImageView pyqtgraph widget
+            time.sleep(self.refresh_delay_ms/1000)  # Applying artificial delays between each image generation
             # If testing of Performance requested, then accumulating of passed times in the array performed
             if self.testPerformance:
                 t2 = time.time()
@@ -89,20 +90,29 @@ class SimUscope(QMainWindow):
     """Create the GUI with buttons for testing image acquisition from the camera and making some image processing."""
 
     __flagGeneration = False  # Private class variable for recording state of continuous generation
+    __flagTestPerformance = False  # Private class variable for switching between test state by using QCheckBox
 
     def __init__(self, img_height, img_width):
+        """Create overall UI inside the QMainWindow widget."""
         super().__init__()
         self.imageGenerator = SingleImageGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
         self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 700, 600)
-        self.imageWidget = pyqtgraph.ImageView(parent=self); self.imageWidget.ui.roiBtn.hide(); self.imageWidget.ui.menuBtn.hide()
+        self.imageWidget = pyqtgraph.ImageView(parent=self)  # The main widget for image showing
+        self.imageWidget.ui.roiBtn.hide(); self.imageWidget.ui.menuBtn.hide()  # Hide ROI and Norm buttons from the widget
         self.imageWidget.setImage(self.img)  # Set image for representation in the ImageView widget
         self.qwindow = QWidget()  # The composing of all buttons and frame for image representation into one main widget
         self.buttonGenSingleImg = QPushButton("Generate Single Pic"); self.buttonGenSingleImg.clicked.connect(self.generate_single_pic)
-        self.buttonContinuousGen = QPushButton("Continuous Generation"); self.buttonContinuousGen.clicked.connect(self.generate_continuous_pics)
-        self.buttonContinuousGen.setCheckable(True)
+        self.buttonContinuousGen = QPushButton("Continuous Generation")  # Switches on/off continuous generation
+        self.toggleTestPerformance = QCheckBox("Test Performance"); self.toggleTestPerformance.setEnabled(True)
+        self.toggleTestPerformance.setChecked(False)  # setChecked - set the state of a button
+        self.buttonContinuousGen.clicked.connect(self.generate_continuous_pics); self.buttonContinuousGen.setCheckable(True)
+        self.exposureTime = QSpinBox(); self.exposureTime.setSingleStep(1); self.exposureTime.setSuffix(" ms")
+        self.exposureTime.setPrefix("Exposure time: "); self.exposureTime.setMinimum(1); self.exposureTime.setMaximum(1000)
+        self.exposureTime.setValue(100); self.exposureTime.adjustSize()
         grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
         grid.addWidget(self.buttonGenSingleImg, 0, 0, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 1, 1, 1)
+        grid.addWidget(self.toggleTestPerformance, 0, 2, 1, 1); grid.addWidget(self.exposureTime, 0, 3, 1, 1)
         grid.addWidget(self.imageWidget, 1, 0, 4, 4)  # the ImageView widget spans on 4 rows and 4 columns
         self.setCentralWidget(self.qwindow)  # Actually, allows to make both buttons and ImageView visible
 
@@ -133,8 +143,14 @@ class SimUscope(QMainWindow):
         global flag_generation
         flag_generation = self.__flagGeneration
         if (self.__flagGeneration):
-            continuousImageGen = ContinuousImageGenerator(self.imageWidget, 1, self.img_height, self.img_width, True)
-            continuousImageGen.start()
+            self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
+            self.exposureTime.setDisabled(True)  # Disable the exposure time control
+            continuousImageGen = ContinuousImageGenerator(self.imageWidget, self.exposureTime.value(),
+                                                          self.img_height, self.img_width,
+                                                          self.toggleTestPerformance.isChecked())
+            continuousImageGen.start()  # Run the threaded code
+        else:
+            self.toggleTestPerformance.setEnabled(True); self.exposureTime.setEnabled(True)
 
 
 # %% Tests
