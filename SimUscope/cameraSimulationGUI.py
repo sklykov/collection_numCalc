@@ -6,7 +6,7 @@ Simple GUI for representing of generated noisy image using PyQT.
 """
 # %% Imports
 # import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout, QSpinBox, QCheckBox, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout, QSpinBox, QCheckBox, QVBoxLayout, QComboBox, QLabel
 import numpy as np
 from generate_noise_pic import generate_noise_picture
 from threading import Thread
@@ -99,13 +99,20 @@ class SimUscope(QMainWindow):
         self.imageGenerator = SingleImageGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
         self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 800, 700)
-        # Buttons and ImageView setting on the main window
+        # PlotItem allows showing the axes and restrict the mouse usage over the image
         self.plot = pyqtgraph.PlotItem(); self.plot.setXRange(0, self.img_width); self.plot.setYRange(0, self.img_height)
+        self.plot.getViewBox().setMouseEnabled(False, False)  # !!!: Disable the possibility of move image by mouse
+        # ImageView - for showing the generated image
         self.imageWidget = pyqtgraph.ImageView(view=self.plot)  # The main widget for image showing
         self.imageWidget.ui.roiBtn.hide(); self.imageWidget.ui.menuBtn.hide()   # Hide ROI, Norm buttons from the ImageView
         self.imageWidget.setImage(self.img)  # Set image for representation in the ImageView widget
         # self.roi = pyqtgraph.ROI((1, 1), size=(100, 100), rotatable=False, removable=True); self.plot.addItem(self.roi)
+        # QWidget - main widget window for grid layout
         self.qwindow = QWidget()  # The composing of all buttons and frame for image representation into one main widget
+        # Selector of type of a camera - Simulated or PCO one
+        self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated", "PCO"]); self.cameraSelLabel = QLabel("Camera Type")
+        vboxSelector = QVBoxLayout(); vboxSelector.addWidget(self.cameraSelLabel); vboxSelector.addWidget(self.cameraSelector)
+        # Push buttons for events evoking
         self.buttonGenSingleImg = QPushButton("Generate Single Pic"); self.buttonGenSingleImg.clicked.connect(self.generate_single_pic)
         self.buttonContinuousGen = QPushButton("Continuous Generation")  # Switches on/off continuous generation
         self.toggleTestPerformance = QCheckBox("Test Performance"); self.toggleTestPerformance.setEnabled(True)
@@ -118,20 +125,20 @@ class SimUscope(QMainWindow):
         self.quitButton.clicked.connect(self.quitClicked)
         # Grid layout below - the main layout pattern for all buttons and windos on the Main Window
         grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
-        grid.addWidget(self.buttonGenSingleImg, 0, 0, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 1, 1, 1)
-        grid.addWidget(self.toggleTestPerformance, 0, 2, 1, 1); grid.addWidget(self.exposureTime, 0, 3, 1, 1)
-        grid.addWidget(self.quitButton, 0, 5, 1, 1)
+        grid.addLayout(vboxSelector, 0, 0, 1, 1)  # Add selector of a camera
+        grid.addWidget(self.buttonGenSingleImg, 0, 1, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 2, 1, 1)
+        grid.addWidget(self.toggleTestPerformance, 0, 3, 1, 1); grid.addWidget(self.exposureTime, 0, 4, 1, 1)
         # vbox below - container for Height / Width buttons
         vbox = QVBoxLayout(self.qwindow); self.widthButton = QSpinBox(); self.heightButton = QSpinBox(); vbox.addWidget(self.widthButton)
         self.heightButton.setPrefix("Height: "); self.widthButton.setPrefix("Width: "); vbox.addWidget(self.heightButton)
-        grid.addLayout(vbox, 0, 4, 1, 1); self.widthButton.setSingleStep(2); self.heightButton.setSingleStep(2)
-        self.widthButton.setMinimum(50); self.heightButton.setMinimum(50)
-        self.widthButton.setMaximum(3000); self.heightButton.setMaximum(3000)
-        self.widthButton.setValue(self.img_width); self.heightButton.setValue(self.img_height)
+        grid.addLayout(vbox, 0, 5, 1, 1); self.widthButton.setSingleStep(2); self.heightButton.setSingleStep(2)
+        self.widthButton.setMinimum(50); self.heightButton.setMinimum(50); self.widthButton.setMaximum(3000);
+        self.heightButton.setMaximum(3000); self.widthButton.setValue(self.img_width); self.heightButton.setValue(self.img_height)
+        grid.addWidget(self.quitButton, 0, 6, 1, 1)
         # Set valueChanged event handlers
         self.widthButton.valueChanged.connect(self.imgSizeChanged); self.heightButton.valueChanged.connect(self.imgSizeChanged)
         # ImageWidget should be central - for better representation of generated images
-        grid.addWidget(self.imageWidget, 1, 0, 5, 6)  # the ImageView widget spans on ... rows and ... columns (2 values in the end)
+        grid.addWidget(self.imageWidget, 1, 0, 6, 6)  # the ImageView widget spans on ... rows and ... columns (2 values in the end)
         self.setCentralWidget(self.qwindow)  # Actually, allows to make both buttons and ImageView visible
 
     def generate_single_pic(self):
