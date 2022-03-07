@@ -6,7 +6,7 @@ Simple GUI for representing of generated noisy image using PyQT.
 """
 # %% Imports
 # import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout, QSpinBox, QCheckBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QGridLayout, QSpinBox, QCheckBox, QVBoxLayout
 import numpy as np
 from generate_noise_pic import generate_noise_picture
 from threading import Thread
@@ -16,7 +16,7 @@ import pyqtgraph
 
 # %% Global variables as simple method for synchronization
 flag_generation = False
-
+width_default = 1000; height_default = 1000  # Default width and height for generation of images
 
 # %% Class wrapper for threaded noisy single picture generation
 class SingleImageGenerator(Thread):
@@ -97,7 +97,7 @@ class SimUscope(QMainWindow):
         super().__init__()
         self.imageGenerator = SingleImageGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
-        self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 700, 600)
+        self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 800, 700)
         self.imageWidget = pyqtgraph.ImageView(parent=self)  # The main widget for image showing
         self.imageWidget.ui.roiBtn.hide(); self.imageWidget.ui.menuBtn.hide()  # Hide ROI and Norm buttons from the widget
         self.imageWidget.setImage(self.img)  # Set image for representation in the ImageView widget
@@ -110,10 +110,22 @@ class SimUscope(QMainWindow):
         self.exposureTime = QSpinBox(); self.exposureTime.setSingleStep(1); self.exposureTime.setSuffix(" ms")
         self.exposureTime.setPrefix("Exposure time: "); self.exposureTime.setMinimum(1); self.exposureTime.setMaximum(1000)
         self.exposureTime.setValue(100); self.exposureTime.adjustSize()
+        self.quitButton = QPushButton("Quit"); self.quitButton.setStyleSheet("color: red"); self.quitButton.clicked.connect(self.quitClicked)
+        # Grid layout below - the main layout pattern for all buttons and windos on the Main Window
         grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
         grid.addWidget(self.buttonGenSingleImg, 0, 0, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 1, 1, 1)
         grid.addWidget(self.toggleTestPerformance, 0, 2, 1, 1); grid.addWidget(self.exposureTime, 0, 3, 1, 1)
-        grid.addWidget(self.imageWidget, 1, 0, 4, 4)  # the ImageView widget spans on 4 rows and 4 columns
+        grid.addWidget(self.quitButton, 0, 5, 1, 1)
+        # vbox below - container for Height / Width buttons
+        vbox = QVBoxLayout(self.qwindow); self.widthButton = QSpinBox(); self.heightButton = QSpinBox(); vbox.addWidget(self.widthButton)
+        self.heightButton.setPrefix("Height: "); self.widthButton.setPrefix("Width: "); vbox.addWidget(self.heightButton)
+        grid.addLayout(vbox, 0, 4, 1, 1); self.widthButton.setSingleStep(2); self.heightButton.setSingleStep(2)
+        self.widthButton.setMinimum(50); self.heightButton.setMinimum(50); self.widthButton.setMaximum(3000); self.heightButton.setMaximum(3000)
+        self.widthButton.setValue(self.img_width); self.heightButton.setValue(self.img_height)
+        # Set valueChanged event handlers
+        self.widthButton.valueChanged.connect(self.imgSizeChanged); self.heightButton.valueChanged.connect(self.imgSizeChanged)
+        # ImageWidget should be central - for better representation of generated images
+        grid.addWidget(self.imageWidget, 1, 0, 5, 6)  # the ImageView widget spans on ... rows and ... columns (2 values in the end)
         self.setCentralWidget(self.qwindow)  # Actually, allows to make both buttons and ImageView visible
 
     def generate_single_pic(self):
@@ -145,18 +157,75 @@ class SimUscope(QMainWindow):
         if (self.__flagGeneration):
             self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
             self.exposureTime.setDisabled(True)  # Disable the exposure time control
+            self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
             continuousImageGen = ContinuousImageGenerator(self.imageWidget, self.exposureTime.value(),
                                                           self.img_height, self.img_width,
                                                           self.toggleTestPerformance.isChecked())
             continuousImageGen.start()  # Run the threaded code
         else:
             self.toggleTestPerformance.setEnabled(True); self.exposureTime.setEnabled(True)
+            self.widthButton.setEnabled(True); self.heightButton.setEnabled(True)
+
+    def closeEvent(self, closeEvent):
+        """
+        Rewrites the default behaviour of clicking on the X button on the main window GUI.
+
+        Parameters
+        ----------
+        closeEvent : QWidget Close Event
+            Needed by the API.
+
+        Returns
+        -------
+        None.
+
+        """
+        global flag_generation
+        if flag_generation:
+            flag_generation = False  # For notifiyng of Generation Thread to stop generation
+            exp_time = self.exposureTime.value(); time.sleep((exp_time*3)/1000)  # Artificial delay for waiting the Generation Thread ended
+            print("Waited", exp_time*3, "ms for closing the Generation Thread")
+            closeEvent.accept()  # Maybe redundant, but this is explicit accepting quit event (could be refused if asked for example)
+
+    def quitClicked(self):
+        """
+        Handle the clicking event on the Quit Button.
+
+        Sets the global variables to False state. Waits for threads stop running. Quits the Main window.
+
+        Returns
+        -------
+        None.
+
+        """
+        global flag_generation
+        if flag_generation:
+            flag_generation = False  # For notifiyng of Generation Thread to stop generation
+            exp_time = self.exposureTime.value(); time.sleep((exp_time*3)/1000)  # Artificial delay for waiting the Generation Thread ended
+        self.close()  # Calls the closing event for QMainWindow
+
+    def imgSizeChanged(self):
+        """
+        Handle changing of image width or height. Allows to pick up values for single image generation and continuous one.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.img_width = self.widthButton.value(); self.img_height = self.heightButton.value()
+        self.imageGenerator = SingleImageGenerator(self.img_height, self.img_width)
 
 
 # %% Tests
 if __name__ == "__main__":
     my_app = QApplication([])  # application without any command-line arguments
     my_app.setQuitOnLastWindowClosed(True)  # workaround for forcing the quit of the application window for returning to the kernel
-    main_window = SimUscope(1000, 1000); main_window.show()
+    main_window = SimUscope(width_default, height_default); main_window.show()
 
-    my_app.exec()
+    my_app.exec()  # Exit of the main program
+
+    # Simple check if the continuous generation still could be runned in the background and stopping it by assigning the global variable to False
+    if flag_generation:
+        print("Generation is still happening and will be handled by the main program")
+        flag_generation = False; time.sleep(0.3)
