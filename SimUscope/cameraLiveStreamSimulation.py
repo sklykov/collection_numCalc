@@ -89,7 +89,8 @@ class ContinuousImageThreadedGenerator(Thread):
                 if self.refresh_delay_ms == 0:  # if the delay between frames is 0, than the generation is unstable
                     self.refresh_delay_ms += 1  # make the delay at least 1 ms
             image = generate_noise_picture(self.width, self.height)  # Get the noisy picture, width and height swapped
-            self.imageWidget.setImage(image, autoRange=self.autoRange)  # Set the image for representation by passed ImageView pyqtgraph widget
+            # Set the image for representation by passed ImageView pyqtgraph widget - below
+            self.imageWidget.setImage(image, autoRange=self.autoRange)
             time.sleep(self.refresh_delay_ms/1000)  # Applying artificial delays between each image generation
             # If testing of Performance requested, then accumulating of passed times in the array performed
             if self.testPerformance:
