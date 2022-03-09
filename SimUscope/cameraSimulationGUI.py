@@ -35,7 +35,7 @@ class SimUscope(QMainWindow):
         self.messages2Continuous_ImgGen = Queue(maxsize=4)  # Initialize message queue for communication with the Camera
         self.imageGenerator = SingleImageThreadedGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
-        self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 800, 700)
+        self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 840, 720)
         # PlotItem allows showing the axes and restrict the mouse usage over the image
         self.plot = pyqtgraph.PlotItem()
         self.plot.getViewBox().setMouseEnabled(False, False)  # !!!: Disable the possibility of move image by mouse
@@ -46,10 +46,19 @@ class SimUscope(QMainWindow):
         # QWidget - main widget window for grid layout
         self.qwindow = QWidget()  # The composing of all buttons and frame for image representation into one main widget
         # Selector of type of a camera - Simulated or PCO one
-        self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated Treaded", "Simulated Process", "PCO"])
-        self.cameraSelLabel = QLabel("Camera Type")
+        self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated Threaded", "PCO"])
+        self.cameraSelLabel = QLabel("Camera Type"); self.cameraSelector.setEditable(True)  # setEditable is needed for setAlignment
+        self.cameraSelector.lineEdit().setAlignment(Qt.AlignCenter); self.cameraSelector.lineEdit().setReadOnly(True)
         vboxSelector = QVBoxLayout(); vboxSelector.addWidget(self.cameraSelLabel); vboxSelector.addWidget(self.cameraSelector)
         self.cameraSelLabel.setAlignment(Qt.AlignCenter)  # Align the label text on the center
+        # ROI size selectors
+        self.heightROI = QSpinBox(); self.heightROI.setSingleStep(2); self.heightROI.setMaximum(self.img_width)  # swapped
+        self.widthROI = QSpinBox(); self.widthROI.setSingleStep(2); self.widthROI.setMaximum(self.img_height)  # swapped
+        self.heightROI.setMinimum(2); self.widthROI.setMinimum(2); self.heightROI.setValue(100); self.widthROI.setValue(100)
+        self.widthROI.setAlignment(Qt.AlignCenter); self.heightROI.setAlignment(Qt.AlignCenter)
+        self.widthROI.setPrefix("ROI width: "); self.heightROI.setPrefix("ROI height: ")
+        vboxROI = QVBoxLayout(); vboxROI.addWidget(self.widthROI); vboxROI.addWidget(self.heightROI)
+        self.widthROI.valueChanged.connect(self.roiSizesSpecified); self.heightROI.valueChanged.connect(self.roiSizesSpecified)
         # Push buttons for events evoking
         self.buttonGenSingleImg = QPushButton("Generate Single Pic"); self.buttonGenSingleImg.clicked.connect(self.generate_single_pic)
         self.buttonContinuousGen = QPushButton("Continuous Generation")  # Switches on/off continuous generation
@@ -67,7 +76,7 @@ class SimUscope(QMainWindow):
         # self.calculateImgFFT
         self.quitButton = QPushButton("Quit"); self.quitButton.setStyleSheet("color: red")
         self.quitButton.clicked.connect(self.quitClicked)
-        # Grid layout below - the main layout pattern for all buttons and windos on the Main Window
+        # Grid layout below - the main layout pattern for all buttons and windows put on the Main Window (GUI)
         grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
         grid.addLayout(vboxSelector, 0, 0, 1, 1)  # Add selector of a camera
         grid.addWidget(self.buttonGenSingleImg, 0, 1, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 2, 1, 1)
@@ -80,6 +89,7 @@ class SimUscope(QMainWindow):
         self.heightButton.setMaximum(3000); self.widthButton.setValue(self.img_width); self.heightButton.setValue(self.img_height)
         grid.addWidget(self.quitButton, 0, 6, 1, 1); grid.addWidget(self.switchMouseCtrlImage, 7, 0, 1, 1)
         grid.addWidget(self.saveSnapImg, 7, 1, 1, 1); grid.addWidget(self.putROI, 7, 2, 1, 1)
+        grid.addLayout(vboxROI, 7, 3, 1, 1)
         # Set valueChanged event handlers
         self.widthButton.valueChanged.connect(self.imgSizeChanged); self.heightButton.valueChanged.connect(self.imgSizeChanged)
         # ImageWidget should be central - for better representation of generated images
@@ -117,16 +127,17 @@ class SimUscope(QMainWindow):
             self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
             self.exposureTime.setDisabled(True)  # Disable the exposure time control
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
-            # Below - initialization of the imported class for continous image generation
-            self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Continuous_ImgGen,
-                                                                       self.exposureTime.value(), self.img_height, self.img_width,
-                                                                       self.toggleTestPerformance.isChecked(), self.autoRange)
-            self.continuousImageGen.start()  # Run the threaded code
+            # Below - initialization of the imported class for continuous image generation
+            if self.cameraSelector.currentText() == "Simulated Threaded":
+                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Continuous_ImgGen,
+                                                                           self.exposureTime.value(), self.img_height, self.img_width,
+                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
+                self.continuousImageGen.start()  # Run the threaded code
             if not(self.saveSnapImg.isEnabled()):   # activate saving images, since some image generated and displayed
                 time.sleep(self.exposureTime.value()/1000)  # wait at least 1 exposure time before activate the saving button
                 self.saveSnapImg.setEnabled(True)
         else:
-            if not(self.messages2Continuous_ImgGen.full()):
+            if not(self.messages2Continuous_ImgGen.full()) and (self.cameraSelector.currentText() == "Simulated Threaded"):
                 self.messages2Continuous_ImgGen.put_nowait("Stop Generation")  # Send the message to stop continuous generation
             if (self.continuousImageGen.is_alive()):  # if the threaded process is still running
                 self.continuousImageGen.join()  # wait the stop of threaded process ending
@@ -182,7 +193,7 @@ class SimUscope(QMainWindow):
 
         """
         self.img_width = self.widthButton.value(); self.img_height = self.heightButton.value()
-        self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width)
+        self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width)  # reinitialize single generator
 
     def activateMouseOnImage(self):
         """
@@ -222,13 +233,16 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        qrect = QRect(0, 0, self.img_height, self.img_width)  # Bounding to image rectangle
-        if hasattr(self, "roi"):  # Checking of the class has the attribute already "roi"
-            self.removeROI()  # Cleaning existed roi
-        self.roi = pyqtgraph.ROI((self.img_height//2 - 50, self.img_width//2 - 50), size=(100, 100),
-                                 rotatable=False, removable=True, maxBounds=qrect)  # Create the ROI object
+        qrect = QRect(2, 2, self.img_height, self.img_width)  # Bounding of ROI to the image (ROI not movable outside of an image)
+        if hasattr(self, "roi"):  # Checking of the class has the attribute already "roi" => some ROI already drawn
+            self.removeROI()  # Cleaning existed (drawn) roi from the image for refreshing it
+        # ROI will be put in the middle of an image, assuming it has size more than 100 pixels, width and height swapped again
+        # Create the ROI object that is non rotatable, removable and expanding only evenly (snapSize and scaleSnap)
+        self.roi = pyqtgraph.ROI((self.img_width//2 - 50, self.img_height//2 - 50), size=(100, 100), snapSize=2.0,
+                                 scaleSnap=True, rotatable=False, removable=True, maxBounds=qrect)
         self.plot.addItem(self.roi)  # Add ROI object on the image
-        self.roi.sigRemoveRequested.connect(self.removeROI)  # Register handling of ROI tool
+        self.roi.sigRemoveRequested.connect(self.removeROI)  # Register handling of removing of ROI
+        self.roi.sigRegionChangeFinished.connect(self.roiSizeChanged)
 
     def removeROI(self):
         """
@@ -240,6 +254,34 @@ class SimUscope(QMainWindow):
 
         """
         self.plot.removeItem(self.roi)  # Remove added roi
+
+    def roiSizesSpecified(self):
+        """
+        Adjust input value for preventing odd values specification within the QSpinBoxes.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.heightROI.value() % 2 != 0:
+            self.heightROI.setValue(self.heightROI.value()+1)
+        if self.widthROI.value() % 2 != 0:
+            self.widthROI.setValue(self.widthROI.value()+1)
+        if hasattr(self, "roi"):
+            self.roi.setSize((self.widthROI.value(), self.heightROI.value()))
+
+    def roiSizeChanged(self):
+        """
+        Transfer changed by the user sizes of ROI on the image to the buttons representing them on GUI.
+
+        Returns
+        -------
+        None.
+
+        """
+        (w, h) = self.roi.size(); w = int(w); h = int(h)
+        self.widthROI.setValue(w); self.heightROI.setValue(h)
 
 
 # %% Tests

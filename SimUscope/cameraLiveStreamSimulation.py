@@ -34,7 +34,7 @@ class SingleImageThreadedGenerator(Thread):
         self.image = generate_noise_picture(self.width, self.height)  # Width and height order re-defined in the subfunction as well
 
 
-# %% Class wrapper for threaded noisy continuous pictures generation for checking the performance of Python representation
+# %% Class wrapper for threaded noisy continuous pictures generation for checking the performance of generation in Python
 class ContinuousImageThreadedGenerator(Thread):
     """Threaded class for generation of continuous stream of noisy images and updating the ImageView widget."""
 
@@ -118,6 +118,10 @@ class ContinuousImageThreadedGenerator(Thread):
             self.meanGenerationT = np.uint(np.round(np.mean(self.meanGenTimes), 0))
             print("Mean generation time is:", self.meanGenerationT, "ms")
 
+
+# %% Attempt to create implementation of Process class is failed because of complications with its import to other module
+# !!! Seems that implementation of Process from multiprocessing and further importing it as submodule to the main python
+# script can't be achieved
 
 # %% Tests of functionality
 if __name__ == "__main__":
