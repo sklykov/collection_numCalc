@@ -66,7 +66,7 @@ if shwfs:
 
 # %% Calibration of pictures shared in the repository
 if repo_pics:
-    plot = False; debug = True; aperture_radius = 18.0
+    plot = False; debug = False; aperture_radius = 16.0
     (coms_shifts, coms_integral_lim, pic_int_lim) = get_overall_coms_shifts(plot_found_focal_spots=plot)
     # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_int_lim, coms_integral_lim,
     #                                                                     aperture_radius=aperture_radius, debug=debug)
@@ -78,13 +78,13 @@ if repo_pics:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")
     calibration_path = os.path.join(calibrations, calibration_file_name)
-    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesRepoPics_unitcircle.npy")
+    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesRepoPics_calibrated.npy")
     if not(os.path.exists(precalculated_zernikes)):
         if not(os.path.exists(calibration_path)):
             t1 = time.time()
             # n_steps defines speed of calculations, suboptimal number of steps = 60, see "calibrations_tests.py"
             integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-                                                           aperture_radius=aperture_radius, n_steps=40, on_unit_circle=True)
+                                                           aperture_radius=aperture_radius, n_steps=50, on_unit_circle=False)
             np.save(calibration_path, integral_matrix)
             t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
         else:
