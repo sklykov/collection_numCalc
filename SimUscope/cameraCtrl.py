@@ -24,6 +24,7 @@ class PCOcamera(Thread):
         self.initialized = True  # Additional flag for the start the loop in the run method
         self.imageWidget = imageWidget  # For updating the image on the pyqtgraph.ImageView
         # TODO: initialization code for the camera
+        self.max_width = 1024; self.max_height = 1024
         print("The PCO camera initialized")
 
     def run(self):
@@ -57,6 +58,12 @@ class PCOcamera(Thread):
                             print("Camera start live streaming")  # TODO
                         if message == "Snap single image":
                             print("Snap single image")  # TODO
+                        if message == "Restore Full Frame":
+                            print("Full frame image will be restored with sizes: ", self.max_width, self.max_height)  # TODO
+                    if isinstance(message, tuple):
+                        (command, parameters) = message
+                        if command == "Crop Image":
+                            print("Received sizes for cropping:", parameters)  # TODO
                 except Empty:
                     pass
 

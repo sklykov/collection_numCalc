@@ -38,6 +38,7 @@ class SimUscope(QMainWindow):
         self.messages2Camera = Queue(maxsize=5)  # Initialize message queue for communication with the camera (simulated or not)
         self.exceptionsQueue = Queue(maxsize=5)  # Initialize separate queue for spreading and handling Exceptions occured within modules
         self.imageGenerator = SingleImageThreadedGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
+        self.img_width_default = img_width; self.img_height_default = img_height
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
         self.setWindowTitle("Simulation of uscope camera"); self.setGeometry(200, 200, 840, 800)
         # PlotItem allows showing the axes and restrict the mouse usage over the image
@@ -66,11 +67,11 @@ class SimUscope(QMainWindow):
         vboxROI = QVBoxLayout(); vboxROI.addWidget(self.widthROI); vboxROI.addWidget(self.heightROI)
         self.widthROI.valueChanged.connect(self.roiSizesSpecified); self.heightROI.valueChanged.connect(self.roiSizesSpecified)
         # Push buttons for events evoking
-        self.buttonGenSingleImg = QPushButton("Generate Single Pic"); self.buttonGenSingleImg.clicked.connect(self.snap_single_img)
-        self.buttonContinuousGen = QPushButton("Continuous Generation")  # Switches on/off continuous generation
+        self.snapSingleImgButton = QPushButton("Generate Single Pic"); self.snapSingleImgButton.clicked.connect(self.snap_single_img)
+        self.continuousStreamButton = QPushButton("Continuous Generation")  # Switches on/off continuous generation
         self.toggleTestPerformance = QCheckBox("Test Performance"); self.toggleTestPerformance.setEnabled(True)
         self.toggleTestPerformance.setChecked(False)  # setChecked - set the state of a button
-        self.buttonContinuousGen.clicked.connect(self.continuous_stream); self.buttonContinuousGen.setCheckable(True)
+        self.continuousStreamButton.clicked.connect(self.continuous_stream); self.continuousStreamButton.setCheckable(True)
         self.exposureTime = QSpinBox(); self.exposureTime.setSingleStep(1); self.exposureTime.setSuffix(" ms")
         self.exposureTime.setPrefix("Exposure time: "); self.exposureTime.setMinimum(1); self.exposureTime.setMaximum(1000)
         self.exposureTime.setValue(100); self.exposureTime.adjustSize(); self.exposureTime.valueChanged.connect(self.exposureTimeChanged)
@@ -81,13 +82,15 @@ class SimUscope(QMainWindow):
         self.putROI = QPushButton("ROI selector"); self.putROI.clicked.connect(self.putROIonImage)
         self.generateException = QPushButton("Generate Exception"); self.generateException.clicked.connect(self.genMessageWithException)
         self.cropImageButton = QPushButton("Crop Image"); self.cropImageButton.clicked.connect(self.cropImage)
+        self.restoreFullImgButton = QPushButton("Restore Full Image"); self.restoreFullImgButton.clicked.connect(self.restoreFullImage)
+        self.cropImageButton.setDisabled(True); self.restoreFullImgButton.setDisabled(True)  # until some roi selected
         # self.calculateImgFFT
         self.quitButton = QPushButton("Quit"); self.quitButton.setStyleSheet("color: red")
         self.quitButton.clicked.connect(self.quitClicked)
         # Grid layout below - the main layout pattern for all buttons and windows put on the Main Window (GUI)
         grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
         grid.addLayout(vboxSelector, 0, 0, 1, 1)  # Add selector of a camera
-        grid.addWidget(self.buttonGenSingleImg, 0, 1, 1, 1); grid.addWidget(self.buttonContinuousGen, 0, 2, 1, 1)
+        grid.addWidget(self.snapSingleImgButton, 0, 1, 1, 1); grid.addWidget(self.continuousStreamButton, 0, 2, 1, 1)
         grid.addWidget(self.toggleTestPerformance, 0, 3, 1, 1); grid.addWidget(self.exposureTime, 0, 4, 1, 1)
         # vbox below - container for Height / Width buttons
         vbox = QVBoxLayout(self.qwindow); self.widthButton = QSpinBox(); self.heightButton = QSpinBox(); vbox.addWidget(self.widthButton)
@@ -98,6 +101,7 @@ class SimUscope(QMainWindow):
         grid.addWidget(self.quitButton, 0, 6, 1, 1); grid.addWidget(self.switchMouseCtrlImage, 7, 0, 1, 1)
         grid.addWidget(self.saveSnapImg, 7, 1, 1, 1); grid.addWidget(self.putROI, 7, 2, 1, 1)
         grid.addLayout(vboxROI, 7, 3, 1, 1); grid.addWidget(self.generateException, 7, 6, 1, 1)
+        grid.addWidget(self.cropImageButton, 7, 4, 1, 1); grid.addWidget(self.restoreFullImgButton, 7, 5, 1, 1)
         # Set valueChanged event handlers
         self.widthButton.valueChanged.connect(self.imgSizeChanged); self.heightButton.valueChanged.connect(self.imgSizeChanged)
         # ImageWidget should be central - for better representation of generated images
@@ -155,7 +159,7 @@ class SimUscope(QMainWindow):
 
         """
         self.__flagGeneration = not(self.__flagGeneration)  # changing the state of generation
-        self.buttonContinuousGen.setDown(self.__flagGeneration)  # changing the visible state of button (clicked or not)
+        self.continuousStreamButton.setDown(self.__flagGeneration)  # changing the visible state of button (clicked or not)
         if (self.__flagGeneration):
             # Activate generation or Live imaging
             self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
@@ -304,11 +308,14 @@ class SimUscope(QMainWindow):
             self.removeROI()  # Cleaning existed (drawn) roi from the image for refreshing it
         # ROI will be put in the middle of an image, assuming it has size more than 100 pixels, width and height swapped again
         # Create the ROI object that is non rotatable, removable and expanding only evenly (snapSize and scaleSnap)
-        self.roi = pyqtgraph.ROI((self.img_width//2 - 50, self.img_height//2 - 50), size=(100, 100), snapSize=2.0,
+        self.roi = pyqtgraph.ROI((self.img_width//2 - self.img_width//20, self.img_height//2 - self.img_height//20),
+                                 size=(self.img_width//10, self.img_height//10), snapSize=2.0,
                                  scaleSnap=True, rotatable=False, removable=True, maxBounds=qrect)
         self.plot.addItem(self.roi)  # Add ROI object on the image
         self.roi.sigRemoveRequested.connect(self.removeROI)  # Register handling of removing of ROI
         self.roi.sigRegionChangeFinished.connect(self.roiSizeChanged)
+        self.heightROI.setValue(self.img_height//10); self.widthROI.setValue(self.img_width//10)  # Update ROI sizes values on the GUI
+        self.cropImageButton.setEnabled(True)  # some ROI specified => cropping is possible
 
     def removeROI(self):
         """
@@ -320,6 +327,7 @@ class SimUscope(QMainWindow):
 
         """
         self.plot.removeItem(self.roi)  # Remove added roi
+        self.cropImageButton.setDisabled(True)  # cropiing is impossible
 
     def roiSizesSpecified(self):
         """
@@ -386,7 +394,7 @@ class SimUscope(QMainWindow):
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
-            self.buttonGenSingleImg.setText("Single Snap Image"); self.buttonContinuousGen.setText("Live Stream")
+            self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
             if not(hasattr(self, "cameraHandle")):
                 self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
             if not(self.cameraHandle.is_alive()):
@@ -399,7 +407,7 @@ class SimUscope(QMainWindow):
             self.widthButton.setEnabled(True); self.heightButton.setEnabled(True)
             if not(self.generateException.isVisible()):  # return the visibility of the button
                 self.generateException.setVisible(True)
-            self.buttonGenSingleImg.setText("Generate Single Pic"); self.buttonContinuousGen.setText("Continuous Generation")
+            self.snapSingleImgButton.setText("Generate Single Pic"); self.continuousStreamButton.setText("Continuous Generation")
 
     def cropImage(self):
         """
@@ -410,14 +418,57 @@ class SimUscope(QMainWindow):
         None.
 
         """
+        # Implementation for the simulated camera
         if self.cameraSelector.currentText() == "Simulated Threaded":
             self.img_height = self.heightROI.value(); self.img_width = self.widthROI.value()
-            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width)
+            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width); self.snapSingleImgButton.click()
+            self.widthButton.setValue(self.widthROI.value()); self.heightButton.setValue(self.heightROI.value())
             if self.__flagGeneration:
-                self.messages2Camera.put_nowait("Stop Generation")
-            pass
+                # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
+                self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
+            else:
+                # Reinitialize the simulation class below for the getting new image sizes
+                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
+                                                                           self.exposureTime.value(), self.img_height, self.img_width,
+                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
+        # Implementation for the actual camera
         elif self.cameraSelector.currentText() == "PCO":
-            pass
+            if not(self.messages2Camera.full()):
+                # Message in the format (sting_command, (paramaters))
+                (y, x) = self.roi.pos()  # get the ROI's origin
+                y = int(y); x = int(x)
+                self.messages2Camera.put_nowait(("Crop Image", (y, x, self.heightROI.value(), self.widthROI.value())))
+
+        self.removeROI()  # remove the ROI because it was used for cropping and not actual anymore
+        self.restoreFullImgButton.setEnabled(True)  # Allowing the restoration of an image
+
+    def restoreFullImage(self):
+        """
+        Restore full frame image (predefined call for camera simulation and the internal property of the camera).
+
+        Returns
+        -------
+        None.
+
+        """
+        # Implementation for the simulated camera
+        if self.cameraSelector.currentText() == "Simulated Threaded":
+            self.img_height = self.img_height_default; self.img_width = self.img_width_default
+            self.widthButton.setValue(self.img_width_default); self.heightButton.setValue(self.img_height_default)
+            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width); self.snapSingleImgButton.click()
+            if self.__flagGeneration:
+                # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
+                self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
+            else:
+                # Reinitialize the simulation class below for the getting new image sizes
+                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera, self.exposureTime.value(),
+                                                                           self.img_height_default, self.img_width_default,
+                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
+        # Implementation for the actual camera
+        elif self.cameraSelector.currentText() == "PCO":
+            if not(self.messages2Camera.full()):
+                self.messages2Camera.put_nowait("Restore Full Frame")
+        self.restoreFullImgButton.setDisabled(True)
 
 
 # %% Tests
