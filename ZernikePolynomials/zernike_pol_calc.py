@@ -308,7 +308,7 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
     elif (m < 0):
         return -m*math.cos(m*theta)
     else:
-        return 1.0
+        return 0.0
 
 
 def get_classical_polynomial_name(mode: tuple) -> str:
@@ -372,35 +372,44 @@ def test():
     None if all tests passed.
 
     """
-    m = 1; n = 1; r = 1.5
-    assert radial_polynomial(m, n, r) == r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    m = 1; n = 1; r = 1.5; theta = np.radians(30.0)
+    assert radial_polynomial(m, n, r) == r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 1.0, f'Implemented dR{m, n} != to the calculated derivative'
+    assert zernike_polynomial(m, n, r, theta) == 2*r*np.cos(theta), f'Implemented Z{m, n} not equal to tabulated Zernike polynomial'
+    m = -1; n = 1
+    assert zernike_polynomial(m, n, r, theta) == 2*r*np.sin(theta), f'Implemented Z{m, n} not equal to tabulated Zernike polynomial'
     m = 0; n = 2
-    assert radial_polynomial(m, n, r) == 2*r*r-1, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial(m, n, r) == 2*r*r-1, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 4*r, f'Implemented dR{m, n} != to the calculated derivative'
+    assert zernike_polynomial(m, n, r, theta) == np.sqrt(3)*(2*r*r-1), f'Implemented Z{m, n} != tabulated value'
+    m = -2; n = 2
+    assert zernike_polynomial(m, n, r, theta) == np.sqrt(6)*r*r*np.sin(2*theta), f'Implemented Z{m, n} != tabulated value'
     m = 2; n = 2
-    assert radial_polynomial(m, n, r) == r*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial(m, n, r) == r*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 2*r, f'Implemented dR{m, n} != to the calculated derivative'
     m = 1; n = 3
-    assert radial_polynomial(m, n, r) == 3*r*r*r-2*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial(m, n, r) == 3*r*r*r-2*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 9*r*r-2.0, f'Implemented dR{m, n} != to the calculated derivative'
+    assert zernike_polynomial(m, n, r, theta) == np.sqrt(8)*(3*r*r*r-2*r)*np.cos(theta), f'Implemented Z{m, n} != tabulated value'
     m = 3; n = 3
-    assert radial_polynomial(m, n, r) == r*r*r, f'Implemented R{m, n} not equal to tabulated Zernike polynomial'
+    assert radial_polynomial(m, n, r) == r*r*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 3*r*r, f'Implemented dR{m, n} != to the calculated derivative'
     m = 0; n = 4
-    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 6*(4*r*r*r-2*r), f'Implemented dR{m, n} != to the calculated derivative'
     m = 2; n = 4
-    assert radial_polynomial(m, n, r) == 4*np.power(r, 4)-3*np.power(r, 2), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial(m, n, r) == 4*np.power(r, 4)-3*np.power(r, 2), f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 16*r*r*r - 6*r, f'Implemented dR{m, n} != to the calculated derivative'
     m = 4; n = 4
-    assert radial_polynomial(m, n, r) == np.power(r, 4), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial(m, n, r) == np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 4*r*r*r, f'Implemented dR{m, n} != to the calculated derivative'
+    m = -4; n = 4
+    assert abs(zernike_polynomial(m, n, r, theta) - np.sqrt(10)*r*r*r*r*np.sin(4*theta)) < 0.001, f'Z{m, n} != tabulated value'
     m = 1; n = 5
-    assert radial_polynomial(m, n, r) == 10*np.power(r, 5) - 12*r*r*r + 3*r, f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial(m, n, r) == 10*np.power(r, 5) - 12*r*r*r + 3*r, f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 50*np.power(r, 4) - 36*r*r + 3, f'Implemented dR{m, n} != to the derivative'
     m = 4; n = 6
-    assert radial_polynomial(m, n, r) == 6*np.power(r, 6) - 5*np.power(r, 4), f'Implemented R{m, n} not equal to tabulated Zernike'
+    assert radial_polynomial(m, n, r) == 6*np.power(r, 6) - 5*np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 36*np.power(r, 5) - 20*r*r*r, f'Implemented dR{m, n} != to the derivative'
     print("All tests passed")
 

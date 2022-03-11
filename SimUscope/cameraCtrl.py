@@ -8,6 +8,7 @@ Camera wrapper for imports and further utilization in OOP manner.
 from threading import Thread
 from queue import Queue, Empty
 import time
+import pco
 
 
 # %% Class wrapper
@@ -23,7 +24,12 @@ class PCOcamera(Thread):
         Thread.__init__(self)  # Initialize this class in the other thread
         self.initialized = True  # Additional flag for the start the loop in the run method
         self.imageWidget = imageWidget  # For updating the image on the pyqtgraph.ImageView
-        # TODO: initialization code for the camera
+        # Initialization code for the camera
+        try:
+            self.cameraReference = pco.Camera()
+        except ImportError:
+            print("Camera not initialized! The reference to the camera will be empty!")
+            self.cameraReference = None
         self.max_width = 1024; self.max_height = 1024
         print("The PCO camera initialized")
 
@@ -57,6 +63,7 @@ class PCOcamera(Thread):
                         if message == "Start Live Stream":
                             print("Camera start live streaming")  # TODO
                         if message == "Snap single image":
+                            self.snap_single_image()
                             print("Snap single image")  # TODO
                         if message == "Restore Full Frame":
                             print("Full frame image will be restored with sizes: ", self.max_width, self.max_height)  # TODO
@@ -69,15 +76,32 @@ class PCOcamera(Thread):
 
             time.sleep(self.mainLoopTimeDelay/1000)  # Delays of each step of processing of commands
 
-    def close(self):
+    def snap_single_image(self):
         """
-        Deinitialize the camera and close the connection.
+        Get the single image from the camera.
 
         Returns
         -------
         None.
 
         """
-        # TODO: camera deinitialize
+        if self.cameraReference is not None:
+            self.cameraReference.record(number_of_images=1, mode='sequence')
+            self.cameraReference.wait_for_first_image()
+            image, metadata = self.cameraReference.image()
+            self.imageWidget.setImage(image)
+            self.imageWidget.setPredefinedGradient('grey')
+
+    def close(self):
+        """
+        Deinitialize the camera and close the connection to it.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.cameraReference is not None:  # If the camera was initialized, then the cameraReference will be not None
+            self.cameraReference.close()
         time.sleep(self.mainLoopTimeDelay/1000)
         print("The PCO camera closed")

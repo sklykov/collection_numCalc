@@ -530,7 +530,8 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
         delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
         theta = theta_a  # initial value of theta
         # Integration over theta (trapezoidal rule)
-        integral_sumX = 0.0; integral_sumY = 0.0; integral_sum_Zernike = 0.0
+        integral_sumX = 0.0; integral_sumY = 0.0
+        # integral_sum_Zernike = 0.0
         for j_theta in range(n_steps+1):
             # Getting limits for integration on rho
             (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
@@ -564,19 +565,21 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
 
             integral_sum_rhoX = (integral_sum_rhoX1 - integral_sum_rhoX2)
             integral_sum_rhoY = (integral_sum_rhoY1 + integral_sum_rhoY2)
-            integral_sum_rhoX *= delta_rho; integral_sum_rhoY *= delta_rho; integral_Zernike_rho *= delta_rho
+            integral_sum_rhoX /= integral_Zernike_rho; integral_sum_rhoY /= integral_Zernike_rho
+            # integral_sum_rhoX *= delta_rho; integral_sum_rhoY *= delta_rho; integral_Zernike_rho *= delta_rho
 
             if (j_theta == 0) and (j_theta == n_steps):
                 integral_sumX += 0.5*integral_sum_rhoX; integral_sumY += 0.5*integral_sum_rhoY
-                triangPol = triangular_function(m, theta)
-                integral_sum_Zernike += 0.5*triangPol*triangPol*integral_Zernike_rho  # caluibration - integration angular part
+                # triangPol = triangular_function(m, theta)
+                # integral_sum_Zernike += 0.5*integral_Zernike_rho  # caluibration - integration angular part
             else:
                 integral_sumX += integral_sum_rhoX; integral_sumY += integral_sum_rhoY
-                triangPol = triangular_function(m, theta)
-                integral_sum_Zernike += triangPol*triangPol*integral_Zernike_rho  # caluibration - integration angular part
+                # triangPol = triangular_function(m, theta)
+                # integral_sum_Zernike += integral_Zernike_rho  # caluibration - integration angular part
             theta += delta_theta
-        # integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
-        integral_sumX /= integral_sum_Zernike; integral_sumY /= integral_sum_Zernike  # Calibration on the integrals of Zmn
+        integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
+        # integral_sumX /= integral_sum_Zernike; integral_sumY /= integral_sum_Zernike  # Calibration on the integrals of Zmn
+        # ???: the results of calculation using this definitions are disappointing!
 
         # The final integral values should be also calibrated to focal and wavelengths
         integral_values[i_subaperture, 1] = calibration*integral_sumX  # Partially calibration on the area of sub-aperture
@@ -621,18 +624,19 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
         print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
+        # Integration limits and steps on theta
         (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta (radians)
         delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
         theta = theta_a  # initial value of theta
+        # Getting limits for integration on rho
+        (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
+        # !!!: Another approach to integration on rho: the entire picture with sub-apertures will be accounted as unit-radius circle
+        # For that, all rho values should be normilized to the maximum rho0 coordinate + radius_subaperture
+        rho_a /= rho_unit_calibration; rho_b /= rho_unit_calibration
         # Integration over theta (trapezoidal rule)
         integral_sumX = 0.0; integral_sumY = 0.0
         for j_theta in range(n_steps+1):
-            # Getting limits for integration on rho
-            (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
             # Integration on rho for X and Y axis (trapezoidal formula)
-            # !!!: Another approach to integration on rho: the entire picture with sub-apertures will be accounted as unit-radius circle
-            # For that, all rho values should be normilized to the maximum rho0 coordinate + radius_subaperture
-            rho_a /= rho_unit_calibration; rho_b /= rho_unit_calibration
             rho = rho_a  # Lower integration boundary
             delta_rho = (rho_b - rho_a)/n_steps
             integral_sum_rhoX1 = 0.0; integral_sum_rhoX2 = 0.0; integral_sum_rhoY1 = 0.0; integral_sum_rhoY2 = 0.0
@@ -659,17 +663,22 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
             theta += delta_theta
         integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
         # integral values should be also calibrated to the areas of sub-apertures (the thesis)
-        integral_sumX /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
-        integral_sumY /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
+        # integral_sumX /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
+        # integral_sumY /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
+        # actually, the integral values should be calibrated to the each sub-aperture area - depedning on the integration limits
+        # !!! But the values of them acually small - differences between rho_b and rho_a
+        integral_sumX /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
+        integral_sumY /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
         # The final integral values should be also calibrated to focal and wavelengths
-        integral_values[i_subaperture, 1] = calibration*integral_sumX  # Not yet implemented calibration, not necessary now
-        integral_values[i_subaperture, 0] = calibration*integral_sumY
+        # Below - the question about X and Y axes - their order
+        integral_values[i_subaperture, 0] = calibration*integral_sumX  # Not yet implemented calibration, not necessary now
+        integral_values[i_subaperture, 1] = calibration*integral_sumY
         integral_values = np.round(integral_values, 8)
     return integral_values
 
 
 def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_limits: np.ndarray, theta0: np.ndarray,
-                                 rho0: np.ndarray, aperture_radius: float = 15.0, n_steps: int = 50, on_unit_circle: bool = False):
+                                 rho0: np.ndarray, aperture_radius: float = 15.0, n_steps: int = 50, on_unit_circle: bool = True):
     """
     Wrap for calculation of integral values on sub-apertures performing on several Zernike polynomials.
 
@@ -709,13 +718,13 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
     for i in range(len(zernike_polynomials_list)):
         (m, n) = zernike_polynomials_list[i]
         if ((m == -1) and (n == 1)) or ((m == -2) and (n == 2)) or ((m == -3) and (n == 3)) or ((m == -4) and (n == 4)):
-            i_simmetry = i; symmetrical_substition = False
+            i_simmetry = i; symmetrical_substition = True
         if symmetrical_substition:
             if ((m == 1) and (n == 1)) or ((m == 2) and (n == 2)) or ((m == 3) and (n == 3)) or ((m == 4) and (n == 4)):
                 # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
                 # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
-                integral_matrix[:, 2*i+1] = integral_matrix[:, 2*i_simmetry]
-                integral_matrix[:, 2*i] = -integral_matrix[:, 2*i_simmetry+1]
+                integral_matrix[:, 2*i] = integral_matrix[:, 2*i_simmetry+1]
+                integral_matrix[:, 2*i+1] = -integral_matrix[:, 2*i_simmetry]
                 print("Shortening of calculation used")
             else:
                 # Normal integrals calculation
@@ -947,9 +956,9 @@ if __name__ == '__main__':
                                                                              aperture_radius=16.0, debug=True)
     # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
     t1 = time.time()
-    zernikes_set = [(-2, 2), (0, 2)]
+    zernikes_set = [(-3, 3), (3, 3)]
     # zernikes_set = [(-1, 1)]
     integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-                                                   aperture_radius=18.0, n_steps=40, on_unit_circle=False)
+                                                   aperture_radius=18.0, n_steps=40)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)

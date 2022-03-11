@@ -88,12 +88,12 @@ class SimUscope(QMainWindow):
         self.quitButton = QPushButton("Quit"); self.quitButton.setStyleSheet("color: red")
         self.quitButton.clicked.connect(self.quitClicked)
         # Grid layout below - the main layout pattern for all buttons and windows put on the Main Window (GUI)
-        grid = QGridLayout(self.qwindow); self.setLayout(grid)  # grid layout allows better layout of buttons and frames
+        grid = QGridLayout(self.qwindow)  # grid layout allows better layout of buttons and frames
         grid.addLayout(vboxSelector, 0, 0, 1, 1)  # Add selector of a camera
         grid.addWidget(self.snapSingleImgButton, 0, 1, 1, 1); grid.addWidget(self.continuousStreamButton, 0, 2, 1, 1)
         grid.addWidget(self.toggleTestPerformance, 0, 3, 1, 1); grid.addWidget(self.exposureTime, 0, 4, 1, 1)
         # vbox below - container for Height / Width buttons
-        vbox = QVBoxLayout(self.qwindow); self.widthButton = QSpinBox(); self.heightButton = QSpinBox(); vbox.addWidget(self.widthButton)
+        vbox = QVBoxLayout(); self.widthButton = QSpinBox(); self.heightButton = QSpinBox(); vbox.addWidget(self.widthButton)
         self.heightButton.setPrefix("Height: "); self.widthButton.setPrefix("Width: "); vbox.addWidget(self.heightButton)
         grid.addLayout(vbox, 0, 5, 1, 1); self.widthButton.setSingleStep(2); self.heightButton.setSingleStep(2)
         self.widthButton.setMinimum(50); self.heightButton.setMinimum(50); self.widthButton.setMaximum(3000)
@@ -123,10 +123,12 @@ class SimUscope(QMainWindow):
         """
         if self.cameraSelector.currentText() == "Simulated Threaded":
             # Initialize the simulated camera
+            pyqtgraph.setConfigOptions(imageAxisOrder='col-major')  # Set for conforming with initial development
             self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
                                                                        self.exposureTime.value(), self.img_height, self.img_width,
                                                                        self.toggleTestPerformance.isChecked(), self.autoRange)
         elif self.cameraSelector.currentText() == "PCO":
+            pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
             self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
 
     def snap_single_img(self):
@@ -390,6 +392,7 @@ class SimUscope(QMainWindow):
 
         """
         if self.cameraSelector.currentText() == "PCO":
+            pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
             # No need to deinitialize the simulated camera now
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
@@ -400,6 +403,7 @@ class SimUscope(QMainWindow):
             if not(self.cameraHandle.is_alive()):
                 self.cameraHandle.start()   # Start the main loop for receiving the commands
         elif self.cameraSelector.currentText() == "Simulated Threaded":
+            pyqtgraph.setConfigOptions(imageAxisOrder='col-major')  # Set for conforming with initial development
             if (hasattr(self, "cameraHandle")):  # Check that the PCO camera was initialized
                 if self.cameraHandle.is_alive():  # Check that the PCO camera is still running in the separate thread
                     self.messages2Camera.put_nowait("Close the camera")  # Send the message to stop the imaging and deinitialize the camera

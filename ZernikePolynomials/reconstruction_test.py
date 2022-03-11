@@ -13,7 +13,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = True
+shwfs = True; repo_pics = False
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set = [(-1, 1)]
@@ -26,13 +26,13 @@ zernikes_set = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 
 # %% Tests on the recorded pictures from the Shack-Hartmann sensor
 # Manual change the working directory to the folder with stored pictures, outside the repository
 if shwfs:
-    os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs"); aberrated_pic_name = "AstigmatismPic0.png"
-    plot = False; debug = True; aperture_radius = 12.4
+    os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs"); aberrated_pic_name = "DefocusPic1.png"
+    plot = False; debug = True; aperture_radius = 10.0
     (coms_shifts, coms_integral_lim, pic_int_lim) = get_overall_coms_shifts(pics_folder=os.getcwd(),
                                                                             background_pic_name="backgroundPic2.png",
                                                                             nonaberrated_pic_name="nonAberrationPic2.png",
                                                                             aberrated_pic_name=aberrated_pic_name,
-                                                                            min_dist_peaks=20, threshold_abs=54, region_size=18,
+                                                                            min_dist_peaks=20, threshold_abs=55, region_size=18,
                                                                             substract_background=False, plot_found_focal_spots=plot)
     # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_int_lim, coms=coms_integral_lim,
     #                                                                     aperture_radius=aperture_radius, debug=debug)
@@ -43,15 +43,18 @@ if shwfs:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")
     calibration_path = os.path.join(calibrations, calibration_file_name)
-    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesShH.npy")
+    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesShH_DefocusPic1.npy")
     if not(os.path.exists(precalculated_zernikes)):
         if not(os.path.exists(calibration_path)):
             t1 = time.time()
             # n_steps defines speed of calculations, suboptimal number of steps = 60, see "calibrations_tests.py"
             integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-                                                           aperture_radius=aperture_radius, n_steps=38)
-            np.save(calibration_path, integral_matrix)
-            t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
+                                                           aperture_radius=aperture_radius, n_steps=24)
+            np.save(calibration_path, integral_matrix); t2 = time.time()
+            if np.round(t2-t1, 3) > 60:
+                print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round((t2-t1)/60, 1), "minutes")
+            else:
+                print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
         else:
             integral_matrix = np.load(calibration_path)
     else:
@@ -61,12 +64,12 @@ if shwfs:
                          (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         for i in range(len(set14zernikes)):
             print(get_classical_polynomial_name(set14zernikes[i]), ":", np.round(alpha_coefficients[i], 4))
-        plot_zps_polar(set14zernikes, title="reconstraction of " + aberrated_pic_name + " 23 Feb",
+        plot_zps_polar(set14zernikes, title="reconstraction of " + "actual astigmatism",
                        tuned=True, alpha_coefficients=alpha_coefficients)
 
 # %% Calibration of pictures shared in the repository
 if repo_pics:
-    plot = False; debug = False; aperture_radius = 16.0
+    plot = False; debug = True; aperture_radius = 14.0
     (coms_shifts, coms_integral_lim, pic_int_lim) = get_overall_coms_shifts(plot_found_focal_spots=plot)
     # (integration_limits, theta0, rho0) = get_integr_limits_circles_coms(pic_int_lim, coms_integral_lim,
     #                                                                     aperture_radius=aperture_radius, debug=debug)
@@ -78,15 +81,18 @@ if repo_pics:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")
     calibration_path = os.path.join(calibrations, calibration_file_name)
-    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesRepoPics_calibrated.npy")
+    precalculated_zernikes = os.path.join(calibrations, "Calibration14ZernikesRepoPics_unitcircle.npy")
     if not(os.path.exists(precalculated_zernikes)):
         if not(os.path.exists(calibration_path)):
             t1 = time.time()
             # n_steps defines speed of calculations, suboptimal number of steps = 60, see "calibrations_tests.py"
             integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-                                                           aperture_radius=aperture_radius, n_steps=50, on_unit_circle=False)
-            np.save(calibration_path, integral_matrix)
-            t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
+                                                           aperture_radius=aperture_radius, n_steps=60, on_unit_circle=True)
+            np.save(calibration_path, integral_matrix); t2 = time.time()
+            if np.round(t2-t1, 3) > 60:
+                print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round((t2-t1)/60, 1), "minutes")
+            else:
+                print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
         else:
             integral_matrix = np.load(calibration_path)
     else:
