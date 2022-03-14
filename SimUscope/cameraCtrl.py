@@ -27,11 +27,14 @@ class PCOcamera(Thread):
         # Initialization code for the camera
         try:
             self.cameraReference = pco.Camera()
+            print("The PCO camera initialized")
         except ImportError:
-            print("Camera not initialized! The reference to the camera will be empty!")
+            print("The PCO library is unavailable, check the installation. The camera not initialized!")
+            self.cameraReference = None
+        except ValueError:
+            print("CAMERA NOT INITIALIZED! THE HANDLE TO IT - NONE")
             self.cameraReference = None
         self.max_width = 1024; self.max_height = 1024
-        print("The PCO camera initialized")
 
     def run(self):
         """
@@ -54,10 +57,10 @@ class PCOcamera(Thread):
                             try:
                                 print("Received by the camera process:", message)
                                 self.close()
-                            except Exception:
-                                pass
+                            except Exception as error:
+                                print("Raised exception during closing the camera:", error)
                             finally:
-                                self.initialized = False  # In any case stop the loop
+                                self.initialized = False  # In any case stop the loop waiting the commands from the GUI
                         if message == "Stop Live Stream":
                             print("Camera stop live streaming")  # TODO
                         if message == "Start Live Stream":
@@ -75,6 +78,7 @@ class PCOcamera(Thread):
                     pass
 
             time.sleep(self.mainLoopTimeDelay/1000)  # Delays of each step of processing of commands
+        print("The threaded process for the camera is closed")
 
     def snap_single_image(self):
         """

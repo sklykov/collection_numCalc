@@ -398,8 +398,7 @@ class SimUscope(QMainWindow):
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
             self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
-            if not(hasattr(self, "cameraHandle")):
-                self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
+            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
             if not(self.cameraHandle.is_alive()):
                 self.cameraHandle.start()   # Start the main loop for receiving the commands
         elif self.cameraSelector.currentText() == "Simulated Threaded":
