@@ -596,7 +596,8 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
                 # Normal integrals calculation
                 if on_unit_circle:
                     integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                                              aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
+                                                                              aperture_radius=aperture_radius, n_steps=n_steps,
+                                                                              swapXY=swapXY)
                 else:
                     integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
                                                                   aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
@@ -747,7 +748,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             # Assign specified threshold values for searching of local peaks (including default values)
             threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
     else:
-        # If background substracted, then assign the specified threshold or keep the the default value(the pictures in the repository = 2.0)
+        # If background substracted, then assign the specified threshold or keep the the default value
         threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
     # Plotting of results on an image for debugging (for coms_nonaberrated)
     # CoMs = center of masses, calculated in the areas around found local peaks
@@ -781,7 +782,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
                     if (diffX < (min_dist_peaks//2) and diffY < (min_dist_peaks//2)):
                         coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign; break  # Stop if the candidate found
     else:
-        # If the number of detected peaks is different for aberrated and non-aberrated pictures, then use the aberrated one for calculations
+        # If the number of detected peaks is different for aberrated and non-aberrated pictures, then use the aberrated one
         # Removed - checking sizes of detected CoMs for aberrated and non-aberrated, in general case last one should more then another
         coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')  # coms shifts calculation - relative to the
         pic_integral_limits = diff_aberrated; coms_integral_limits = coms_aberrated  # diff_nonaberrated => non=aberrated picture
@@ -804,10 +805,49 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
     return (coms_shifts, coms_integral_limits, pic_integral_limits)
 
 
-def get_nonaberrated_centers(pics_folder: str = "pics", background_pic_name: str = "picBackground.png",
-                             nonaberrated_pic_name: str = "nonAberrationPic.png", min_dist_peaks: int = 16,
-                             threshold_abs: float = 2.0, region_size: int = 16, substract_background: bool = False,
-                             plot_results: bool = False) -> tuple:
+def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", background_pic_name: str = "picBackground.png",
+                                             nonaberrated_pic_name: str = "nonAberrationPic.png", min_dist_peaks: int = 18,
+                                             threshold_abs: float = 60.0, region_size: int = 20, substract_background: bool = False,
+                                             aperture_radius: float = 15.0, plot_results: bool = False) -> tuple:
+    """
+    Calculate the center of masses of localized focal spots and also the integration limits for further modal wavefront reconstruction.
+
+    Focal spots are recorded within the non-aberrated image (for flat wavefront) from Shack-Hartmann sensor. Integrations limits are calculated
+    according to the mentioned above in this file thesis.
+
+    Parameters
+    ----------
+    pics_folder : str, optional
+        Path to the folder with pictures for processing. The default is "pics".
+    background_pic_name : str, optional
+        Picture name containing background. The default is "picBackground.png".
+    nonaberrated_pic_name : str, optional
+        Picture name containing non-aberrated (flat) wavefront. The default is "nonAberrationPic.png".
+    min_dist_peaks : int, optional
+        Minimal distance between two local peaks. The default is 18.
+    threshold_abs : float, optional
+        Absolute minimal intensity value of the local peak, seeding value for the iterative searching of them. The default is 60.0.
+    region_size : int, optional
+        Size of local rectangle, there the center of mass is calculated. The default is 20.
+    substract_background : bool, optional
+        If False, from the opened images the stored background picture won't be substracted. The default is False.
+    aperture_radius : float, optional
+        Radius of sub-aperture in pixels on the image. The default is 15.0.
+    plot_results : bool, optional
+        If True, the images with found local peaks and sub-apertures will be plotted. The default is False.
+
+    Raises
+    ------
+    Exception
+        If the specified path to the folder with pictures doesn't exist or not a directory and if images there aren't actual files.
+
+    Returns
+    -------
+    tuple
+        (Centers of masses for non-aberrated image without the central sub-aperture, non-aberrated image,
+         Theta (polar) coordinates of sub-apertures, Rho (polar) coordinates of sub-apertures, Integration limits for sub-apertures).
+
+    """
     # Open images on some specified folder
     if pics_folder == "pics":
         # Default folder in the repository
@@ -831,6 +871,7 @@ def get_nonaberrated_centers(pics_folder: str = "pics", background_pic_name: str
     if substract_background:
         # Substracting from the recorded pictures (non- and aberrated) the recorded background
         diff_nonaberrated = (nonaberrated - background); diff_nonaberrated = img_as_ubyte(diff_nonaberrated)
+        threshold_abs = np.round(np.mean(diff_nonaberrated), 0) + 1
     else:
         # Substracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
         # Additionally, stretch a bit the contrast
@@ -843,21 +884,10 @@ def get_nonaberrated_centers(pics_folder: str = "pics", background_pic_name: str
         plt.figure(); plt.imshow(diff_nonaberrated); plt.tight_layout(); plt.title("Non-aberrated - Background")
     elif plot_results:
         plt.figure(); plt.imshow(nonaberrated); plt.tight_layout(); plt.title("Non-aberrated")
-    # Below all if statements - for substite default threshold values for normal starting value for searching for a local peak
-    if not(substract_background):
-        if (threshold_abs == 2.0):  # if the default value provided, but the background not substracted, then make new default or use the provided
-            threshold_abs_nonaber = np.round(np.mean(diff_nonaberrated), 0) + 2  # the substitution of the default threshold value
-        else:
-            # Assign specified threshold values for searching of local peaks (including default values)
-            threshold_abs_nonaber = threshold_abs
-    else:
-        # If background substracted, then assign the specified threshold or keep the the default value(the pictures in the repository = 2.0)
-        threshold_abs_nonaber = threshold_abs
     # Plotting of results on an image for debugging (for coms_nonaberrated)
     # CoMs = center of masses, calculated in the areas around found local peaks
-    coms_nonaberrated = get_localCoM_matrix(diff_nonaberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs_nonaber,
+    coms_nonaberrated = get_localCoM_matrix(diff_nonaberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs,
                                             region_size=region_size, plot=plot_results)
-    pic_integral_limits = diff_nonaberrated  # for further calculation of integration limits
     # Searching for the central sub-aperture that should be close to the center of the image
     (rows, cols) = diff_nonaberrated.shape; x_img_center = cols//2; y_img_center = rows//2
     x_min_dist = cols; y_min_dist = rows; i_center_subaperture = -1
@@ -868,28 +898,184 @@ def get_nonaberrated_centers(pics_folder: str = "pics", background_pic_name: str
         if (min_distance > distance):
             i_center_subaperture = i; min_distance = distance
     x_central_subaperture = coms_nonaberrated[i_center_subaperture, 1]; y_central_subaperture = coms_nonaberrated[i_center_subaperture, 0]
+    # Plotting the found center of image and central sub-aperture
     if plot_results:
         plt.figure(); plt.imshow(diff_nonaberrated)  # for plotting the found central sub-aperture
         plt.plot(x_central_subaperture, y_central_subaperture, '+', color="red")
         plt.plot(x_img_center, y_img_center, '+', color="blue")
         plt.title("Estimated circular apertures of mircolenses array")
-    return (coms_nonaberrated, pic_integral_limits)
+    # Detected centers below are searched for on the aberrated image, so the shifts in CoMs should be calculated relatively to it
+    rho0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate r of a sub-aperture (lens)
+    theta0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate theta of a sub-aperture (lens)
+    theta_a = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (lower) on theta (1)
+    theta_b = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (higher) on theta (2)
+    subapertures_wt_central = np.zeros((np.size(coms_nonaberrated, 0)-1, 2), dtype='float')
+    integration_limits = [(0.0, 0.0) for i in range(np.size(coms_nonaberrated, 0)-1)]
+    # Calculation of integration limits - below
+    j = 0
+    for i in range(np.size(coms_nonaberrated, 0)):
+        # Plot found regions for CoM calculations
+        if plot_results and not(i == i_center_subaperture):
+            plt.gca().add_patch(Circle((coms_nonaberrated[i, 1], coms_nonaberrated[i, 0]), aperture_radius,
+                                       edgecolor='green', facecolor='none'))
+        if i == i_center_subaperture:  # Deleting the central subaperture from the calculations
+            continue
+        else:
+            # Calculation of the boundaries of the integration intervals for equations from the thesis
+            x_relative = coms_nonaberrated[i, 1] - x_central_subaperture  # relative to the central sub-aperture
+            y_relative = -coms_nonaberrated[i, 0] + y_central_subaperture   # relative to the central sub-aperture
+            rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
+            # Calculation of integration limits for the angles theta
+            theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with selection of the right quadrant in grads!
+            # ??? Maybe redundant but seems better to make conversion to all positive values angles:
+            if theta0[j] < 0.0:
+                theta0[j] += 360.0   # all negative angles become positive
+            theta_a[j] = np.round(theta0[j] - np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
+            theta_b[j] = np.round(theta0[j] + np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
+            integration_limits[j] = (theta_a[j], theta_b[j])
+            subapertures_wt_central[j, 0] = coms_nonaberrated[i, 0]; subapertures_wt_central[j, 1] = coms_nonaberrated[i, 1]
+            j += 1
+    # Plotting the calculated coordinates in polar projection for checking that all their centers defined correctly
+    if plot_results:
+        plt.figure()
+        plt.axes(projection='polar')
+        plt.plot(np.radians(theta0), rho0, '.')
+        plt.tight_layout()
+    # Before the calculation for angles made in grads, below the transfer to radians for passing it further to trigonometric functions
+    theta0 = np.radians(theta0)
+    integration_limits = np.radians(integration_limits)
+    return (subapertures_wt_central, diff_nonaberrated, theta0, rho0, integration_limits)
+
+
+def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, pics_folder: str = "pics",
+                    background_pic_name: str = "picBackground.png", aberrated_pic_name: str = "aberrationPic.png",
+                    min_dist_peaks: int = 18, threshold_abs: float = 60.0, region_size: int = 20,
+                    substract_background: bool = False, plot_results: bool = False) -> tuple:
+    """
+    Calculate shifts between center of masses around local focal spots for aberrated and non-aberrated images.
+
+    Parameters
+    ----------
+    coms_nonaberrated : np.ndarray
+        Calculated center of masses around local focal spots on the non-aberrated image.
+    integral_matrix : np.ndarray
+        Calculated the integral matrix for Zernike polynomials.
+    pics_folder : str, optional
+        Path to the folder with pictures for processing. The default is "pics".
+    background_pic_name : str, optional
+        Picture name containing background. The default is "picBackground.png"
+    aberrated_pic_name : str, optional
+        Picture name containing aberrated wavefront. The default is "aberrationPic.png".
+    min_dist_peaks : int, optional
+        Minimal distance between two local peaks. The default is 18.
+    threshold_abs : float, optional
+        Absolute minimal intensity value of the local peak, seeding value for the iterative searching of them. The default is 60.0.
+    region_size : int, optional
+        Size of local rectangle, there the center of mass is calculated. The default is 20.
+    substract_background : bool, optional
+        If False, from the opened images the stored background picture won't be substracted. The default is False.
+    plot_results : bool, optional
+        If True, the images with found local peaks and sub-apertures will be plotted. The default is False.
+
+    Raises
+    ------
+    Exception
+        If the specified path to the folder with pictures doesn't exist or not a directory and if images there aren't actual files.
+
+    Returns
+    -------
+    tuple
+        (shifts of CoMs, integral matrix according to the detected CoMs on the aberrated image).
+
+    """
+    # Open images on some specified folder
+    if pics_folder == "pics":
+        # Default folder in the repository
+        absolute_path = os.path.join(os.getcwd(), pics_folder)
+        backgroundPath = os.path.join(absolute_path, background_pic_name)
+        aberratedPath = os.path.join(absolute_path, aberrated_pic_name)
+    else:
+        if not(os.path.exists(pics_folder)):
+            raise Exception("Specified Path doesn't exist")
+        else:
+            if not(os.path.isdir(pics_folder)):
+                raise Exception("Specified object isn't a directory")
+            else:
+                # Looking for images on the specified path
+                backgroundPath = os.path.join(pics_folder, background_pic_name)
+                aberratedPath = os.path.join(pics_folder, aberrated_pic_name)
+                if (not(os.path.isfile(backgroundPath)) or not(os.path.isfile(aberratedPath))):
+                    raise Exception("Some of specified images are not actual files, check path and their names")
+    # Open the stored files and extracting the recorded background from the wavefronts
+    background = (io.imread(backgroundPath, as_gray=True)); aberrated = (io.imread(aberratedPath, as_gray=True))
+    if substract_background:
+        # Substracting from the recorded pictures (non- and aberrated) the recorded background
+        diff_aberrated = (aberrated - background); diff_aberrated = img_as_ubyte(diff_aberrated)
+        threshold_abs = np.round(np.mean(diff_aberrated), 0) + 1
+    else:
+        # Substracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
+        # Additionally, stretch a bit the contrast
+        diff_aberrated = aberrated - abs(np.min(aberrated)); diff_aberrated *= (255/np.max(diff_aberrated))
+        diff_aberrated = np.uint8(diff_aberrated)
+        if plot_results and not(substract_background):
+            plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated")
+    # If the recorded background helps to enhance the contrast, then preserve the operation of background substraction
+    if plot_results and substract_background:
+        plt.figure(); plt.imshow(background); plt.tight_layout(); plt.title("Background")
+        plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated - Background")
+    # CoMs = center of masses, calculated in the areas around found local peaks, below - for specified aberrated picture
+    coms_aberrated = get_localCoM_matrix(diff_aberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs,
+                                         region_size=region_size, plot=plot_results)
+    # Calculate the shifts between CoMs in aberrated and non-aberrated images
+    coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')  # Shifts between CoMs
+    # Recalculate the integration values that will be used furhter for calculation of alpha coefficient
+    integral_matrix_aberrated = np.zeros((np.size(coms_aberrated, 0), np.size(integral_matrix, 1)), dtype='float')
+    i_central_aperture = -1  # for defining the central aperture in the aberrated list of CoMs
+    # Below - calculation of shifts between CoMs
+    for i in range(np.size(coms_aberrated, 0)):
+        central_aperture_found = True  # flag for defining the index of central sub-aperture in the aberrated list
+        for j in range(0, np.size(coms_nonaberrated, 0)):
+            diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            if (diffX < float((min_dist_peaks//2) + 1)) and (diffY < float((min_dist_peaks//2) + 1)):
+                central_aperture_found = False  # the matching is defined, shift found => it's not the central sub-aperture
+                coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign
+                for k in range(np.size(integral_matrix, 1)):
+                    integral_matrix_aberrated[i, k] = integral_matrix[j, k]
+                break  # Stop searching the candidates within CoMs from nonaberrated image if the actual shift found
+        if central_aperture_found:
+            # print("Central subaperture found:", i)
+            i_central_aperture = i  # record the found index for further removing of the central aperture integral values and coms
+    # Below: removing belonging to central subaperture values
+    coms_shifts = np.delete(coms_shifts, i_central_aperture, axis=0)
+    integral_matrix_aberrated = np.delete(integral_matrix_aberrated, i_central_aperture, axis=0)
+    # print("coordinates of central sub-aperture:", int(coms_aberrated[i_central_aperture, 1]), int(coms_aberrated[i_central_aperture, 0]))
+
+    return (coms_shifts, integral_matrix_aberrated)
 
 
 # %% Tests of functionality
 # Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
 if __name__ == '__main__':
+    show_plots = False; t1 = time.time(); threshold = 60.0; region_size = 20; aperture_radius = 14.0  # Parameters
+    zernikes_set = [(-3, 3), (3, 3)]
     # Get the shifts in center of masses and aberrated image with extracted background
-    (coms_shifts, coms_integral_limits, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False)
-    (integration_limits, theta0, rho0,
-     subapertures, coms_shifts) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits, coms_shifts,
-                                                                             aperture_radius=16.0, debug=False, swapXY=True)
-    get_nonaberrated_centers(plot_results=True, threshold_abs=60, region_size=18)
-    # %% Testing of the decomposition of aberrations into the sum of Zernike polynomials
-    # t1 = time.time()
-    # zernikes_set = [(-3, 3), (3, 3)]
-    # # zernikes_set = [(-1, 1)]
-    # integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-    #                                                aperture_radius=16.0, n_steps=42, swapXY=True)
-    # t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
-    # alpha_coefficients = get_polynomials_coefficients(integral_matrix, coms_shifts)
+    (coms_shifts2, coms_integral_limits2, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False,
+                                                                                         substract_background=False,
+                                                                                         threshold_abs=60.0)
+    (integration_limits2, theta02, rho02,
+     subapertures2, coms_shifts2) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits2, coms_shifts2,
+                                                                               aperture_radius=aperture_radius, debug=False, swapXY=True)
+    integral_matrix2 = calc_integral_matrix_zernike(zernikes_set, integration_limits2, theta02, rho02,
+                                                    aperture_radius=aperture_radius, n_steps=10)
+
+    # %% Testing another concept for integral matrix calculation
+    (coms_nonaberrated, pic_integral_limits,
+     theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(plot_results=show_plots, threshold_abs=threshold,
+                                                                                  region_size=region_size, aperture_radius=aperture_radius)
+    integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
+                                                   aperture_radius=aperture_radius, n_steps=10)
+    (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix, plot_results=show_plots,
+                                                               threshold_abs=threshold, region_size=region_size)
+    t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
+    alpha_coefficients = get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)
