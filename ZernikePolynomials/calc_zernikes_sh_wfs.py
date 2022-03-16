@@ -108,7 +108,7 @@ def get_localCoM_matrix(image: np.ndarray, min_dist_peaks: int = 15, threshold_a
 def get_integr_limits_centralized_subapertures(image: np.ndarray, coms: np.ndarray, coms_shifts: np.ndarray,
                                                aperture_radius: float = 15.0, debug: bool = False, swapXY: bool = True) -> tuple:
     """
-    Calculate integration limits on theta for sub-apertures and polar coordinates of their centers relatively to the found central aperture.
+    Calculate integration limits on theta for sub-apertures and their polar coordinates relatively to the found central aperture.
 
     The found central aperture is calculated relatively to the center of the global image recorded by a sensor.
 
@@ -225,7 +225,7 @@ def get_integr_limits_centralized_subapertures(image: np.ndarray, coms: np.ndarr
                 y_relative = -detected_centers[i, 0] + y_central_subaperture   # relative to the central sub-aperture
                 rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
                 # Calculation of integration limits for the angles theta
-                theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with selection of the right quadrant in grads!
+                theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with selection of the quadrant in grads!
                 # ??? Maybe redundant but seems better to make conversion to all positive values angles:
                 if theta0[j] < 0.0:
                     theta0[j] += 360.0   # all negative angles become positive
@@ -812,7 +812,7 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
     """
     Calculate the center of masses of localized focal spots and also the integration limits for further modal wavefront reconstruction.
 
-    Focal spots are recorded within the non-aberrated image (for flat wavefront) from Shack-Hartmann sensor. Integrations limits are calculated
+    Focal spots are recorded within the non-aberrated image (flat wavefront) from Shack-Hartmann sensor. Integrations limits are calculated
     according to the mentioned above in this file thesis.
 
     Parameters
@@ -862,14 +862,18 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
                 raise Exception("Specified object isn't a directory")
             else:
                 # Looking for images on the specified path
-                backgroundPath = os.path.join(pics_folder, background_pic_name)
+                if substract_background:
+                    backgroundPath = os.path.join(pics_folder, background_pic_name)
+                    if not(os.path.isfile(backgroundPath)):
+                        raise Exception("The background image doesn't exist or not a file, check root path and its name")
                 nonaberratedPath = os.path.join(pics_folder, nonaberrated_pic_name)
-                if (not(os.path.isfile(backgroundPath)) or not(os.path.isfile(nonaberratedPath))):
+                if not(os.path.isfile(nonaberratedPath)):
                     raise Exception("Some of specified images are not actual files, check path and their names")
     # Open the stored files and extracting the recorded background from the wavefronts
-    background = (io.imread(backgroundPath, as_gray=True)); nonaberrated = (io.imread(nonaberratedPath, as_gray=True))
+    nonaberrated = (io.imread(nonaberratedPath, as_gray=True))
     if substract_background:
         # Substracting from the recorded pictures (non- and aberrated) the recorded background
+        background = (io.imread(backgroundPath, as_gray=True))  # reads the background image only if it's requested by input parameters
         diff_nonaberrated = (nonaberrated - background); diff_nonaberrated = img_as_ubyte(diff_nonaberrated)
         threshold_abs = np.round(np.mean(diff_nonaberrated), 0) + 1
     else:
@@ -1002,14 +1006,18 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
                 raise Exception("Specified object isn't a directory")
             else:
                 # Looking for images on the specified path
-                backgroundPath = os.path.join(pics_folder, background_pic_name)
+                if substract_background:
+                    backgroundPath = os.path.join(pics_folder, background_pic_name)
+                    if not(os.path.isfile(backgroundPath)):
+                        raise Exception("The background image doesn't exist or not a file, check root path and its name")
                 aberratedPath = os.path.join(pics_folder, aberrated_pic_name)
-                if (not(os.path.isfile(backgroundPath)) or not(os.path.isfile(aberratedPath))):
-                    raise Exception("Some of specified images are not actual files, check path and their names")
+                if not(os.path.isfile(aberratedPath)):
+                    raise Exception("The aberrated image doesn't exist or not a file, check root path and its name")
     # Open the stored files and extracting the recorded background from the wavefronts
-    background = (io.imread(backgroundPath, as_gray=True)); aberrated = (io.imread(aberratedPath, as_gray=True))
+    aberrated = (io.imread(aberratedPath, as_gray=True))
     if substract_background:
         # Substracting from the recorded pictures (non- and aberrated) the recorded background
+        background = (io.imread(backgroundPath, as_gray=True))
         diff_aberrated = (aberrated - background); diff_aberrated = img_as_ubyte(diff_aberrated)
         threshold_abs = np.round(np.mean(diff_aberrated), 0) + 1
     else:
@@ -1037,9 +1045,10 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
         for j in range(0, np.size(coms_nonaberrated, 0)):
             diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
             diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
-            if (diffX < float((min_dist_peaks//2) + 1)) and (diffY < float((min_dist_peaks//2) + 1)):
+            if (diffX < float((min_dist_peaks/2))) and (diffY < float((min_dist_peaks/2))):
                 central_aperture_found = False  # the matching is defined, shift found => it's not the central sub-aperture
-                coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign
+                coms_shifts[i, 0] = -diffY_sign  # Direction of Y axis swapped (not as on the picture, from top to bottom)
+                coms_shifts[i, 1] = diffX_sign  # Direction of X axis is the same as on the picture (from left to right)
                 for k in range(np.size(integral_matrix, 1)):
                     integral_matrix_aberrated[i, k] = integral_matrix[j, k]
                 break  # Stop searching the candidates within CoMs from nonaberrated image if the actual shift found
@@ -1057,25 +1066,30 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
 # %% Tests of functionality
 # Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
 if __name__ == '__main__':
-    show_plots = False; t1 = time.time(); threshold = 60.0; region_size = 20; aperture_radius = 14.0  # Parameters
+    t1 = time.time()
+    show_plots = False; min_dist_peaks = 18; threshold = 60.0; region_size = 20; aperture_radius = 14.0  # Parameters
     zernikes_set = [(-3, 3), (3, 3)]
     # Get the shifts in center of masses and aberrated image with extracted background
-    (coms_shifts2, coms_integral_limits2, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False,
-                                                                                         substract_background=False,
-                                                                                         threshold_abs=60.0)
-    (integration_limits2, theta02, rho02,
-     subapertures2, coms_shifts2) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_integral_limits2, coms_shifts2,
-                                                                               aperture_radius=aperture_radius, debug=False, swapXY=True)
-    integral_matrix2 = calc_integral_matrix_zernike(zernikes_set, integration_limits2, theta02, rho02,
-                                                    aperture_radius=aperture_radius, n_steps=10)
+    # (coms_shifts2, coms_aberrated2, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False,
+    #                                                                                substract_background=False,
+    #                                                                                threshold_abs=60.0,
+    #                                                                                min_dist_peaks=min_dist_peaks,
+    #                                                                                region_size=region_size)
+    # (integration_limits2, theta02, rho02,
+    #  coms_aberrated2, coms_shifts2) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_aberrated2, coms_shifts2,
+    #                                                                              aperture_radius=aperture_radius, debug=False, swapXY=True)
+    # integral_matrix2 = calc_integral_matrix_zernike(zernikes_set, integration_limits2, theta02, rho02,
+    #                                                 aperture_radius=aperture_radius, n_steps=10)
 
     # %% Testing another concept for integral matrix calculation
     (coms_nonaberrated, pic_integral_limits,
      theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(plot_results=show_plots, threshold_abs=threshold,
-                                                                                  region_size=region_size, aperture_radius=aperture_radius)
+                                                                                  region_size=region_size, aperture_radius=aperture_radius,
+                                                                                  min_dist_peaks=min_dist_peaks)
     integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
-                                                   aperture_radius=aperture_radius, n_steps=10)
+                                                   aperture_radius=aperture_radius, n_steps=20)
     (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix, plot_results=show_plots,
-                                                               threshold_abs=threshold, region_size=region_size)
+                                                               threshold_abs=threshold, region_size=region_size,
+                                                               min_dist_peaks=min_dist_peaks)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)

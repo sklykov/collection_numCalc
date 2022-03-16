@@ -315,6 +315,9 @@ def get_classical_polynomial_name(mode: tuple) -> str:
     """
     Return the classical name of Zernike polynomial.
 
+    Till the 4th order (including) - the names taken from the Wikipedia artuicle ( https://en.wikipedia.org/wiki/Zernike_polynomials ).
+    5th order names - from the website https://www.telescope-optics.net/monochromatic_eye_aberrations.htm.
+
     Parameters
     ----------
     mode : tuple
@@ -356,6 +359,18 @@ def get_classical_polynomial_name(mode: tuple) -> str:
         name = "Vertical secondary astigmatism"
     if (m == 4) and (n == 4):
         name = "Vertical quadrafoil"
+    if (m == -5) and (n == 5):
+        name = "Vertical pentafoil"
+    if (m == -3) and (n == 5):
+        name = "Vertical secondary trefoil"
+    if (m == -1) and (n == 5):
+        name = "Vertical secondary coma"
+    if (m == 1) and (n == 5):
+        name = "Horizontal secondary coma"
+    if (m == 3) and (n == 5):
+        name = "Oblique secondary trefoil"
+    if (m == 5) and (n == 5):
+        name = "Oblique pentafoil"
     return name
 
 
@@ -403,6 +418,7 @@ def test():
     m = 4; n = 4
     assert radial_polynomial(m, n, r) == np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 4*r*r*r, f'Implemented dR{m, n} != to the calculated derivative'
+    assert abs(zernike_polynomial(m, n, r, theta) - np.sqrt(10)*r*r*r*r*np.cos(4*theta)) < 0.001, f'Z{m, n} != tabulated value'
     m = -4; n = 4
     assert abs(zernike_polynomial(m, n, r, theta) - np.sqrt(10)*r*r*r*r*np.sin(4*theta)) < 0.001, f'Z{m, n} != tabulated value'
     m = 1; n = 5

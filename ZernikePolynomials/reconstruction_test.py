@@ -14,15 +14,21 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = False; repo_pics2 = True
+shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes = 14
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
-# zernikes_set = [(-1, 1)]
-# zernikes_set = [(-1, 1), (1, 1)]
-# zernikes_set = [(-2, 2), (0, 2), (2, 2)]
-# zernikes_set = [(-3, 3), (-1, 3), (1, 3), (3, 3)]
-# zernikes_set = [(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
-zernikes_set = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
+# zernikes_set1 = [(-1, 1), (1, 1)]
+# zernikes_set2 = [(-2, 2), (0, 2), (2, 2)]
+# zernikes_set3 = [(-3, 3), (-1, 3), (1, 3), (3, 3)]
+# zernikes_set4 = [(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
+zernikes_set5 = [(-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
+zernikes_set14 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
+zernikes_set20 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4),
+                  (-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
+if n_zernikes == 20:
+    zernikes_set = zernikes_set20
+elif n_zernikes == 14:
+    zernikes_set = zernikes_set14
 
 # %% Tests on the recorded pictures from the Shack-Hartmann sensor
 # Manual change the working directory to the folder with stored pictures, outside the repository
@@ -110,20 +116,24 @@ if repo_pics:
 
 # %% Testing the another calibration mechanism - calculate only once the integral matrix for the non-aberrated image
 if repo_pics2:
-    plot = True; aperture_radius = 14.0; threshold = 60.0; region_size = 18; n_integration_steps = 20
+    plot = True; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 60; min_dist_peaks = 20
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix14Zernike_RepoPics.npy")
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20Zernike_RepoPics.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RepoPics.npy")
-    if not(os.path.exists(precalculated_zernikes)) and not(os.path.exists(precalculated_nonaberration)):
-        t1 = time.time()  # get the current time measurment
+    if not(os.path.exists(precalculated_zernikes)):
+        t1 = time.time()  # get the current time measurement
         (coms_nonaberrated, pic_integral_limits,
          theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(plot_results=plot, threshold_abs=threshold,
                                                                                       region_size=region_size,
-                                                                                      aperture_radius=aperture_radius)
+                                                                                      aperture_radius=aperture_radius,
+                                                                                      min_dist_peaks=min_dist_peaks)
         integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, aperture_radius=aperture_radius,
                                                        n_steps=n_integration_steps)
-        np.save(precalculated_zernikes, integral_matrix); np.save(precalculated_nonaberration, coms_nonaberrated); t2 = time.time()
+        np.save(precalculated_zernikes, integral_matrix)
+        if not(os.path.exists(precalculated_nonaberration)):  # if CoMs from non-aberrated image not saved, save them
+            np.save(precalculated_nonaberration, coms_nonaberrated)
+        t2 = time.time()  # get the current time measurement
         if np.round(t2-t1, 3) > 60:
             print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round((t2-t1)/60, 1), "minutes")
         else:
@@ -133,13 +143,55 @@ if repo_pics2:
         (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix, plot_results=plot,
                                                                    threshold_abs=threshold, region_size=region_size)
         alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts))
-        set14zernikes = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3),
-                         (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
-        plot_zps_polar(set14zernikes, title="reconstraction of pics from the open repository",
+        # set14zernikes = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3),
+        #                  (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
+        plot_zps_polar(zernikes_set, title="reconstraction of pics from the open repository",
                        tuned=True, alpha_coefficients=alpha_coefficients)
         # Plotting the 14 Zernikes, assuming that the graph from the calculation gives the coefficients for Zernike polynomials
-        repo_coefficients = [-0.987, 0.367, 0.341, -1.434, 0.843, -0.306, 0.192, 0.375, -0.277, 0.343, -0.159, 0.171, -0.037, -0.016]
-        for i in range(len(set14zernikes)):
-            print(get_classical_polynomial_name(set14zernikes[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3), "(SK) ",
+        repo_coefficients = [-0.987, 0.367, 0.341, -1.434, 0.843, -0.306, 0.192, 0.375, -0.277, 0.343, -0.159, 0.171, -0.037, -0.016,
+                             0.0, -0.01, 0.25, 0.0, 0.004, 0.0]
+        for i in range(len(zernikes_set)):
+            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3), "(SK) ",
                   repo_coefficients[i], "(Jacopo's)")
-        plot_zps_polar(set14zernikes, title="profile reconstructed by Jacopo", tuned=True, alpha_coefficients=repo_coefficients)
+        plot_zps_polar(zernikes_set, title="profile reconstructed by Jacopo", tuned=True, alpha_coefficients=repo_coefficients)
+
+# %% Tests on the recorded pictures from the Shack-Hartmann sensor
+if shwfs2:
+    plot = False; aperture_radius = 10.0; threshold = 54.0; region_size = 18; n_integration_steps = 60; min_dist_peaks = 16
+    current_path = os.path.dirname(__file__)  # get path to the folder containing the script
+    calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
+    aberrated_pic_name = "AstigmatismPic2.png"  # Name of prerecorded picture with aberrations
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix5OrderZernike_RecordedAberrations.npy")
+    precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RecordedAberrations.npy")
+    os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs")  # Navigation to the local storage with recorded aberrations
+    if not(os.path.exists(precalculated_zernikes)):
+        t1 = time.time()  # get the current time measurement
+        (coms_nonaberrated, pic_integral_limits,
+         theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(pics_folder=os.getcwd(),
+                                                                                      background_pic_name="backgroundPic2.png",
+                                                                                      nonaberrated_pic_name="nonAberrationPic2.png",
+                                                                                      plot_results=plot, threshold_abs=threshold,
+                                                                                      region_size=region_size,
+                                                                                      aperture_radius=aperture_radius,
+                                                                                      min_dist_peaks=min_dist_peaks)
+        integral_matrix = calc_integral_matrix_zernike(zernikes_set5, integration_limits, theta0, rho0, aperture_radius=aperture_radius,
+                                                       n_steps=n_integration_steps)
+        np.save(precalculated_zernikes, integral_matrix)
+        if not(os.path.exists(precalculated_nonaberration)):  # if CoMs from non-aberrated image not saved, save them
+            np.save(precalculated_nonaberration, coms_nonaberrated)
+        t2 = time.time()  # get the current time measurement
+        if np.round(t2-t1, 3) > 60:
+            print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round((t2-t1)/60, 1), "minutes")
+        else:
+            print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
+    else:
+        integral_matrix = np.load(precalculated_zernikes); coms_nonaberrated = np.load(precalculated_nonaberration)
+        plot = False; threshold = 54.0
+        (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix,
+                                                                   pics_folder=os.getcwd(), aberrated_pic_name=aberrated_pic_name,
+                                                                   plot_results=plot, threshold_abs=threshold, region_size=region_size)
+        alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts))  # get expansion of aberrations
+        # Plot the sum profile of all aberrations
+        plot_zps_polar(zernikes_set, title="reconstraction of " + "actual defocus", tuned=True, alpha_coefficients=alpha_coefficients)
+        for i in range(len(zernikes_set)):
+            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3))
