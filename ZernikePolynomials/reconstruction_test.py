@@ -21,7 +21,8 @@ shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes 
 # zernikes_set2 = [(-2, 2), (0, 2), (2, 2)]
 # zernikes_set3 = [(-3, 3), (-1, 3), (1, 3), (3, 3)]
 # zernikes_set4 = [(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
-zernikes_set5 = [(-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
+# zernikes_set5 = [(-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
+zernikes_set5 = [(-5, 5), (-3, 5)]
 zernikes_set14 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
 zernikes_set20 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4),
                   (-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
@@ -161,7 +162,7 @@ if shwfs2:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
     aberrated_pic_name = "AstigmatismPic2.png"  # Name of prerecorded picture with aberrations
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix5OrderZernike_RecordedAberrations.npy")
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix[(-5, 5), (-3, 5))]]OrderZernike_RecordedAberrations.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RecordedAberrations.npy")
     os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs")  # Navigation to the local storage with recorded aberrations
     if not(os.path.exists(precalculated_zernikes)):
