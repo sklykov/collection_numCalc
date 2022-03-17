@@ -18,12 +18,12 @@ class PCOcamera(Thread):
     initialized = False  # Start the mail inifinite loop if the class initialized
     mainLoopTimeDelay = 25  # Internal constant - delaying for the main loop for receiving and process the commands
 
-    def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imageWidget):
+    def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue):
         self.messagesQueue = messagesQueue  # For receiving the commands to stop / start live stream
         self.exceptionsQueue = exceptionsQueue  # For adding the exceptions that should stop the main program
         Thread.__init__(self)  # Initialize this class in the other thread
         self.initialized = True  # Additional flag for the start the loop in the run method
-        self.imageWidget = imageWidget  # For updating the image on the pyqtgraph.ImageView
+        self.imagesQueue = imagesQueue  # For storing the acquired images
         # Initialization code for the camera
         try:
             self.cameraReference = pco.Camera()
@@ -90,11 +90,12 @@ class PCOcamera(Thread):
 
         """
         if self.cameraReference is not None:
-            self.cameraReference.record(number_of_images=1, mode='sequence')
+            self.cameraReference.record(number_of_images=1, mode='sequence')  # setup the camera to acquire a single image
             self.cameraReference.wait_for_first_image()
-            image, metadata = self.cameraReference.image()
-            self.imageWidget.setImage(image)
-            self.imageWidget.setPredefinedGradient('grey')
+            image, metadata = self.cameraReference.image()  # get the single image
+            self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
+        else:
+            self.imagesQueue.put_nowait("String replacer for image")
 
     def close(self):
         """

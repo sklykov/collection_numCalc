@@ -23,7 +23,7 @@ from cameraCtrl import PCOcamera
 width_default = 1000; height_default = 1000  # Default width and height for generation of images
 
 
-# %% Implementation of all windows inside the child class
+# %% GUI class
 class SimUscope(QMainWindow):
     """Create the GUI with buttons for testing image acquisition from the camera and making some image processing."""
 
@@ -37,6 +37,8 @@ class SimUscope(QMainWindow):
         self.applicationHandle = applicationHandle  # handle to the main application for exit it in the appropriate place
         self.messages2Camera = Queue(maxsize=5)  # Initialize message queue for communication with the camera (simulated or not)
         self.exceptionsQueue = Queue(maxsize=5)  # Initialize separate queue for spreading and handling Exceptions occured within modules
+        self.imagesQueue = Queue(maxsize=100)  # Initialize the queue for holding acquired images and acessing them from the GUI thread
+        self.gui_refresh_rate_ms = 10  # The constant time pause between each attempt to retrieve the image
         self.imageGenerator = SingleImageThreadedGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
         self.img_width_default = img_width; self.img_height_default = img_height
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
@@ -129,7 +131,7 @@ class SimUscope(QMainWindow):
                                                                        self.toggleTestPerformance.isChecked(), self.autoRange)
         elif self.cameraSelector.currentText() == "PCO":
             pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
+            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue)  # Initialize the PCO camera
 
     def snap_single_img(self):
         """
@@ -150,6 +152,11 @@ class SimUscope(QMainWindow):
         elif self.cameraSelector.currentText() == "PCO":
             if not(self.messages2Camera.full()):
                 self.messages2Camera.put_nowait("Snap single image")  # Send the command for acquiring single image
+                image = self.imagesQueue.get(block=True)  # Waiting then image will be available
+                if not(isinstance(image, str)):
+                    self.imageWidget.setImage(image)  # Represent acquired image
+                else:
+                    print(image)
 
     def continuous_stream(self):
         """
@@ -398,7 +405,7 @@ class SimUscope(QMainWindow):
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
             self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imageWidget)  # Initialize the PCO camera
+            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue)  # Initialize the PCO camera
             if not(self.cameraHandle.is_alive()):
                 self.cameraHandle.start()   # Start the main loop for receiving the commands
         elif self.cameraSelector.currentText() == "Simulated Threaded":
