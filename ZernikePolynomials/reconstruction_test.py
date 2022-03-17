@@ -14,7 +14,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes = 14
+shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes = 20
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set1 = [(-1, 1), (1, 1)]
@@ -22,7 +22,6 @@ shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes 
 # zernikes_set3 = [(-3, 3), (-1, 3), (1, 3), (3, 3)]
 # zernikes_set4 = [(-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
 # zernikes_set5 = [(-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
-zernikes_set5 = [(-5, 5), (-3, 5)]
 zernikes_set14 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
 zernikes_set20 = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4),
                   (-5, 5), (-3, 5), (-1, 5), (1, 5), (3, 5), (5, 5)]
@@ -162,7 +161,7 @@ if shwfs2:
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
     aberrated_pic_name = "AstigmatismPic2.png"  # Name of prerecorded picture with aberrations
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix[(-5, 5), (-3, 5))]]OrderZernike_RecordedAberrations.npy")
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20Zernike_RecordedAberrations.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RecordedAberrations.npy")
     os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs")  # Navigation to the local storage with recorded aberrations
     if not(os.path.exists(precalculated_zernikes)):
@@ -175,7 +174,7 @@ if shwfs2:
                                                                                       region_size=region_size,
                                                                                       aperture_radius=aperture_radius,
                                                                                       min_dist_peaks=min_dist_peaks)
-        integral_matrix = calc_integral_matrix_zernike(zernikes_set5, integration_limits, theta0, rho0, aperture_radius=aperture_radius,
+        integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, aperture_radius=aperture_radius,
                                                        n_steps=n_integration_steps)
         np.save(precalculated_zernikes, integral_matrix)
         if not(os.path.exists(precalculated_nonaberration)):  # if CoMs from non-aberrated image not saved, save them
@@ -193,6 +192,6 @@ if shwfs2:
                                                                    plot_results=plot, threshold_abs=threshold, region_size=region_size)
         alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts))  # get expansion of aberrations
         # Plot the sum profile of all aberrations
-        plot_zps_polar(zernikes_set, title="reconstraction of " + "actual defocus", tuned=True, alpha_coefficients=alpha_coefficients)
+        plot_zps_polar(zernikes_set, title="reconstruction of " + "actual defocus", tuned=True, alpha_coefficients=alpha_coefficients)
         for i in range(len(zernikes_set)):
             print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3))
