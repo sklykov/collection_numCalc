@@ -17,13 +17,17 @@ class PCOcamera(Thread):
 
     initialized = False  # Start the mail inifinite loop if the class initialized
     mainLoopTimeDelay = 25  # Internal constant - delaying for the main loop for receiving and process the commands
+    liveStream: bool  # force type checking
+    exposure_time_ms: int
 
-    def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue):
+    def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue, exposure_time_ms: int):
         self.messagesQueue = messagesQueue  # For receiving the commands to stop / start live stream
         self.exceptionsQueue = exceptionsQueue  # For adding the exceptions that should stop the main program
         Thread.__init__(self)  # Initialize this class in the other thread
         self.initialized = True  # Additional flag for the start the loop in the run method
         self.imagesQueue = imagesQueue  # For storing the acquired images
+        self.liveStream = False  # Set default live stream state to false
+        self.exposure_time_ms = exposure_time_ms  # Initializing with the default exposure time
         # Initialization code for the camera
         try:
             self.cameraReference = pco.Camera()
@@ -51,29 +55,37 @@ class PCOcamera(Thread):
             # Checking for command of closing the camera
             if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
                 try:
-                    message = self.messagesQueue.get_nowait()
+                    message = self.messagesQueue.get_nowait()  # get the message from the main controlling GUI
                     if isinstance(message, str):
                         if message == "Close the camera" or message == "Stop" or message == "Stop Program":
                             try:
                                 print("Received by the camera process:", message)
-                                self.close()
+                                self.close()  # closing the connection to the camera and release all resources
                             except Exception as error:
                                 print("Raised exception during closing the camera:", error)
+                                self.exceptionsQueue.put_nowait(error)  # re-throw to the main program the error
                             finally:
                                 self.initialized = False  # In any case stop the loop waiting the commands from the GUI
-                        if message == "Stop Live Stream":
-                            print("Camera stop live streaming")  # TODO
                         if message == "Start Live Stream":
                             print("Camera start live streaming")  # TODO
+                            self.live_imaging()  # call the function
                         if message == "Snap single image":
-                            self.snap_single_image()
-                            print("Snap single image")  # TODO
+                            try:
+                                self.snap_single_image()  # The single acquired image is sent back to the calling controlling program via Queue
+                            except Exception as e:
+                                # Any encountered exceptions should be reported to the main controlling program
+                                self.close()  # An attempt to close the camera
+                                self.initialized = False  # Stop this running loop
+                                self.exceptionsQueue.put_nowait(e)  # Send to the main controlling program the caught Exception e
                         if message == "Restore Full Frame":
                             print("Full frame image will be restored with sizes: ", self.max_width, self.max_height)  # TODO
                     if isinstance(message, tuple):
                         (command, parameters) = message
                         if command == "Crop Image":
                             print("Received sizes for cropping:", parameters)  # TODO
+                    if isinstance(message, Exception):
+                        print("Camera will be stopped because of throw from the main GUI exception")
+                        self.close()
                 except Empty:
                     pass
 
@@ -95,7 +107,31 @@ class PCOcamera(Thread):
             image, metadata = self.cameraReference.image()  # get the single image
             self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
         else:
-            self.imagesQueue.put_nowait("String replacer for image")
+            self.imagesQueue.put_nowait("String replacer for an image")
+
+    def live_imaging(self):
+        self.liveStream = True
+        if self.cameraReference is not None:
+            pass
+        else:
+            # Substituion of actual image generation
+            while (self.liveStream):
+                self.exposure_time_ms += 10  # some overhead delay
+                time.sleep(self.exposure_time_ms/1000)  # the artificial application of delays resembling the acquisition of images from the camera
+                self.imagesQueue.put_nowait("Live Image substituted by this string")
+                if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
+                    try:
+                        message = self.messagesQueue.get_nowait()  # get the message from the main controlling GUI
+                        if isinstance(message, str):
+                            if message == "Stop Live Stream":
+                                print("Camera stop live streaming")
+                                self.liveStream = False; break
+                        elif isinstance(message, Exception):
+                            print("Camera stop live streaming because of reported error")
+                            self.messagesQueue.put_nowait(message)  # setting for run() method again the error report for stopping the camera
+                            self.liveStream = False; break
+                    except Empty:
+                        pass
 
     def close(self):
         """

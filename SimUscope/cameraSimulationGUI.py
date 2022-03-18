@@ -18,6 +18,7 @@ import os
 from skimage import io
 from checkExceptionsInLive import CheckMessagesForExceptions
 from cameraCtrl import PCOcamera
+from threading import Thread
 
 # %% Some default values. The global value is omitted as the non-reliable for communication with the functions imported from modules
 width_default = 1000; height_default = 1000  # Default width and height for generation of images
@@ -82,7 +83,7 @@ class SimUscope(QMainWindow):
         self.saveSnapImg = QPushButton("Save Single Image"); self.saveSnapImg.clicked.connect(self.saveSingleSnapImg)
         self.saveSnapImg.setDisabled(True)  # disable the saving image before any image generated / displayed
         self.putROI = QPushButton("ROI selector"); self.putROI.clicked.connect(self.putROIonImage)
-        self.generateException = QPushButton("Generate Exception"); self.generateException.clicked.connect(self.genMessageWithException)
+        self.generateException = QPushButton("Generate Exception"); self.generateException.clicked.connect(self.generateMessageWithException)
         self.cropImageButton = QPushButton("Crop Image"); self.cropImageButton.clicked.connect(self.cropImage)
         self.restoreFullImgButton = QPushButton("Restore Full Image"); self.restoreFullImgButton.clicked.connect(self.restoreFullImage)
         self.cropImageButton.setDisabled(True); self.restoreFullImgButton.setDisabled(True)  # until some roi selected
@@ -131,7 +132,8 @@ class SimUscope(QMainWindow):
                                                                        self.toggleTestPerformance.isChecked(), self.autoRange)
         elif self.cameraSelector.currentText() == "PCO":
             pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue)  # Initialize the PCO camera
+            # Initialize the PCO camera
+            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.exposureTime.value())
 
     def snap_single_img(self):
         """
@@ -156,7 +158,7 @@ class SimUscope(QMainWindow):
                 if not(isinstance(image, str)):
                     self.imageWidget.setImage(image)  # Represent acquired image
                 else:
-                    print(image)
+                    print(image)  # Printing substitution of an image by the string
 
     def continuous_stream(self):
         """
@@ -179,6 +181,8 @@ class SimUscope(QMainWindow):
                 self.continuousImageGen.start()  # Run the threaded code for continuous updating of showing image
             elif self.cameraSelector.currentText() == "PCO":
                 self.messages2Camera.put_nowait("Start Live Stream")  # Send this command to the wrapper class
+                imageUpdater = Thread(target=self.update_image, args=())
+                imageUpdater.start()
 
             # Below - activation of save single image button
             if not(self.saveSnapImg.isEnabled()):   # activate saving single image button, since some image generated and displayed
@@ -202,6 +206,24 @@ class SimUscope(QMainWindow):
             # Returns buttons to active state below
             self.toggleTestPerformance.setEnabled(True); self.exposureTime.setEnabled(True)
             self.widthButton.setEnabled(True); self.heightButton.setEnabled(True); self.cameraSelector.setEnabled(True)
+
+    def update_image(self):
+        """
+        Update the received from the camera via queue image which is shown on the GUI.
+
+        Returns
+        -------
+        None.
+
+        """
+        image = self.imagesQueue.get(block=True)  # Waiting then image will be available
+        if not(isinstance(image, str)):
+            self.imageWidget.setImage(image)  # Represent acquired image
+        else:
+            while(self.__flagGeneration):
+                print(image)  # Printing substitution of an image by the string
+                time.sleep(self.exposureTime.value()/1000)
+                image = self.imagesQueue.get(block=True)  # Waiting then image will be available
 
     def closeEvent(self, closeEvent):
         """
@@ -366,7 +388,7 @@ class SimUscope(QMainWindow):
         (w, h) = self.roi.size(); w = int(w); h = int(h)
         self.widthROI.setValue(w); self.heightROI.setValue(h)
 
-    def genMessageWithException(self):
+    def generateMessageWithException(self):
         """
         Put the exception into the Queue used for communication with the camera for testing quit/stop handling.
 
@@ -405,7 +427,8 @@ class SimUscope(QMainWindow):
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
             self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue)  # Initialize the PCO camera
+            # Initialize the PCO camera
+            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.exposureTime.value())
             if not(self.cameraHandle.is_alive()):
                 self.cameraHandle.start()   # Start the main loop for receiving the commands
         elif self.cameraSelector.currentText() == "Simulated Threaded":
