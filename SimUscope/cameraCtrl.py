@@ -32,6 +32,9 @@ class PCOcamera(Thread):
         try:
             self.cameraReference = pco.Camera()
             print("The PCO camera initialized")
+            self.cameraReference.set_exposure_time(self.exposure_time_ms/1000)
+            print("Default exposure ime is set for the camera")
+            print("The camera status report:", self.cameraReference.sdk.get_camera_health_status())
         except ImportError:
             print("The PCO library is unavailable, check the installation. The camera not initialized!")
             self.cameraReference = None
@@ -50,9 +53,7 @@ class PCOcamera(Thread):
 
         """
         while self.initialized:
-            # TODO: implement calling the functions for Live Stream, Getting single image, etc.
-
-            # Checking for command of closing the camera
+            # Checking for commands created by clicking buttons or by any events
             if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
                 try:
                     message = self.messagesQueue.get_nowait()  # get the message from the main controlling GUI
@@ -110,14 +111,44 @@ class PCOcamera(Thread):
             self.imagesQueue.put_nowait("String replacer for an image")
 
     def live_imaging(self):
+        """
+        Make of Live Imaging stream for the PCO camera.
+
+        Returns
+        -------
+        None.
+
+        """
         self.liveStream = True
-        if self.cameraReference is not None:
-            pass
+        if self.cameraReference is not None:  # then it's supposed that the camera has been properly initialized
+            self.cameraReference.record(number_of_images=50, mode='ring buffer')  # configure the live stream acquisition
+            # make the loop below for infinite live stream, that could be stopped only by receiving the command or exception
+            while (self.liveStream):
+                self.cameraReference.wait_for_first_image()  # wait that the image acquired actually
+                image, metadata = self.cameraReference.image()  # get the acquired image
+                if not(self.imagesQueue.full()):
+                    self.imagesQueue.put(image, block=True)  # put the image to the queue for getting it in the main thread
+                if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
+                    try:
+                        message = self.messagesQueue.get_nowait()  # get the message from the main controlling GUI
+                        if isinstance(message, str):
+                            if message == "Stop Live Stream":
+                                print("Camera stop live streaming")
+                                self.cameraReference.stop()  # stop the live stream from the camera
+                                self.liveStream = False; break
+                        elif isinstance(message, Exception):
+                            print("Camera stop live streaming because of reported error")
+                            self.cameraReference.stop()  # stop the live stream from the camera
+                            self.messagesQueue.put_nowait(message)  # setting for run() method again the error report for stopping the camera
+                            self.liveStream = False; break
+                    except Empty:
+                        pass
         else:
             # Substituion of actual image generation
             while (self.liveStream):
                 self.exposure_time_ms += 10  # some overhead delay
-                time.sleep(self.exposure_time_ms/1000)  # the artificial application of delays resembling the acquisition of images from the camera
+                # Below time sleep - the artificial application of delays resembling the acquisition of images from the camera
+                time.sleep(self.exposure_time_ms/1000)
                 self.imagesQueue.put_nowait("Live Image substituted by this string")
                 if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
                     try:

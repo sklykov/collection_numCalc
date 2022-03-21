@@ -13,7 +13,7 @@ import time
 import numpy as np
 import pyqtgraph
 from cameraLiveStreamSimulation import SingleImageThreadedGenerator, ContinuousImageThreadedGenerator
-from queue import Queue
+from queue import Queue, Empty
 import os
 from skimage import io
 from checkExceptionsInLive import CheckMessagesForExceptions
@@ -77,7 +77,7 @@ class SimUscope(QMainWindow):
         self.continuousStreamButton.clicked.connect(self.continuous_stream); self.continuousStreamButton.setCheckable(True)
         self.exposureTime = QSpinBox(); self.exposureTime.setSingleStep(1); self.exposureTime.setSuffix(" ms")
         self.exposureTime.setPrefix("Exposure time: "); self.exposureTime.setMinimum(1); self.exposureTime.setMaximum(1000)
-        self.exposureTime.setValue(100); self.exposureTime.adjustSize(); self.exposureTime.valueChanged.connect(self.exposureTimeChanged)
+        self.exposureTime.setValue(200); self.exposureTime.adjustSize(); self.exposureTime.valueChanged.connect(self.exposureTimeChanged)
         self.switchMouseCtrlImage = QCheckBox("Handling Image by mouse"); self.switchMouseCtrlImage.setChecked(False)
         self.switchMouseCtrlImage.stateChanged.connect(self.activateMouseOnImage)
         self.saveSnapImg = QPushButton("Save Single Image"); self.saveSnapImg.clicked.connect(self.saveSingleSnapImg)
@@ -106,7 +106,7 @@ class SimUscope(QMainWindow):
         grid.addLayout(vboxROI, 7, 3, 1, 1); grid.addWidget(self.generateException, 7, 6, 1, 1)
         grid.addWidget(self.cropImageButton, 7, 4, 1, 1); grid.addWidget(self.restoreFullImgButton, 7, 5, 1, 1)
         # Set valueChanged event handlers
-        self.widthButton.valueChanged.connect(self.imgSizeChanged); self.heightButton.valueChanged.connect(self.imgSizeChanged)
+        self.widthButton.valueChanged.connect(self.imageSizeChanged); self.heightButton.valueChanged.connect(self.imageSizeChanged)
         # ImageWidget should be central - for better representation of generated images
         grid.addWidget(self.imageWidget, 1, 0, 6, 6)  # the ImageView widget spans on ... rows and ... columns (2 values in the end)
         self.setCentralWidget(self.qwindow)  # Actually, allows to make both buttons and ImageView visible
@@ -176,13 +176,14 @@ class SimUscope(QMainWindow):
             self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
             self.exposureTime.setDisabled(True)  # Disable the exposure time control
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True); self.cameraSelector.setDisabled(True)
+            self.snapSingleImgButton.setDisabled(True)
             # Below - initialization of the imported class for continuous image generation
             if self.cameraSelector.currentText() == "Simulated Threaded":
                 self.continuousImageGen.start()  # Run the threaded code for continuous updating of showing image
             elif self.cameraSelector.currentText() == "PCO":
                 self.messages2Camera.put_nowait("Start Live Stream")  # Send this command to the wrapper class
-                imageUpdater = Thread(target=self.update_image, args=())
-                imageUpdater.start()
+                imageUpdater = Thread(target=self.update_image, args=())  # assign updating of images to the evoked Thread
+                imageUpdater.start()  # start the Thread and assigned to it task
 
             # Below - activation of save single image button
             if not(self.saveSnapImg.isEnabled()):   # activate saving single image button, since some image generated and displayed
@@ -204,6 +205,7 @@ class SimUscope(QMainWindow):
             if not(self.messages2Camera.full()) and (self.cameraSelector.currentText() == "PCO"):
                 self.messages2Camera.put_nowait("Stop Live Stream")  # Send the message to stop live stream
             # Returns buttons to active state below
+            self.snapSingleImgButton.setEnabled(True)
             self.toggleTestPerformance.setEnabled(True); self.exposureTime.setEnabled(True)
             self.widthButton.setEnabled(True); self.heightButton.setEnabled(True); self.cameraSelector.setEnabled(True)
 
@@ -216,14 +218,28 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        image = self.imagesQueue.get(block=True)  # Waiting then image will be available
+        timeoutWait = round(2*self.exposureTime.value())  # integer number of 2*exposure time for a single frame
+        image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be available
+        # If instead of image generated only string, then the PCO (or other) camera hasn't been initialized
         if not(isinstance(image, str)):
-            self.imageWidget.setImage(image)  # Represent acquired image
+            while(self.__flagGeneration):
+                self.imageWidget.setImage(image)  # Represent acquired image
+                try:
+                    timeoutWait = round(1.5*self.exposureTime.value())  # integer number of 1.5*exposure time for a single frame
+                    # Waiting then image will be available at least 1.5 of exposure time
+                    image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
+                except Empty:
+                    pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
         else:
             while(self.__flagGeneration):
                 print(image)  # Printing substitution of an image by the string
-                time.sleep(self.exposureTime.value()/1000)
-                image = self.imagesQueue.get(block=True)  # Waiting then image will be available
+                time.sleep(self.exposureTime.value()/1000)  # wait at least the exposure time
+                try:
+                    timeoutWait = round(1.5*self.exposureTime.value())  # integer number of 1.5*exposure time for a single frame
+                    # Waiting then image will be available at least 1.5 of exposure time
+                    image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
+                except Empty:
+                    pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
 
     def closeEvent(self, closeEvent):
         """
@@ -284,7 +300,7 @@ class SimUscope(QMainWindow):
             self.exceptionChecker.join()
         self.close()  # Calls the closing event for QMainWindow
 
-    def imgSizeChanged(self):
+    def imageSizeChanged(self):
         """
         Handle changing of image width or height. Allows to pick up values for single image generation and continuous one.
 
@@ -421,9 +437,10 @@ class SimUscope(QMainWindow):
 
         """
         if self.cameraSelector.currentText() == "PCO":
-            pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
+            # pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
             # No need to deinitialize the simulated camera now
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
+            self.snapSingleImgButton.setDisabled(True); self.continuousStreamButton.setDisabled(True)
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
             self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
@@ -431,6 +448,7 @@ class SimUscope(QMainWindow):
             self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.exposureTime.value())
             if not(self.cameraHandle.is_alive()):
                 self.cameraHandle.start()   # Start the main loop for receiving the commands
+            self.snapSingleImgButton.setEnabled(True); self.continuousStreamButton.setEnabled(True)
         elif self.cameraSelector.currentText() == "Simulated Threaded":
             pyqtgraph.setConfigOptions(imageAxisOrder='col-major')  # Set for conforming with initial development
             if (hasattr(self, "cameraHandle")):  # Check that the PCO camera was initialized
