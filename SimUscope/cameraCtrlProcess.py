@@ -5,14 +5,14 @@ Class wrapper for controlling PCO camera using separate thread and implementatio
 @author: ssklykov
 """
 # %% Imports
-from threading import Thread
+from multiprocessing import Process
 from queue import Queue, Empty
 import time
 import pco
 
 
 # %% Class wrapper
-class PCOcamera(Thread):
+class PCOcamera(Process):
     """Class for wrapping controls of the PCO camera and provided API features."""
 
     initialized = False  # Start the mail inifinite loop if the class initialized
@@ -23,7 +23,7 @@ class PCOcamera(Thread):
     def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue, exposure_time_ms: int):
         self.messagesQueue = messagesQueue  # For receiving the commands to stop / start live stream
         self.exceptionsQueue = exceptionsQueue  # For adding the exceptions that should stop the main program
-        Thread.__init__(self)  # Initialize this class in the other thread
+        Process.__init__(self)  # Initialize this class in the other thread
         self.initialized = True  # Additional flag for the start the loop in the run method
         self.imagesQueue = imagesQueue  # For storing the acquired images
         self.liveStream = False  # Set default live stream state to false
