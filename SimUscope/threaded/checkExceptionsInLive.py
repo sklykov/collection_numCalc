@@ -10,7 +10,7 @@ from queue import Queue, Empty
 import time
 
 
-# %% Class implementation
+# %% Class implementation of Exceptions checker and evoking clicking of Exit or Quit button
 class CheckMessagesForExceptions(Thread):
     """Threaded class for continuous and independent loop running for checking that any Exception reported anythere in the GUI program."""
 

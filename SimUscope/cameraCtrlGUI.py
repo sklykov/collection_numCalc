@@ -7,19 +7,17 @@ Simple GUI for representing of generated noisy image using PyQT.
 # %% Imports
 # import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget, QGridLayout,
-                             QSpinBox, QCheckBox, QVBoxLayout, QComboBox, QLabel, QHBoxLayout)
+                             QSpinBox, QCheckBox, QVBoxLayout, QComboBox, QLabel)
 from PyQt5.QtCore import Qt, QRect
 import time
 import numpy as np
 import pyqtgraph
-from cameraLiveStreamSimulation import SingleImageThreadedGenerator, ContinuousImageThreadedGenerator
-from queue import Queue, Empty
-# from multiprocessing import Queue as ProcessQueue
-# from cameraCtrlProcess import PCOcamera as PCOcameraProcess
+from queue import Empty
+from multiprocessing import Queue
+from cameraCtrlWrapper import Camera
 import os
 from skimage import io
-from checkExceptionsInLive import CheckMessagesForExceptions
-from cameraCtrl import PCOcamera
+from checkExceptionsMessagesLive import CheckMessagesForExceptions, MessagesPrinter
 from threading import Thread
 
 # %% Some default values. The global value is omitted as the non-reliable for communication with the functions imported from modules
@@ -30,19 +28,21 @@ width_default = 1000; height_default = 1000  # Default width and height for gene
 class SimUscope(QMainWindow):
     """Create the GUI with buttons for testing image acquisition from the camera and making some image processing."""
 
-    __flagGeneration = False  # Private class variable for recording state of continuous generation
+    __flagLiveStream = False  # Private class variable for recording state of continuous generation
     __flagTestPerformance = False  # Private class variable for switching between test state by using
     autoRange = True  # flag for handling user preference about possibility to zoom in/out to images
 
     def __init__(self, img_height, img_width, applicationHandle: QApplication):
         """Create overall UI inside the QMainWindow widget."""
         super().__init__()
+        pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
         self.applicationHandle = applicationHandle  # handle to the main application for exit it in the appropriate place
-        self.messages2Camera = Queue(maxsize=5)  # Initialize message queue for communication with the camera (simulated or not)
+        self.messages2Camera = Queue(maxsize=8)  # Initialize message queue for communication with the camera (simulated or not)
+        self.messagesFromCamera = Queue(maxsize=10)  # Initialize message queue for listening messages from the camera
         self.exceptionsQueue = Queue(maxsize=5)  # Initialize separate queue for spreading and handling Exceptions occured within modules
         self.imagesQueue = Queue(maxsize=50)  # Initialize the queue for holding acquired images and acessing them from the GUI thread
         self.gui_refresh_rate_ms = 10  # The constant time pause between each attempt to retrieve the image
-        self.imageGenerator = SingleImageThreadedGenerator(img_height, img_width); self.img_height = img_height; self.img_width = img_width
+        self.img_height = img_height; self.img_width = img_width
         self.img_width_default = img_width; self.img_height_default = img_height
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
         self.setWindowTitle("Camera control / simulation GUI"); self.setGeometry(200, 200, 840, 800)
@@ -58,9 +58,9 @@ class SimUscope(QMainWindow):
         # QWidget - main widget window for grid layout
         self.qwindow = QWidget()  # The composing of all buttons and frame for image representation into one main widget
         # Selector of type of a camera - Simulated or PCO one
-        self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated Threaded", "PCO"])
+        self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated", "PCO"])
         # self.cameraSelector.addItems(["Simulated Threaded", "PCO", "PCO Process"])
-        self.cameraSelector.setCurrentText("Simulated Threaded")  # Deafult camera for initialization - the simulated one
+        self.cameraSelector.setCurrentText("Simulated")  # Deafult camera for initialization - the simulated one
         self.cameraSelector.currentTextChanged.connect(self.activeCameraChanged)  # Attach handlers for camera choosing
         self.cameraSelLabel = QLabel("Camera Type"); self.cameraSelector.setEditable(True)  # setEditable is needed for setAlignment
         self.cameraSelector.lineEdit().setAlignment(Qt.AlignCenter); self.cameraSelector.lineEdit().setReadOnly(True)
@@ -136,29 +136,59 @@ class SimUscope(QMainWindow):
         grid.addWidget(self.imageWidget, 1, 0, 6, 6)  # the ImageView widget spans on ... rows and ... columns (2 values in the end)
         self.setCentralWidget(self.qwindow)  # Actually, allows to make both buttons and ImageView visible
         # Initiliaze and start the Exception checker and associate it with the initialized Quit button
-        self.exceptionChecker = CheckMessagesForExceptions(self.exceptionsQueue, self.quitButton, period_checks_ms=25)
-        self.exceptionChecker.start()  # Start the Exception checker
+        self.exceptionChecker = CheckMessagesForExceptions(self.exceptionsQueue, self.quitButton, period_checks_ms=30)
+        self.messagesPrinter = MessagesPrinter(self.messagesFromCamera, period_checks_ms=40)
+        self.exceptionChecker.start(); self.messagesPrinter.start()  # Start the Exception Checker and Messages Printer
         self.initializeCamera()  # Initializes default camera defined by the default value of cameraSelector button
 
     def initializeCamera(self):
         """
-        Initialize the default camera.
+        Initialize the default (selected above in the __init__ method) camera.
 
         Returns
         -------
         None.
 
         """
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            # Initialize the simulated camera
-            pyqtgraph.setConfigOptions(imageAxisOrder='col-major')  # Set for conforming with initial development
-            self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
-                                                                       self.exposureTimeButton.value(), self.img_height, self.img_width,
-                                                                       self.toggleTestPerformance.isChecked(), self.autoRange)
-        elif self.cameraSelector.currentText() == "PCO":
-            pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
-            # Initialize the PCO camera
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.exposureTimeButton.value())
+        # Initialize the Camera class
+        self.cameraHandle = Camera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
+                                   self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
+                                   camera_type=self.cameraSelector.currentText())
+        self.cameraHandle.start()
+
+    def activeCameraChanged(self):
+        """
+        Handle changing of active (selected) camera.
+
+        Returns
+        -------
+        None.
+
+        """
+        # General changing of type of the camera
+        # Deinitialize previous initiliazed process bundled with the Camera class
+        if (self.cameraHandle.is_alive()):
+            self.messages2Camera.put_nowait("Close the camera")
+            self.cameraHandle.join()  # wait for exiting from the evoked process
+        # Initialize the Camera class with the selected camera type by the user (button)
+        self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)  # for keeping buttons waiting for initialization
+        self.cameraHandle = Camera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
+                                   self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
+                                   camera_type=self.cameraSelector.currentText())
+        if not(self.cameraHandle.is_alive()):
+            self.cameraHandle.start()   # Start the main loop in the Camera for receiving the commands
+        # Below - associated with the selected camera pecularities
+        if self.cameraSelector.currentText() == "PCO":
+            self.snapSingleImgButton.setDisabled(True); self.continuousStreamButton.setDisabled(True)
+            self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
+            # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
+            self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
+        elif self.cameraSelector.currentText() == "Simulated":
+            self.widthButton.setEnabled(True); self.heightButton.setEnabled(True)
+            if not(self.generateException.isVisible()):  # return the visibility of the button
+                self.generateException.setVisible(True)
+            self.snapSingleImgButton.setText("Generate Single Pic"); self.continuousStreamButton.setText("Continuous Generation")
+        self.snapSingleImgButton.setEnabled(True); self.continuousStreamButton.setEnabled(True)
 
     def snap_single_img(self):
         """
@@ -169,22 +199,14 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            # !!!: Don't forget that waiting that thread complete its task guarantees all proper assignments (below)
-            self.imageGenerator.start(); self.imageGenerator.join()
-            self.imageWidget.setImage(self.imageGenerator.image, autoRange=self.autoRange,
-                                      autoLevels=not(self.disableAutoLevelsButton.isChecked()))
-            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width)  # Re-initialize the class
-            if not(self.saveSnapImg.isEnabled()):   # activate saving images, since some image generated and displayed
-                self.saveSnapImg.setEnabled(True)
-        elif self.cameraSelector.currentText() == "PCO":
-            if not(self.messages2Camera.full()):
-                self.messages2Camera.put_nowait("Snap single image")  # Send the command for acquiring single image
-                image = self.imagesQueue.get(block=True)  # Waiting then image will be available
-                if not(isinstance(image, str)) and (image is not None):
-                    self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
-                else:
-                    print(image)  # Printing substitution of an image by the string
+        if not(self.messages2Camera.full()):
+            self.messages2Camera.put_nowait("Snap single image")  # Send the command for acquiring single image
+            timeoutWait = round(2*self.exposureTimeButton.value())  # integer number of 2*exposure time for a single frame
+            image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be available
+            if not(isinstance(image, str)) and (image is not None):
+                self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
+            if (isinstance(image, str)):
+                print("Image: ", image)  # replacer for PCO simulation
 
     def continuous_stream(self):
         """
@@ -195,40 +217,25 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        self.__flagGeneration = not(self.__flagGeneration)  # changing the state of generation
-        self.continuousStreamButton.setDown(self.__flagGeneration)  # changing the visible state of button (clicked or not)
-        if (self.__flagGeneration):
+        self.__flagLiveStream = not(self.__flagLiveStream)  # changing the state of generation
+        self.continuousStreamButton.setDown(self.__flagLiveStream)  # changing the visible state of button (clicked or not)
+        if (self.__flagLiveStream):
             # Activate generation or Live imaging
             self.toggleTestPerformance.setDisabled(True)  # Disable the check box for preventing test on during continuous generation
             self.exposureTimeButton.setDisabled(True)  # Disable the exposure time control
             self.widthButton.setDisabled(True); self.heightButton.setDisabled(True); self.cameraSelector.setDisabled(True)
             self.snapSingleImgButton.setDisabled(True)
             # Below - initialization of the imported class for continuous image generation
-            if self.cameraSelector.currentText() == "Simulated Threaded":
-                self.continuousImageGen.start()  # Run the threaded code for continuous updating of showing image
-            elif self.cameraSelector.currentText() == "PCO":
-                self.messages2Camera.put_nowait("Start Live Stream")  # Send this command to the wrapper class
-                imageUpdater = Thread(target=self.update_image, args=())  # assign updating of images to the evoked Thread
-                imageUpdater.start()  # start the Thread and assigned to it task
-
+            self.messages2Camera.put_nowait("Start Live Stream")  # Send this command to the wrapper class
+            self.imageUpdater = Thread(target=self.update_image, args=())  # assign updating of images to the evoked Thread
+            self.imageUpdater.start()  # start the Thread and assigned to it task
             # Below - activation of save single image button
             if not(self.saveSnapImg.isEnabled()):   # activate saving single image button, since some image generated and displayed
                 time.sleep(self.exposureTimeButton.value()/1000)  # wait at least 1 exposure time before activate the saving button
                 self.saveSnapImg.setEnabled(True)
         else:
-            # Deactivate generation or Live imaging
-            if not(self.messages2Camera.full()) and (self.cameraSelector.currentText() == "Simulated Threaded"):
-                self.messages2Camera.put_nowait("Stop Generation")  # Send the message to stop continuous generation
-                if hasattr(self, "continuousImageGen"):
-                    if (self.continuousImageGen.is_alive()):  # if the threaded process is still running
-                        self.continuousImageGen.join()  # wait the stop of threaded process ending
-                # Drawback of the continuous image generator - upon the receiving the Stop generation command it exits the thread
-                # So, re-initialize the simulation camera below
-                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
-                                                                           self.exposureTimeButton.value(), self.img_height, self.img_width,
-                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
-            # For stopping the live stream from the PCO camera - send the command to the wrapper class
-            if not(self.messages2Camera.full()) and (self.cameraSelector.currentText() == "PCO"):
+            # For stopping the live stream from the Camera - send the command to it through messages queue
+            if not(self.messages2Camera.full()):
                 self.messages2Camera.put_nowait("Stop Live Stream")  # Send the message to stop live stream
             # Returns buttons to active state below
             self.snapSingleImgButton.setEnabled(True)
@@ -251,91 +258,31 @@ class SimUscope(QMainWindow):
             print("The first image not acquired, timeout reached")
             image = None
             self.continuousStreamButton.click()  # should deactivate the live stream
-        timeoutWait = round(1.5*self.exposureTimeButton.value())  # integer number of 1.5*exposure time for a single frame
+        timeoutWait = round(2*self.exposureTimeButton.value())  # integer number of 1.5*exposure time for a single frame
         # If instead of image generated only string, then the PCO (or other) camera hasn't been initialized
         # And below the if statement checks that the first image properly acquired
         if not(isinstance(image, str)) and (image is not None) and (isinstance(image, np.ndarray)):
-            while(self.__flagGeneration):
+            while(self.__flagLiveStream):
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
                 # time.sleep(0.01)  # wait 10 ms before querying the new image from the queue
                 try:
                     # Waiting then image will be available at least 1.5 of exposure time
-                    # image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
-                    time.sleep((self.exposureTimeButton.value() + 10)/1000)  # delay before querying new image
-                    image = self.imagesQueue.get_nowait()  # non-blocking of the queue request for an image
+                    image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
+                    # time.sleep((self.exposureTimeButton.value() + 10)/1000)  # delay before querying new image
+                    # image = self.imagesQueue.get_nowait()  # non-blocking of the queue request for an image
                 except Empty:
                     pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
         elif isinstance(image, str):  # image substitution by the string
-            while(self.__flagGeneration):
+            while(self.__flagLiveStream):
                 print(image)  # Printing substitution of an image by the string
                 time.sleep(self.exposureTimeButton.value()/1000)  # wait at least the exposure time
                 try:
-                    timeoutWait = round(1.5*self.exposureTimeButton.value())  # integer number of 1.5*exposure time for a single frame
                     # Waiting then image will be available at least 1.5 of exposure time
                     image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
                     # time.sleep((self.exposureTimeButton.value() + 10)/1000)
                     # image = self.imagesQueue.get_nowait()
                 except Empty:
                     pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
-
-    def closeEvent(self, closeEvent):
-        """
-        Rewrites the default behaviour of clicking on the X button on the main window GUI.
-
-        Parameters
-        ----------
-        closeEvent : QWidget Close Event
-            Needed by the API.
-
-        Returns
-        -------
-        None.
-
-        """
-        # Below - sending message to stop continuous generation
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and self.__flagGeneration:
-                self.messages2Camera.put_nowait("Stop Generation")  # Send the message to stop continuous generation
-                if hasattr(self, "continuousImageGen"):
-                    if (self.continuousImageGen.is_alive()):  # if the threaded generation process is still running
-                        self.continuousImageGen.join()  # wait the stop of threaded process ending
-        elif self.cameraSelector.currentText() == "PCO":
-            if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and hasattr(self, "cameraHandle"):
-                if (self.cameraHandle.is_alive()):  # if the threaded associated with the camera process hasn't been finished
-                    self.messages2Camera.put_nowait("Close the camera")  # Send the message to stop the imaging and deinitialize the camera
-                    self.cameraHandle.join()  # wait the camera closing / deinitializing
-        if self.exceptionChecker.is_alive():
-            self.exceptionsQueue.put_nowait("Stop Exception Checker")
-            self.exceptionChecker.join()
-        closeEvent.accept()  # Maybe redundant, but this is explicit accepting quit event (could be refused if asked for example)
-        self.applicationHandle.exit()  # Exit the main application, returning to the calling it kernel
-
-    def quitClicked(self):
-        """
-        Handle the clicking event on the Quit Button.
-
-        Sets the global variables to False state. Waits for threads stop running. Quits the Main window.
-
-        Returns
-        -------
-        None.
-
-        """
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and self.__flagGeneration:
-                self.messages2Camera.put_nowait("Stop Generation")  # Send the message to stop continuous generation
-                if hasattr(self, "continuousImageGen"):
-                    if (self.continuousImageGen.is_alive()):  # if the threaded generation process is still running
-                        self.continuousImageGen.join()  # wait the stop of threaded process ending
-        elif self.cameraSelector.currentText() == "PCO":
-            if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and hasattr(self, "cameraHandle"):
-                self.messages2Camera.put_nowait("Close the camera")  # Send the message to stop the imaging and deinitialize the camera:
-                if (self.cameraHandle.is_alive()):  # if the threaded associated with the camera process hasn't been finished
-                    self.cameraHandle.join()  # wait the camera closing / deinitializing
-        if self.exceptionChecker.is_alive():
-            self.exceptionsQueue.put_nowait("Stop Exception Checker")
-            self.exceptionChecker.join()
-        self.close()  # Calls the closing event for QMainWindow
 
     def imageSizeChanged(self):
         """
@@ -347,7 +294,6 @@ class SimUscope(QMainWindow):
 
         """
         self.img_width = self.widthButton.value(); self.img_height = self.heightButton.value()
-        self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width)  # reinitialize single generator
 
     def activateMouseOnImage(self):
         """
@@ -467,42 +413,7 @@ class SimUscope(QMainWindow):
             self.messages2Camera.put_nowait(("Set exposure time", self.exposureTimeButton.value()))
         elif self.cameraSelector.currentText() == "Simulated Threaded":
             # Re-initialize the instance of continuous image generator with new exposure time
-            self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
-                                                                       self.exposureTimeButton.value(), self.img_height, self.img_width,
-                                                                       self.toggleTestPerformance.isChecked(), self.autoRange)
-
-    def activeCameraChanged(self):
-        """
-        Handle changing of active (selected) camera.
-
-        Returns
-        -------
-        None.
-
-        """
-        if self.cameraSelector.currentText() == "PCO":
-            pyqtgraph.setConfigOptions(imageAxisOrder='row-major')  # Set for conforming with images from the camera
-            # No need to deinitialize the simulated camera now
-            self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)
-            self.snapSingleImgButton.setDisabled(True); self.continuousStreamButton.setDisabled(True)
-            self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
-            # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
-            self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
-            # Initialize the PCO camera
-            self.cameraHandle = PCOcamera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.exposureTimeButton.value())
-            if not(self.cameraHandle.is_alive()):
-                self.cameraHandle.start()   # Start the main loop for receiving the commands
-            self.snapSingleImgButton.setEnabled(True); self.continuousStreamButton.setEnabled(True)
-        elif self.cameraSelector.currentText() == "Simulated Threaded":
-            pyqtgraph.setConfigOptions(imageAxisOrder='col-major')  # Set for conforming with initial development
-            if (hasattr(self, "cameraHandle")):  # Check that the PCO camera was initialized
-                if self.cameraHandle.is_alive():  # Check that the PCO camera is still running in the separate thread
-                    self.messages2Camera.put_nowait("Close the camera")  # for stopping the imaging and deinitialize the camera
-                    self.cameraHandle.join()  # wait the camera closing / deinitializing
-            self.widthButton.setEnabled(True); self.heightButton.setEnabled(True)
-            if not(self.generateException.isVisible()):  # return the visibility of the button
-                self.generateException.setVisible(True)
-            self.snapSingleImgButton.setText("Generate Single Pic"); self.continuousStreamButton.setText("Continuous Generation")
+            pass
 
     def cropImage(self):
         """
@@ -516,16 +427,14 @@ class SimUscope(QMainWindow):
         # Implementation for the simulated camera
         if self.cameraSelector.currentText() == "Simulated Threaded":
             self.img_height = self.heightROI.value(); self.img_width = self.widthROI.value()
-            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width); self.snapSingleImgButton.click()
             self.widthButton.setValue(self.widthROI.value()); self.heightButton.setValue(self.heightROI.value())
-            if self.__flagGeneration:
+            if self.__flagLiveStream:
                 # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
                 self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
             else:
                 # Reinitialize the simulation class below for the getting new image sizes
-                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera,
-                                                                           self.exposureTime.value(), self.img_height, self.img_width,
-                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
+                pass
+
         # Implementation for the actual camera
         elif self.cameraSelector.currentText() == "PCO":
             if not(self.messages2Camera.full()):
@@ -550,15 +459,13 @@ class SimUscope(QMainWindow):
         if self.cameraSelector.currentText() == "Simulated Threaded":
             self.img_height = self.img_height_default; self.img_width = self.img_width_default
             self.widthButton.setValue(self.img_width_default); self.heightButton.setValue(self.img_height_default)
-            self.imageGenerator = SingleImageThreadedGenerator(self.img_height, self.img_width); self.snapSingleImgButton.click()
-            if self.__flagGeneration:
+            if self.__flagLiveStream:
                 # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
                 self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
             else:
                 # Reinitialize the simulation class below for the getting new image sizes
-                self.continuousImageGen = ContinuousImageThreadedGenerator(self.imageWidget, self.messages2Camera, self.exposureTime.value(),
-                                                                           self.img_height_default, self.img_width_default,
-                                                                           self.toggleTestPerformance.isChecked(), self.autoRange)
+                pass
+
         # Implementation for the actual camera
         elif self.cameraSelector.currentText() == "PCO":
             if not(self.messages2Camera.full()):
@@ -578,25 +485,111 @@ class SimUscope(QMainWindow):
         self.imageWidget.getView().showAxis("bottom", show=not(self.disableAxesOnImageButton.isChecked()))
 
     def disableAutoLevelsCalculation(self):
+        """
+        Disable autoleveling of pixel values of shown on the main GUI window image.
+
+        Returns
+        -------
+        None.
+
+        """
         if self.disableAutoLevelsButton.isChecked():
             self.imageWidget.ui.histogram.hide()  # hide the side histogram with sliders
             self.imageWidget.getImageItem().setLevels([self.minLevelButton.value(), self.maxLevelButton.value()], update=False)
-            # if self.cameraSelector.currentText() == "Simulated Threaded":
-            #     # set autolevels for a generated U8 image
-            #     self.imageWidget.setLevels(min=self.minLevelButton.value(), max=self.maxLevelButton.value())
         else:
             self.imageWidget.ui.histogram.show()
 
     def histogramLevelsChanged(self):
+        """
+        Handle changing on the GUI the dragging pixel levels (minimum and maximum ones).
+
+        Returns
+        -------
+        None.
+
+        """
         levels = self.imageWidget.ui.histogram.getLevels()
         minPixelLevel = int(round(levels[0], 0)); maxPixelLevel = int(round(levels[1], 0))
         self.minLevelButton.setValue(minPixelLevel); self.maxLevelButton.setValue(maxPixelLevel)
 
     def pixelValuesChanged(self):
+        """
+        Handle manual input of minimal or maximal pixel value on the GUI.
+
+        Returns
+        -------
+        None.
+
+        """
         if self.disableAutoLevelsButton.isChecked():
             if self.minLevelButton.value() > self.maxLevelButton.value():
                 self.maxLevelButton.setValue(self.minLevelButton.value() + 1)
             self.imageWidget.getImageItem().setLevels([self.minLevelButton.value(), self.maxLevelButton.value()], update=False)
+
+    def closeEvent(self, closeEvent):
+        """
+        Rewrites the default behaviour of clicking on the X button on the main window GUI.
+
+        Parameters
+        ----------
+        closeEvent : QWidget Close Event
+            Needed by the API.
+
+        Returns
+        -------
+        None.
+
+        """
+        # Stop the camera - below
+        if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and hasattr(self, "cameraHandle"):
+            if self.__flagLiveStream:
+                self.__flagLiveStream = False  # should stop associated update_image thread
+                self.messages2Camera.put_nowait("Stop Live Stream")  # Send the message to stop live stream
+                time.sleep(self.exposureTimeButton.value()/1000)  # wait (main thread) at least the image finish to acquire
+                if self.imageUpdater.is_alive():
+                    self.imageUpdater.join((2*self.exposureTimeButton.value())/1000)  # wait the image updater thread stopped
+            self.messages2Camera.put_nowait("Stop Program")  # Send the message to stop the imaging and deinitialize the camera:
+            if (self.cameraHandle.is_alive()):  # if the threaded associated with the camera process hasn't been finished
+                self.cameraHandle.join()  # wait the camera closing / deinitializing
+        # Stop Exceptions checker and Messages Printer
+        if self.exceptionChecker.is_alive():
+            self.exceptionsQueue.put_nowait("Stop Exception Checker")
+            self.exceptionChecker.join()
+        if self.messagesPrinter.is_alive():
+            self.messagesFromCamera.put_nowait("Stop Messages Printer")
+            self.messagesPrinter.join()
+        closeEvent.accept()  # Maybe redundant, but this is explicit accepting quit event (could be refused if asked for example)
+        self.applicationHandle.exit()  # Exit the main application, returning to the calling it kernel
+
+    def quitClicked(self):
+        """
+        Handle the clicking event on the Quit Button.
+
+        Sets the global variables to False state. Waits for threads stop running. Quits the Main window.
+
+        Returns
+        -------
+        None.
+
+        """
+        if not(self.messages2Camera is None) and not(self.messages2Camera.full()) and hasattr(self, "cameraHandle"):
+            # __flagLiveStream - if true, then the live stream is on
+            if self.__flagLiveStream:
+                self.__flagLiveStream = False  # should stop associated update_image thread
+                self.messages2Camera.put_nowait("Stop Live Stream")  # Send the message to stop live stream
+                time.sleep(self.exposureTimeButton.value()/1000)  # wait (main thread) at least the image finish to acquire
+                if self.imageUpdater.is_alive():
+                    self.imageUpdater.join((2*self.exposureTimeButton.value())/1000)  # wait the image updater thread stopped
+            self.messages2Camera.put_nowait("Close the camera")  # Send the message to stop the imaging and deinitialize the camera:
+            if (self.cameraHandle.is_alive()):  # if the threaded associated with the camera process hasn't been finished
+                self.cameraHandle.join()  # wait the camera closing / deinitializing
+        if self.exceptionChecker.is_alive():
+            self.exceptionsQueue.put_nowait("Stop Exception Checker")
+            self.exceptionChecker.join()
+        if self.messagesPrinter.is_alive():
+            self.messagesFromCamera.put_nowait("Stop Messages Printer")
+            self.messagesPrinter.join()
+        self.close()  # Calls the closing event for QMainWindow
 
 
 # %% Tests
