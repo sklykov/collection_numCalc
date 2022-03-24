@@ -8,14 +8,14 @@ For dependency list - see the imports (the simplest form).
 """
 # %% Imports
 from multiprocessing import Process, Queue
-from queue import Empty
+from queue import Empty, Full
 import time
 import pco
 import numpy as np
 
 
 # %% Class wrapper
-class Camera(Process):
+class CameraWrapper(Process):
     """Class for wrapping controls of the PCO camera and provided API features."""
 
     initialized = False  # Start the mail inifinite loop if the class initialized
@@ -25,9 +25,11 @@ class Camera(Process):
     camera_type: str
     max_width: int; max_height: int
     image_width: int; image_height: int
+    cameraReference = None
 
     def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue, messagesToCaller: Queue,
                  exposure_time_ms: int, img_width: int, img_height: int, camera_type: str = "Simulated"):
+        Process.__init__(self)  # Initialize this class on the separate process with it's own memory and core
         self.messagesQueue = messagesQueue  # For receiving the commands to stop / start live stream
         self.exceptionsQueue = exceptionsQueue  # For adding the exceptions that should stop the main program
         self.messagesToCaller = messagesToCaller  # For sending internal messages from this class for debugging
@@ -35,26 +37,11 @@ class Camera(Process):
         self.liveStream = False  # Set default live stream state to false
         self.exposure_time_ms = exposure_time_ms  # Initializing with the default exposure time
         self.camera_type = camera_type  # Type of initialized camera
-        Process.__init__(self)  # Initialize this class on the separate process with it's own memory and core
-        # Initialization code for the PCO camera
+        # Initialization code for the PCO camera -> MOVED to the run() because it's impossible to pickle handle to the camera
         if self.camera_type == "PCO":
-            try:
-                self.cameraReference = pco.Camera()  # open connection to the camera
-                # printing statement won't be redirected to stdout, thus sending this message to the queue
-                self.messagesToCaller.put_nowait("The PCO camera initialized")
-                self.cameraReference.set_exposure_time(self.exposure_time_ms/1000)
-                self.messagesToCaller.put_nowait("Default exposure time is set for the camera")
-                self.messagesToCaller.put_nowait("The camera status report: " + str(self.cameraReference.sdk.get_camera_health_status()))
-                self.initialized = True  # Additional flag for the start the loop in the run method
-            except ImportError as import_err:
-                self.messagesToCaller.put_nowait("The PCO library is unavailable, check the installation. The camera not initialized!")
-                self.cameraReference = None
-                self.exceptionsQueue.put_nowait(import_err)
-            except ValueError:
-                self.messagesToCaller.put_nowait("CAMERA NOT INITIALIZED! THE HANDLE TO IT - 'NONE'")
-                self.cameraReference = None
-                # Below - allowing to generate images as strings
-                self.initialized = True  # Additional flag for the start the loop in the run method
+            # All the camera initialization code moved to the run() method!
+            # It's because the camera handle returned by the DLL library is not pickleable by the pickle method !!!
+            self.initialized = True  # Additional flag for the start the loop in the run method (run Process!)
             self.max_width = 2048; self.max_height = 2048
         # Initialization code for the Simulated camera
         elif self.camera_type == "Simulated":
@@ -86,6 +73,28 @@ class Camera(Process):
         None.
 
         """
+        # !!! Below - initialization code for the PCO camera, because in the __init__() method it's impossible to make,
+        # because the handle returned by the call pco.Camera() returns the unpickleable object
+        if self.camera_type == "PCO":
+            try:
+                self.cameraReference = pco.Camera()  # open connection to the camera
+                # printing statement won't be redirected to stdout, thus sending this message to the queue
+                self.messagesToCaller.put_nowait("The PCO camera initialized")
+                self.cameraReference.set_exposure_time(self.exposure_time_ms/1000)
+                self.messagesToCaller.put_nowait("Default exposure time is set for the camera")
+                self.messagesToCaller.put_nowait("The camera status report: " + str(self.cameraReference.sdk.get_camera_health_status()))
+                self.initialized = True  # Additional flag for the start the loop in the run method
+                self.imagesQueue.put_nowait("The PCO camera initialized")
+            except ImportError as import_err:
+                self.messagesToCaller.put_nowait("The PCO library is unavailable, check the installation. The camera not initialized!")
+                self.cameraReference = None
+                self.exceptionsQueue.put_nowait(import_err)
+            except ValueError:
+                self.messagesToCaller.put_nowait("CAMERA NOT INITIALIZED! THE HANDLE TO IT - 'NONE'")
+                self.imagesQueue.put_nowait("The PCO camera initialized")
+                self.cameraReference = None
+        self.messagesToCaller.put_nowait(self.camera_type + " camera Process has been launched")  # Send the command for debugging
+        # The main loop - the handler in the Process loop
         while self.initialized:
             # Checking for commands created by clicking buttons or by any events
             if not(self.messagesQueue.empty()) and (self.messagesQueue.qsize() > 0):
@@ -101,7 +110,7 @@ class Camera(Process):
                                 self.messagesToCaller.put_nowait("Raised exception during closing the camera:", error)
                                 self.exceptionsQueue.put_nowait(error)  # re-throw to the main program the error
                             finally:
-                                self.initialized = False  # In any case stop the loop waiting the commands from the GUI
+                                self.initialized = False; break  # In any case stop the loop waiting the commands from the GUI
                         # Live stream mode
                         if message == "Start Live Stream":
                             self.messagesToCaller.put_nowait("Camera start live streaming")
@@ -148,7 +157,7 @@ class Camera(Process):
                     pass
 
             time.sleep(self.mainLoopTimeDelay/1000)  # Delays of each step of processing of commands
-        print("The process for the camera is closed")
+        self.messagesToCaller.put_nowait("run() of Process finished for " + self.camera_type + " camera")  # DEBUG
 
     def snap_single_image(self):
         """
@@ -186,12 +195,13 @@ class Camera(Process):
             if (self.camera_type == "PCO") and (self.cameraReference is not None):
                 self.cameraReference.record(number_of_images=25, mode='ring buffer')  # configure the live stream acquisition
                 # make the loop below for infinite live stream, that could be stopped only by receiving the command or exception
-                self.messagesToCaller.put_nowait("Live streaming started by the PCO camera")
                 self.cameraReference.wait_for_first_image()  # wait that the image acquired actually
                 image, metadata = self.cameraReference.image()  # get the acquired image
                 if not(self.imagesQueue.full()):
-                    self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
-                time.sleep(0.01)  # trying to induce the delay between acquiring and sending images, for letting the GUI refresh image
+                    try:
+                        self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
+                    except Full:
+                        pass  # do nothing for now about the overloaded queue
             elif (self.camera_type == "PCO") and (self.cameraReference is None):
                 # Substituion of actual image generation by the PCO camera
                 time.sleep(self.exposure_time_ms/1000)
@@ -210,6 +220,7 @@ class Camera(Process):
                             self.messagesToCaller.put_nowait("Camera stop live streaming")
                             if (self.camera_type == "PCO") and (self.cameraReference is not None):
                                 self.cameraReference.stop()  # stop the live stream from the PCO  camera
+                            self.imagesQueue.empty()  # delete all images from the queue for stopping their representation
                             self.liveStream = False; break
                     elif isinstance(message, Exception):
                         self.messagesToCaller.put_nowait("Camera stop live streaming because of the reported error")
@@ -306,9 +317,10 @@ class Camera(Process):
         None.
 
         """
-        if self.cameraReference is not None:  # If the camera was initialized, then the cameraReference will be not None
+        #  If the camera - PCO, then call close() function from the pco module
+        if (self.camera_type == "PCO") and (self.cameraReference is not None):
             self.cameraReference.close()
-        time.sleep(self.mainLoopTimeDelay/1000)
+        time.sleep(self.mainLoopTimeDelay/1000)  #
         self.messagesToCaller.put_nowait("The " + self.camera_type + " camera closed")
 
     def generate_noise_picture(self, pixel_type: str = 'uint8') -> np.ndarray:
@@ -346,3 +358,26 @@ class Camera(Process):
             raise Exception("Specified height or width are less than 2")
 
         return img
+
+
+# %% It's testing and unnecessary code, only valuable to check if the real camera is initialized before running the GUI
+if __name__ == "__main__":
+    messagesQueue = Queue(maxsize=5); exceptionsQueue = Queue(maxsize=2); imagesQueue = Queue(maxsize=2)
+    messagesToCaller = Queue(maxsize=5); exposure_time_ms = 100; img_width = 100; img_height = 100
+    camera = CameraWrapper(messagesQueue, exceptionsQueue, imagesQueue, messagesToCaller,
+                           exposure_time_ms, img_width, img_height, camera_type="PCO")
+    camera.start(); time.sleep(8)
+    if not(messagesToCaller.empty()):
+        while not(messagesToCaller.empty()):
+            try:
+                print(messagesToCaller.get_nowait())
+            except Empty:
+                pass
+    messagesQueue.put_nowait("Stop"); time.sleep(5)
+    if not(messagesToCaller.empty()):
+        while not(messagesToCaller.empty()):
+            try:
+                print(messagesToCaller.get_nowait())
+            except Empty:
+                pass
+    camera.join()

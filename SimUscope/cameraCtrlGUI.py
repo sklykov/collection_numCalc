@@ -14,7 +14,7 @@ import numpy as np
 import pyqtgraph
 from queue import Empty
 from multiprocessing import Queue
-from cameraCtrlWrapper import Camera
+from cameraCtrlWrapper import CameraWrapper
 import os
 from skimage import io
 from checkExceptionsMessagesLive import CheckMessagesForExceptions, MessagesPrinter
@@ -153,9 +153,9 @@ class SimUscope(QMainWindow):
 
         """
         # Initialize the Camera class
-        self.cameraHandle = Camera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
-                                   self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
-                                   camera_type=self.cameraSelector.currentText())
+        self.cameraHandle = CameraWrapper(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
+                                          self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
+                                          camera_type=self.cameraSelector.currentText())
         self.cameraHandle.start()
 
     def activeCameraChanged(self):
@@ -171,17 +171,33 @@ class SimUscope(QMainWindow):
         # Deinitialize previous initiliazed process bundled with the Camera class
         if (self.cameraHandle.is_alive()):
             self.messages2Camera.put_nowait("Close the camera")
+            time.sleep((self.exposureTimeButton.value()*2)/1000)  # delay for letting the process to finish (approximate delay)
             self.cameraHandle.join()  # wait for exiting from the evoked process
+        print("Previous camera deinitilized")
         # Initialize the Camera class with the selected camera type by the user (button)
-        self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)  # for keeping buttons waiting for initialization
-        self.cameraHandle = Camera(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
-                                   self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
-                                   camera_type=self.cameraSelector.currentText())
-        if not(self.cameraHandle.is_alive()):
-            self.cameraHandle.start()   # Start the main loop in the Camera for receiving the commands
+        self.snapSingleImgButton.setDisabled(True); self.continuousStreamButton.setDisabled(True)  # Cannot be used before camera initialized
+        self.cameraHandle = CameraWrapper(self.messages2Camera, self.exceptionsQueue, self.imagesQueue, self.messagesFromCamera,
+                                          self.exposureTimeButton.value(), self.img_width_default, self.img_height_default,
+                                          camera_type=self.cameraSelector.currentText())
+        self.cameraHandle.start()   # Start the main loop in the Camera for receiving the commands
+        # PCO camera demands long time for initialization, if below - for waiting it to finish everything
+        if self.cameraSelector.currentText() == "PCO":
+            # Below - the flag to delay this code to wait of confirmation that camera initialized
+            received_initialization_confirmation = False
+            message = "-"  # empty message
+            while not(received_initialization_confirmation):   # ???
+                try:
+                    message = self.imagesQueue.get_nowait()
+                    if message == "The PCO camera initialized":
+                        received_initialization_confirmation = True; break
+                except Empty:
+                    pass
+                time.sleep(0.08)  # sleep before checks for receiving the confirmation about initialization
+            print("Confirmation received:", message)
+        self.snapSingleImgButton.setEnabled(True); self.continuousStreamButton.setEnabled(True)
         # Below - associated with the selected camera pecularities
         if self.cameraSelector.currentText() == "PCO":
-            self.snapSingleImgButton.setDisabled(True); self.continuousStreamButton.setDisabled(True)
+            self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)  # PCO camera cannot support arbitrary size changes
             self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
             # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
             self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
@@ -190,7 +206,6 @@ class SimUscope(QMainWindow):
             if not(self.generateException.isVisible()):  # return the visibility of the button
                 self.generateException.setVisible(True)
             self.snapSingleImgButton.setText("Generate Single Pic"); self.continuousStreamButton.setText("Continuous Generation")
-        self.snapSingleImgButton.setEnabled(True); self.continuousStreamButton.setEnabled(True)
 
     def snap_single_img(self):
         """
@@ -203,8 +218,12 @@ class SimUscope(QMainWindow):
         """
         if not(self.messages2Camera.full()):
             self.messages2Camera.put_nowait("Snap single image")  # Send the command for acquiring single image
-            timeoutWait = round(self.wait_multiplicator*self.exposureTimeButton.value())  # timeout to wait the image on the imagesQueue
-            image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be available
+            timeoutWait = round((self.wait_multiplicator+2)*self.exposureTimeButton.value())  # timeout to wait the image on the imagesQueue
+            try:
+                image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be available
+            except Empty:
+                image = None
+                print("The snap image not acquired, timeout reached")
             if not(isinstance(image, str)) and (image is not None):
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
             if (isinstance(image, str)):
@@ -267,9 +286,10 @@ class SimUscope(QMainWindow):
         # If instead of image generated only string, then the PCO (or other) camera hasn't been initialized
         # And below the if statement checks that the first image properly acquired
         if not(isinstance(image, str)) and (image is not None) and (isinstance(image, np.ndarray)):
+            __flagNoImageInQueue = False  # for testing more reliable stop of loop for imag updating below
             if self.toggleTestPerformance.isChecked():
                 j = 0  # index for putting the measured times into the array for mean passed time calculation
-            while(self.__flagLiveStream):
+            while(self.__flagLiveStream and not(__flagNoImageInQueue)):
                 if self.toggleTestPerformance.isChecked():
                     t1 = time.time()
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
@@ -277,7 +297,10 @@ class SimUscope(QMainWindow):
                     # Waiting then image will be available at least 2*exposure times
                     image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
                 except Empty:
-                    pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
+                    __flagNoImageInQueue = True  # for stopping attempts to retrieve images from the empty queue
+                # Attempt to make the GUI more responsive to the user input => providing artificial delays for button checking
+                if (self.exposureTimeButton.value() < 15) and not(self.disableAutoLevelsButton.isChecked()):
+                    time.sleep(0.012)  # freeze this loop for 12 ms if exposure time is low and autoLevels are active
                 # Below - recording the passed time for calculation of mean passed time after
                 if self.toggleTestPerformance.isChecked():
                     # Putting the measured times in Ring buffer manner
@@ -301,10 +324,11 @@ class SimUscope(QMainWindow):
                 try:
                     # Waiting then image will be available at least 1.5 of exposure time
                     image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
-                    # time.sleep((self.exposureTimeButton.value() + 10)/1000)
-                    # image = self.imagesQueue.get_nowait()
                 except Empty:
                     pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
+                # Making the GUI more responsive for the low exposure times
+                if (self.exposureTimeButton.value() < 10):
+                    time.sleep(0.01)  # add some overhead for better checking of the user input
 
     def imageSizeChanged(self):
         """
