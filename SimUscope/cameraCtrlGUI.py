@@ -21,7 +21,7 @@ from checkExceptionsMessagesLive import CheckMessagesForExceptions, MessagesPrin
 from threading import Thread
 
 # %% Some default values. The global value is omitted as the non-reliable for communication with the functions imported from modules
-width_default = 1000; height_default = 1000  # Default width and height for generation of images
+width_default = 2000; height_default = 2000  # Default width and height for generation of images
 
 
 # %% GUI class
@@ -42,6 +42,7 @@ class SimUscope(QMainWindow):
         self.exceptionsQueue = Queue(maxsize=5)  # Initialize separate queue for spreading and handling Exceptions occured within modules
         self.imagesQueue = Queue(maxsize=50)  # Initialize the queue for holding acquired images and acessing them from the GUI thread
         self.gui_refresh_rate_ms = 10  # The constant time pause between each attempt to retrieve the image
+        self.wait_multiplicator = 2  # The amount for calculation of timeout for retrieving image from the imagesQueue
         self.img_height = img_height; self.img_width = img_width
         self.img_width_default = img_width; self.img_height_default = img_height
         self.img = np.zeros((self.img_height, self.img_width), dtype='uint8')  # Black initial image
@@ -74,6 +75,7 @@ class SimUscope(QMainWindow):
         self.widthROI.setPrefix("ROI width: "); self.heightROI.setPrefix("ROI height: ")
         vboxROI = QVBoxLayout(); vboxROI.addWidget(self.widthROI); vboxROI.addWidget(self.heightROI)
         self.widthROI.valueChanged.connect(self.roiSizesSpecified); self.heightROI.valueChanged.connect(self.roiSizesSpecified)
+        self.widthROI.setKeyboardTracking(False); self.heightROI.setKeyboardTracking(False)  # Disable instant tracking of any changes
         # Push buttons for events evoking
         self.snapSingleImgButton = QPushButton("Generate Single Pic"); self.snapSingleImgButton.clicked.connect(self.snap_single_img)
         self.continuousStreamButton = QPushButton("Continuous Generation")  # Switches on/off continuous generation
@@ -87,7 +89,7 @@ class SimUscope(QMainWindow):
         self.exposureTimeButton = QSpinBox(); self.exposureTimeButton.setSingleStep(1); self.exposureTimeButton.setSuffix(" ms")
         self.exposureTimeButton.setPrefix("Exposure time: "); self.exposureTimeButton.setMinimum(1); self.exposureTimeButton.setMaximum(1000)
         self.exposureTimeButton.setValue(100); self.exposureTimeButton.adjustSize()
-        self.exposureTimeButton.setKeyboardTracking(False)  # special function to disable emtting of signals for each typed value
+        self.exposureTimeButton.setKeyboardTracking(False)  # !!! special function to disable emtting of signals for each typed value
         # E.g., when the user is typing "100" => emit 3 signals for 3 numbers, if keyboardTracking(True)
         self.exposureTimeButton.valueChanged.connect(self.exposureTimeChanged)
         self.switchMouseCtrlImage = QCheckBox("Handling Image by mouse"); self.switchMouseCtrlImage.setChecked(False)
@@ -201,7 +203,7 @@ class SimUscope(QMainWindow):
         """
         if not(self.messages2Camera.full()):
             self.messages2Camera.put_nowait("Snap single image")  # Send the command for acquiring single image
-            timeoutWait = round(2*self.exposureTimeButton.value())  # integer number of 2*exposure time for a single frame
+            timeoutWait = round(self.wait_multiplicator*self.exposureTimeButton.value())  # timeout to wait the image on the imagesQueue
             image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be available
             if not(isinstance(image, str)) and (image is not None):
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
@@ -251,27 +253,47 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        timeoutWait = round(6*self.exposureTimeButton.value())  # integer number of 6*exposure time for a single frame
+        timeoutWait = round((self.wait_multiplicator + 4)*self.exposureTimeButton.value())  # timeout to wait the image on the imagesQueue
         try:
             image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be
         except Empty:
             print("The first image not acquired, timeout reached")
             image = None
             self.continuousStreamButton.click()  # should deactivate the live stream
-        timeoutWait = round(2*self.exposureTimeButton.value())  # integer number of 1.5*exposure time for a single frame
+        timeoutWait = round(self.wait_multiplicator*self.exposureTimeButton.value())  # timeout to wait the image on the imagesQueue
+        # For assesing the performance - calculate the mean time of representation
+        if self.toggleTestPerformance.isChecked():
+            measured_passed_t = np.zeros(101, dtype='int')
         # If instead of image generated only string, then the PCO (or other) camera hasn't been initialized
         # And below the if statement checks that the first image properly acquired
         if not(isinstance(image, str)) and (image is not None) and (isinstance(image, np.ndarray)):
+            if self.toggleTestPerformance.isChecked():
+                j = 0  # index for putting the measured times into the array for mean passed time calculation
             while(self.__flagLiveStream):
+                if self.toggleTestPerformance.isChecked():
+                    t1 = time.time()
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
-                # time.sleep(0.01)  # wait 10 ms before querying the new image from the queue
                 try:
-                    # Waiting then image will be available at least 1.5 of exposure time
+                    # Waiting then image will be available at least 2*exposure times
                     image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
-                    # time.sleep((self.exposureTimeButton.value() + 10)/1000)  # delay before querying new image
-                    # image = self.imagesQueue.get_nowait()  # non-blocking of the queue request for an image
                 except Empty:
                     pass  # just pass the Empty exception if the live stream cancelled in between of waiting time
+                # Below - recording the passed time for calculation of mean passed time after
+                if self.toggleTestPerformance.isChecked():
+                    # Putting the measured times in Ring buffer manner
+                    t2 = time.time(); measured_passed_t[j] = np.round(((t2-t1)*1000), 0)
+                    if j < np.size(measured_passed_t)-1:
+                        j += 1
+                    else:
+                        j = 0
+            # Ending the while loop => the measured performance could be calculated
+            if self.toggleTestPerformance.isChecked():
+                for i in range(np.size(measured_passed_t)):
+                    if measured_passed_t[i] == 0:
+                        break
+                measured_passed_t = measured_passed_t[0:i]  # remove all zero values
+                print("Mean time for image refreshing", int(np.round(np.mean(measured_passed_t), 0)), "ms")
+        # If the image coming from the process as the string (PCO simulated), then just print it below
         elif isinstance(image, str):  # image substitution by the string
             while(self.__flagLiveStream):
                 print(image)  # Printing substitution of an image by the string
@@ -294,6 +316,8 @@ class SimUscope(QMainWindow):
 
         """
         self.img_width = self.widthButton.value(); self.img_height = self.heightButton.value()
+        if self.cameraSelector.currentText() == "Simulated":
+            self.messages2Camera.put_nowait(("Change simulate picture sizes to:", (self.img_width, self.img_height)))
 
     def activateMouseOnImage(self):
         """
@@ -368,9 +392,9 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        if self.heightROI.value() % 2 != 0:
+        if self.heightROI.value() % 2 != 0:  # assmung that ROI size selection (height) can be only even number
             self.heightROI.setValue(self.heightROI.value()+1)
-        if self.widthROI.value() % 2 != 0:
+        if self.widthROI.value() % 2 != 0:  # assmung that ROI size selection (width) can be only even number
             self.widthROI.setValue(self.widthROI.value()+1)
         if hasattr(self, "roi"):
             self.roi.setSize((self.widthROI.value(), self.heightROI.value()))
@@ -385,7 +409,7 @@ class SimUscope(QMainWindow):
 
         """
         (w, h) = self.roi.size(); w = int(w); h = int(h)
-        self.widthROI.setValue(w); self.heightROI.setValue(h)
+        self.widthROI.setValue(w); self.heightROI.setValue(h)  # assign selected by the ROI ctrl sizes to buttons
 
     def generateMessageWithException(self):
         """
@@ -397,6 +421,7 @@ class SimUscope(QMainWindow):
 
         """
         if not(self.exceptionsQueue.full()):
+            # Generate Exceptiom for testing its handling and quit() function
             self.exceptionsQueue.put_nowait(Exception("Generated Test Exception"))
 
     def exposureTimeChanged(self):
@@ -408,12 +433,15 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        if self.cameraSelector.currentText() == "PCO":
-            # below - send the tuple with string command and exposure time value
-            self.messages2Camera.put_nowait(("Set exposure time", self.exposureTimeButton.value()))
-        elif self.cameraSelector.currentText() == "Simulated Threaded":
-            # Re-initialize the instance of continuous image generator with new exposure time
-            pass
+        # below - send the tuple with string command and exposure time value
+        self.messages2Camera.put_nowait(("Set exposure time", self.exposureTimeButton.value()))
+        # Assign multiplicator for letting the software to wait more for the image depending on the exposure time:
+        if self.exposureTimeButton.value() < 50:
+            self.wait_multiplicator = 4
+        if self.exposureTimeButton.value() < 25:
+            self.wait_multiplicator = 6
+        if self.exposureTimeButton.value() < 10:
+            self.wait_multiplicator = 8
 
     def cropImage(self):
         """
@@ -424,25 +452,21 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        # Implementation for the simulated camera
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            self.img_height = self.heightROI.value(); self.img_width = self.widthROI.value()
-            self.widthButton.setValue(self.widthROI.value()); self.heightButton.setValue(self.heightROI.value())
-            if self.__flagLiveStream:
-                # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
-                self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
-            else:
-                # Reinitialize the simulation class below for the getting new image sizes
-                pass
-
+        # Sending the image and height as the tuple along with the command to the camera
+        self.img_height = self.heightROI.value(); self.img_width = self.widthROI.value()
+        self.widthButton.setValue(self.widthROI.value()); self.heightButton.setValue(self.heightROI.value())
+        # Stop Live Stream if it's active - below
+        if self.__flagLiveStream:
+            self.continuousStreamButton.click()  # Should disable automatically Live Stream
+            time.sleep(self.exposureTimeButton.value()/1000)  # wait (main thread) at least the image finish to acquire
+            if self.imageUpdater.is_alive():
+                self.imageUpdater.join((2*self.exposureTimeButton.value())/1000)  # wait the image updater thread stopped
         # Implementation for the actual camera
-        elif self.cameraSelector.currentText() == "PCO":
-            if not(self.messages2Camera.full()):
-                # Message in the format (sting_command, (paramaters))
-                (y, x) = self.roi.pos()  # get the ROI's origin
-                y = int(y); x = int(x)
-                self.messages2Camera.put_nowait(("Crop Image", (y, x, self.heightROI.value(), self.widthROI.value())))
-
+        if not(self.messages2Camera.full()):
+            # Message in the format (sting_command, (paramaters))
+            (y, x) = self.roi.pos()  # get the ROI's origin
+            y = int(y); x = int(x)
+            self.messages2Camera.put_nowait(("Crop Image", (y, x, self.widthROI.value(), self.heightROI.value())))
         self.removeROI()  # remove the ROI because it was used for cropping and not actual anymore
         self.restoreFullImgButton.setEnabled(True)  # Allowing the restoration of an image
 
@@ -455,21 +479,17 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        # Implementation for the simulated camera
-        if self.cameraSelector.currentText() == "Simulated Threaded":
-            self.img_height = self.img_height_default; self.img_width = self.img_width_default
-            self.widthButton.setValue(self.img_width_default); self.heightButton.setValue(self.img_height_default)
-            if self.__flagLiveStream:
-                # Refreshing of continuous generation by the clicking on the button for evoking continuous stream - below
-                self.continuousStreamButton.click(); time.sleep(0.05); self.continuousStreamButton.click()
-            else:
-                # Reinitialize the simulation class below for the getting new image sizes
-                pass
-
-        # Implementation for the actual camera
-        elif self.cameraSelector.currentText() == "PCO":
-            if not(self.messages2Camera.full()):
-                self.messages2Camera.put_nowait("Restore Full Frame")
+        # Assign appropriate values to the buttons and send the commands
+        self.img_height = self.img_height_default; self.img_width = self.img_width_default
+        self.widthButton.setValue(self.img_width_default); self.heightButton.setValue(self.img_height_default)
+        # Stop Live Stream if it's active - below
+        if self.__flagLiveStream:
+            self.continuousStreamButton.click()  # Should disable automatically Live Stream
+            time.sleep(self.exposureTimeButton.value()/1000)  # wait (main thread) at least the image finish to acquire
+            if self.imageUpdater.is_alive():
+                self.imageUpdater.join((2*self.exposureTimeButton.value())/1000)  # wait the image updater thread stopped
+        if not(self.messages2Camera.full()):
+            self.messages2Camera.put_nowait("Restore Full Frame")
         self.restoreFullImgButton.setDisabled(True)
 
     def disableAxesOnImage(self):
@@ -481,6 +501,7 @@ class SimUscope(QMainWindow):
         None.
 
         """
+        # Disable showing the axes on the image
         self.imageWidget.getView().showAxis("left", show=not(self.disableAxesOnImageButton.isChecked()))
         self.imageWidget.getView().showAxis("bottom", show=not(self.disableAxesOnImageButton.isChecked()))
 
@@ -493,11 +514,11 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        if self.disableAutoLevelsButton.isChecked():
+        if self.disableAutoLevelsButton.isChecked():  # isChecked() = Button pressed (True state)
             self.imageWidget.ui.histogram.hide()  # hide the side histogram with sliders
             self.imageWidget.getImageItem().setLevels([self.minLevelButton.value(), self.maxLevelButton.value()], update=False)
         else:
-            self.imageWidget.ui.histogram.show()
+            self.imageWidget.ui.histogram.show()  # restor the histogram bar and controls
 
     def histogramLevelsChanged(self):
         """
@@ -508,6 +529,7 @@ class SimUscope(QMainWindow):
         None.
 
         """
+        # Assign the selected on histogram bar values to the buttons
         levels = self.imageWidget.ui.histogram.getLevels()
         minPixelLevel = int(round(levels[0], 0)); maxPixelLevel = int(round(levels[1], 0))
         self.minLevelButton.setValue(minPixelLevel); self.maxLevelButton.setValue(maxPixelLevel)

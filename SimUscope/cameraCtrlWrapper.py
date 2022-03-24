@@ -23,6 +23,8 @@ class Camera(Process):
     liveStream: bool  # force type checking
     exposure_time_ms: int
     camera_type: str
+    max_width: int; max_height: int
+    image_width: int; image_height: int
 
     def __init__(self, messagesQueue: Queue, exceptionsQueue: Queue, imagesQueue: Queue, messagesToCaller: Queue,
                  exposure_time_ms: int, img_width: int, img_height: int, camera_type: str = "Simulated"):
@@ -59,6 +61,7 @@ class Camera(Process):
             self.cameraReference = None  # no associated library call to any API functions
             self.initialized = True  # Additional flag for the start the loop in the run method
             self.max_width = img_width; self.max_height = img_height
+            self.image_height = img_height; self.image_width = img_width
             try:
                 self.generate_noise_picture()
                 self.messagesToCaller.put_nowait("The Simulated camera initialized")
@@ -120,13 +123,24 @@ class Camera(Process):
                                 self.exceptionsQueue.put_nowait(e)  # Send to the main controlling program the caught Exception e
                         # Restore full frame
                         if message == "Restore Full Frame":
-                            print("Full frame image will be restored with sizes: ", self.max_width, self.max_height)  # TODO
+                            self.messagesToCaller.put_nowait(("Full frame restored: " + str((self.max_width, self.max_height))))
+                            self.restoreFullFrame()  # TODO
                     if isinstance(message, tuple):
                         (command, parameters) = message
                         if command == "Crop Image":
-                            print("Received sizes for cropping:", parameters)  # TODO
+                            # Send back for debugging crop parameters - below
+                            self.messagesToCaller.put_nowait("Crop coordinates: " + str(parameters))
+                            (yLeftUpper, xLeftUpper, height, width) = parameters
+                            self.cropImage(yLeftUpper, xLeftUpper, width, height)  # TODO
+                        # Set exposure time
                         if command == "Set exposure time":
                             self.setExposureTime(parameters)
+                        # Set the new image sizes for Simulated camera
+                        if command == "Change simulate picture sizes to:":
+                            (command, parameters) = message
+                            (width, height) = parameters
+                            self.updateSimulatedSizes(width, height)
+                    # Exceptions handling => close the camera if it receives from other parts of the program the exception
                     if isinstance(message, Exception):
                         print("Camera will be stopped because of throw from the main GUI exception")
                         self.close()
@@ -221,12 +235,67 @@ class Camera(Process):
 
         """
         if isinstance(exposure_time_ms, int):
-            if exposure_time_ms == 0:
+            if exposure_time_ms == 0:  # exposure time cannot be 0
                 exposure_time_ms = 1
             self.exposure_time_ms = exposure_time_ms
             if self.cameraReference is not None:  # if the camera is really activated, then call the function
                 self.cameraReference.set_exposure_time(self.exposure_time_ms/1000)
             print("The set exposure time:", self.exposure_time_ms)
+
+    def cropImage(self, yLeftUpper: int, xLeftUpper: int, width: int, height: int):
+        """
+        Crop selected ROI from the image.
+
+        Parameters
+        ----------
+        yLeftUpper : int
+            y coordinate of left upper corner of ROI region.
+        xLeftUpper : int
+            x coordinate of left upper corner of ROI region.
+        width : int
+            ROI width.
+        height : int
+            ROI height.
+
+        Returns
+        -------
+        None.
+
+        """
+        # For simulated camera only reassign the image height and width
+        if self.camera_type == "Simulated":
+            self.image_width = width; self.image_height = height
+
+    def restoreFullFrame(self):
+        """
+        Restore full size image.
+
+        Returns
+        -------
+        None.
+
+        """
+        # For simulated camera only reassign the image height and width
+        if self.camera_type == "Simulated":
+            self.image_width = self.max_width; self.image_height = self.max_height
+
+    def updateSimulatedSizes(self, width: int, height: int):
+        """
+        Update of sizes of a simulated image.
+
+        Parameters
+        ----------
+        width : int
+            Updated image width.
+        height : int
+            Updated image height.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.image_width = width; self.max_width = width; self.image_height = height; self.max_height = height
 
     def close(self):
         """
@@ -267,10 +336,10 @@ class Camera(Process):
 
         """
         img = np.zeros((1, 1), dtype='uint8')
-        height = self.max_height; width = self.max_width
+        height = self.image_height; width = self.image_width
         if (height >= 2) and (width >= 2):
             if pixel_type == 'uint8':
-                img = np.random.randint(0, high=255, size=(width, height), dtype='uint8')
+                img = np.random.randint(0, high=255, size=(height, width), dtype='uint8')
             if pixel_type == 'float':
                 img = np.random.rand(height, width)
         else:
