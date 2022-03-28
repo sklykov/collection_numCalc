@@ -74,10 +74,10 @@ class CameraWrapper(Process):
 
         """
         # !!! Below - initialization code for the PCO camera, because in the __init__() method it's impossible to make,
-        # because the handle returned by the call pco.Camera() returns the unpickleable object
+        # because the handle returned by the call pco.Camera() is the unpickleable object
         if self.camera_type == "PCO":
             try:
-                self.cameraReference = pco.Camera()  # open connection to the camera
+                self.cameraReference = pco.Camera(debuglevel='none')  # open connection to the camera with some default mode
                 # printing statement won't be redirected to stdout, thus sending this message to the queue
                 self.messagesToCaller.put_nowait("The PCO camera initialized")
                 self.cameraReference.set_exposure_time(self.exposure_time_ms/1000)
@@ -85,8 +85,13 @@ class CameraWrapper(Process):
                                                  + str(int(np.round(1000*(self.cameraReference.get_exposure_time()), 0))))
                 self.messagesToCaller.put_nowait("The camera status report: "
                                                  + str(self.cameraReference.sdk.get_camera_health_status()))
-                self.cameraReference.sdk.set_acquire_mode('auto')
-                self.messagesToCaller.put_nowait("The camera mode: " + str(self.cameraReference.sdk.get_acquire_mode()))
+                self.messagesToCaller.put_nowait("The camera acquire mode: " + str(self.cameraReference.sdk.get_acquire_mode()))
+                self.messagesToCaller.put_nowait("The camera trigger mode: " + str(self.cameraReference.sdk.get_trigger_mode()))
+                # self.messagesToCaller.put_nowait("Sizes of full image " + str(self.cameraReference.sdk.get_sizes()))  # DEBUG
+                self.max_width = self.cameraReference.sdk.get_sizes()['y max']
+                self.max_height = self.cameraReference.sdk.get_sizes()['x max']
+                self.messagesToCaller.put_nowait("Camera max width / height: " + str((self.max_width, self.max_height)))  # DEBUG
+                # self.messagesToCaller.put_nowait("Camera ROI constraints " + str(self.cameraReference.sdk.get_camera_description()))  # DEBUG
                 self.initialized = True  # Additional flag for the start the loop in the run method
                 self.imagesQueue.put_nowait("The PCO camera initialized")
             except ImportError as import_err:
@@ -127,6 +132,7 @@ class CameraWrapper(Process):
                                 self.live_imaging()  # call the function
                             except Exception as error:
                                 self.messagesToCaller.put_nowait("Error string: " + str(error))
+                                self.messagesToCaller.put_nowait(str(error).split(sep=" "))
                                 self.exceptionsQueue.put_nowait(error)
                         # Acquiring single image
                         if message == "Snap single image":
@@ -188,8 +194,9 @@ class CameraWrapper(Process):
         """
         if (self.cameraReference is not None) and (self.camera_type == "PCO"):
             self.cameraReference.record(number_of_images=1, mode='sequence')  # setup the camera to acquire a single image
-            # self.cameraReference.wait_for_first_image()  ???
-            image, metadata = self.cameraReference.image()  # get the single image
+            (image, metadata) = self.cameraReference.image()  # get the single image
+            # self.messagesToCaller.put_nowait("Image timing: " + str(self.cameraReference.sdk.get_image_timing()))
+            # self.messagesToCaller.put_nowait("Delay exp time infor: " + str(self.cameraReference.sdk.get_delay_exposure_time()))
             self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
         elif (self.cameraReference is None) and (self.camera_type == "PCO"):
             self.imagesQueue.put_nowait("String replacer of an image")
@@ -207,17 +214,21 @@ class CameraWrapper(Process):
 
         """
         self.liveStream = True  # flag for the infinite loop for the streaming images continuously
+        # self.messagesToCaller.put_nowait("AT = Time of Acquisition, TT - time for putting image to queue")  # DEBUG
+        if (self.camera_type == "PCO") and (self.cameraReference is not None):  # check that physical camera initialized
+            self.cameraReference.record(number_of_images=100, mode='fifo')  # configure the live stream acquisition
+            # self.messagesToCaller.put_nowait("Settings: " + str(self.cameraReference.rec.get_settings()))  # DEBUG
+            # self.messagesToCaller.put_nowait("Status of recorder: " + str(self.cameraReference.rec.get_status()))  # DEBUG
         # General handle for live streaming - starting with acquiring of the first image
         while (self.liveStream):
             # then it's supposed that the camera has been properly initialized - below
             if (self.camera_type == "PCO") and (self.cameraReference is not None):
-                self.cameraReference.record(number_of_images=10, mode='ring buffer')  # configure the live stream acquisition
-                if self.cameraReference.sdk.get_acquire_mode() == 'auto':
-                    self.cameraReference.sdk.set_acquire_mode('auto')
+                # t1 = time.time()  # DEBUG
                 # make the loop below for infinite live stream, that could be stopped only by receiving the command or exception
                 try:
                     self.cameraReference.wait_for_first_image()  # wait that the image acquired actually
-                    image, metadata = self.cameraReference.image()  # get the acquired image
+                    (image, metadata) = self.cameraReference.image()  # get the acquired image
+                    # t3 = time.time()  # DEBUG
                 except Exception as error:
                     self.messagesToCaller.put_nowait("The Live Mode finished by PCO camera because of thrown Exception")
                     self.messagesToCaller.put_nowait("Thrown error: " + str(error))
@@ -227,6 +238,8 @@ class CameraWrapper(Process):
                         self.imagesQueue.put_nowait(image)  # put the image to the queue for getting it in the main thread
                     except Full:
                         pass  # do nothing for now about the overloaded queue
+                    # t2 = time.time(); self.messagesToCaller.put_nowait("AT: " + str(int(np.round(((t3-t1)*1000), 0))) + " | "
+                    #                                                    + "TT: " + str(int(np.round(((t2-t1)*1000), 0))))  # DEBUG
             elif (self.camera_type == "PCO") and (self.cameraReference is None):
                 # Substituion of actual image generation by the PCO camera
                 time.sleep(self.exposure_time_ms/1000)
@@ -317,6 +330,9 @@ class CameraWrapper(Process):
         # For simulated camera only reassign the image height and width
         if self.camera_type == "Simulated":
             self.image_width = width; self.image_height = height
+        # For actual PCO camera implementation
+        if (self.camera_type == "PCO") and (self.cameraReference is not None):  # check that physical camera initialized
+            self.cameraReference.sdk.set_roi(yLeftUpper + 1, xLeftUpper + 1, (yLeftUpper + width), (xLeftUpper + height))
 
     def restoreFullFrame(self):
         """
@@ -330,6 +346,9 @@ class CameraWrapper(Process):
         # For simulated camera only reassign the image height and width
         if self.camera_type == "Simulated":
             self.image_width = self.max_width; self.image_height = self.max_height
+        # For actual PCO camera implementation
+        if (self.camera_type == "PCO") and (self.cameraReference is not None):  # check that physical camera initialized
+            self.cameraReference.sdk.set_roi(1, 1, self.max_width, self.max_height)
 
     def updateSimulatedSizes(self, width: int, height: int):
         """

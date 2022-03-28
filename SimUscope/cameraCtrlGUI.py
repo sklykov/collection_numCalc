@@ -63,7 +63,7 @@ class SimUscope(QMainWindow):
         # Selector of type of a camera - Simulated or PCO one
         self.cameraSelector = QComboBox(); self.cameraSelector.addItems(["Simulated", "PCO"])
         # self.cameraSelector.addItems(["Simulated Threaded", "PCO", "PCO Process"])
-        self.cameraSelector.setCurrentText("Simulated")  # Deafult camera for initialization - the simulated one
+        self.cameraSelector.setCurrentText("PCO")  # Deafult camera for initialization - the simulated one
         self.cameraSelector.currentTextChanged.connect(self.activeCameraChanged)  # Attach handlers for camera choosing
         self.cameraSelLabel = QLabel("Camera Type"); self.cameraSelector.setEditable(True)  # setEditable is needed for setAlignment
         self.cameraSelector.lineEdit().setAlignment(Qt.AlignCenter); self.cameraSelector.lineEdit().setReadOnly(True)
@@ -84,7 +84,7 @@ class SimUscope(QMainWindow):
         self.toggleTestPerformance = QCheckBox("Test Performance"); self.toggleTestPerformance.setEnabled(True)
         self.toggleTestPerformance.setChecked(False)  # setChecked - set the state of a button
         self.continuousStreamButton.clicked.connect(self.continuous_stream); self.continuousStreamButton.setCheckable(True)
-        self.disableAxesOnImageButton = QPushButton("Disable axis on image"); self.disableAxesOnImageButton.setCheckable(True)
+        self.disableAxesOnImageButton = QPushButton("Disable axes on image"); self.disableAxesOnImageButton.setCheckable(True)
         self.disableAxesOnImageButton.clicked.connect(self.disableAxesOnImage)
         self.disableAutoLevelsButton = QPushButton("Disable pixels leveling"); self.disableAutoLevelsButton.setCheckable(True)
         self.disableAutoLevelsButton.clicked.connect(self.disableAutoLevelsCalculation)
@@ -180,6 +180,19 @@ class SimUscope(QMainWindow):
                 time.sleep(0.08)  # sleep before checks for receiving the confirmation about initialization
             print("Confirmation received:", message)
             self.checkPCOcameraStatus.setVisible(True)
+        # Below - associated with the selected camera pecularities
+        if self.cameraSelector.currentText() == "PCO":
+            self.widthButton.setDisabled(True); self.heightButton.setDisabled(True)  # PCO camera cannot support arbitrary size changes
+            self.generateException.setVisible(False)  # Remove button for testing of handling of generated Exceptions
+            # Changing the titles of the buttons for controlling getting the images (from the camera or generated ones)
+            self.snapSingleImgButton.setText("Single Snap Image"); self.continuousStreamButton.setText("Live Stream")
+            self.checkPCOcameraStatus.setVisible(True)
+        elif self.cameraSelector.currentText() == "Simulated":
+            self.checkPCOcameraStatus.setVisible(False)
+            self.widthButton.setEnabled(True); self.heightButton.setEnabled(True)
+            if not(self.generateException.isVisible()):  # return the visibility of the button
+                self.generateException.setVisible(True)
+            self.snapSingleImgButton.setText("Generate Single Pic"); self.continuousStreamButton.setText("Continuous Generation")
 
     def activeCameraChanged(self):
         """
@@ -299,7 +312,7 @@ class SimUscope(QMainWindow):
         None.
 
         """
-        timeoutWait = round((self.wait_multiplicator*4)*self.exposureTimeButton.value())  # timeout to wait the first image - wait more
+        timeoutWait = round((self.wait_multiplicator*5)*self.exposureTimeButton.value())  # timeout to wait the first image - wait more
         try:
             image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))  # Waiting then image will be
         except Empty:
@@ -315,17 +328,21 @@ class SimUscope(QMainWindow):
         if not(isinstance(image, str)) and (image is not None) and (isinstance(image, np.ndarray)):
             if self.toggleTestPerformance.isChecked():
                 j = 0  # index for putting the measured times into the array for mean passed time calculation
+            flagGetNewTime = True  # If the image not retrieved from the queue, not refresh the time, keep counting from the attempt
             while(self.__flagLiveStream):
-                if self.toggleTestPerformance.isChecked():
+                if self.toggleTestPerformance.isChecked() and flagGetNewTime:
                     t1 = time.time()
                 self.imageWidget.setImage(image, autoLevels=not(self.disableAutoLevelsButton.isChecked()))  # Represent acquired image
                 try:
-                    # Waiting then image will be available at least 2*exposure times
+                    # Waiting then image will be available at least some more time than exposure time
                     image = self.imagesQueue.get(block=True, timeout=(timeoutWait/1000))
+                    flagGetNewTime = True  # For refreshing entry time measurment t1
                 except Empty:
-                    pass  # ??? Actually, how to handle the case that no image put into the queue?
+                    flagGetNewTime = False  # keep the time measured above for accounting the performance
+                    continue  # proceed to the next attempt to retrieve the image from the queue
                 # Attempt to make the GUI more responsive to the user input => providing artificial delays for button (simulation mode)
                 if not(self.__flagRealCameraInitialized):
+                    # Simulation and recalculate min/max pixel value for each image => bigger delays
                     if (self.exposureTimeButton.value() < 50) and not(self.disableAutoLevelsButton.isChecked()):
                         time.sleep(0.015)  # freeze this loop for some ms if exposure time is low and autoLevels are active
                     elif (self.exposureTimeButton.value() < 25) and not(self.disableAutoLevelsButton.isChecked()):
@@ -334,20 +351,25 @@ class SimUscope(QMainWindow):
                         time.sleep(0.035)  # freeze this loop for some ms if exposure time is low and autoLevels are active
                     elif (self.exposureTimeButton.value() < 5) and not(self.disableAutoLevelsButton.isChecked()):
                         time.sleep(0.045)  # freeze this loop for some ms if exposure time is low and autoLevels are active
+                    # Simulation and assign the specified min/max pixel values for each image => less delays
+                    elif (self.exposureTimeButton.value() < 25) and (self.disableAutoLevelsButton.isChecked()):
+                        time.sleep(0.005)  # freeze this loop for some ms if exposure time is low and autoLevels are active
+                    elif (self.exposureTimeButton.value() < 10) and (self.disableAutoLevelsButton.isChecked()):
+                        time.sleep(0.010)  # freeze this loop for some ms if exposure time is low and autoLevels are active
                     elif (self.exposureTimeButton.value() < 5) and (self.disableAutoLevelsButton.isChecked()):
                         time.sleep(0.015)  # freeze this loop for some ms if exposure time is low and autoLevels are active
                 # Another attempt to make more responsive GUI if using the real camera as the controlling device
                 if (self.__flagRealCameraInitialized):
                     if self.exposureTimeButton.value() < 200 and self.exposureTimeButton.value() >= 100:
-                        time.sleep(2/1000)  # delays in ms in explicit form conversion to seconds!
+                        time.sleep(1/1000)  # delays in ms in explicit form conversion to seconds!
                     elif self.exposureTimeButton.value() < 100 and self.exposureTimeButton.value() >= 50:
-                        time.sleep(3/1000)  # delays in ms in explicit form conversion to seconds!
+                        time.sleep(2/1000)  # delays in ms in explicit form conversion to seconds!
                     elif self.exposureTimeButton.value() < 50 and self.exposureTimeButton.value() >= 25:
-                        time.sleep(12/1000)  # delays in ms in explicit form conversion to seconds!
+                        time.sleep(4/1000)  # delays in ms in explicit form conversion to seconds!
                     elif self.exposureTimeButton.value() < 25 and self.exposureTimeButton.value() >= 10:
-                        time.sleep(22/1000)  # delays in ms in explicit form conversion to seconds!
+                        time.sleep(8/1000)  # delays in ms in explicit form conversion to seconds!
                     elif self.exposureTimeButton.value() < 10:
-                        time.sleep(28/1000)  # delays in ms in explicit form conversion to seconds!
+                        time.sleep(12/1000)  # delays in ms in explicit form conversion to seconds!
                 # Below - recording the passed time for calculation of mean passed time after
                 if self.toggleTestPerformance.isChecked():
                     # Putting the measured times in Ring buffer manner
