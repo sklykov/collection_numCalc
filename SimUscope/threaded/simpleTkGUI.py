@@ -22,7 +22,7 @@ mean_t = 0.0
 
 # %% Classes
 class Refresher(Thread):
-    """Defying methods for generation of noisy images and representation in GUI."""
+    """Defining methods for generation of noisy images and representation in GUI."""
 
     def __init__(self, imshow_img, canvas, message_queue, refresh_delay_ms: int = 100):
         Thread.__init__(self)
