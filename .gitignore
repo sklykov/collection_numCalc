@@ -109,3 +109,6 @@ documentation/
 Docs/ 
 DIP/fluo_beads_sim/ 
 SimUscope/*.tiff
+
+# Specifics from PyCharm
+.idea/
