@@ -90,7 +90,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.plotColobar = not(self.plotColobar)
         print(self.plotColobar)
         if self.plotColobar:
-            self.plotColorbarButton.style('pressed')
+            self.plotColorbarButton.style('pressed')  # FIX
         else:
             self.plotColorbarButton.style()
 
