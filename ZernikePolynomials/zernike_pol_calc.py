@@ -228,29 +228,60 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
     plt.tight_layout()
 
 
-def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: float = 1.0, tuned: bool = False,
+def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: float = 8.0, tuned: bool = False,
                        alpha_coefficients: list = [], show_amplitudes: bool = False):
+    """
+    Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle on the provided matplotlib.figure instance.
 
-    R = np.arange(0.0, 1.0+step_r, step_r)
-    Theta = np.arange(0.0, 2*np.pi+np.radians(step_theta), np.radians(step_theta))
+    Parameters
+    ----------
+    figure : matplotlib.figure.Figure()
+        The Figure() class instance from matplotlib.figure module for plotting the Zernkike's polynomials sum on that.
+    orders : list
+        List of Zernike polynomials orders recorded in tuples (m, n) inside the list like [(m, n), ...].
+    step_r : float, optional
+        Step for calculation of radius for a summing map (colormap). The default is 0.01.
+    step_theta : float, optional
+        Step (in grades) for calculation of angle for a summing map (colormap). The default is 1.0.
+    title : str, optional
+        Title for placing on the plot, e.g. for specific single polynomial like X Tilt. The default is "Sum of Zernike polynomials".
+    show_amplitudes : bool, optional
+        Shows the colourbar on the plot with amplitudes. The default is False.
+
+    Returns
+    -------
+    figure : matplotlib.figure.Figure()
+        The Figure() instance with plotted colormesh graph.
+
+    """
+    R = np.arange(0.0, 1.0+step_r, step_r)  # steps on r (polar coordinate)
+    Theta = np.arange(0.0, 2*np.pi+np.radians(step_theta), np.radians(step_theta))  # steps on theta (polar coordinates)
     (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
-    Z = np.zeros((i_size, j_size), dtype='float')
+    Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike\s polynomial values
+    # Calculation of sum of Zernike's polynomials
     for i in range(i_size):
         for j in range(j_size):
             if tuned:
                 Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
             else:
                 Z[i, j] = zernike_polynomials_sum(orders, R[i], Theta[j])
-    # Plotting and formatting - Polar projection + plotting the colormap as filled contour using "contourf"
-    # figure.subplot(1, 1, 1)
-    plt.axes(projection='polar')
-    n_used_tones = 100
-    plt.contourf(Theta, R, Z, n_used_tones, cmap=cm.coolwarm)
-    plt.axis('off')
+    # Plotting and formatting - Polar projection + plotting the colormap as colour mesh"
+    # Below - clearing of picture axes, for preventing adding many axes to the single figure
+    figure.clear(); axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
+    # Below - manual deletion and reinitializing of axes
+    # if figure.get_axes() == []:
+    #     axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
+    # else:
+    #     figure.delaxes(figure.get_axes()[0])
+    #     axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
+    # !!!: using contourf function is too slow for providing refreshing upon calling by the button
+    axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
+    #  Below - plot the colour map by using the coordinates Z and according to Theta, R polar coordinates
+    axes.pcolormesh(Theta, R, Z, cmap=cm.coolwarm)  #
+    axes.axis('off')  # off polar coordnate axes
     if show_amplitudes:
-        plt.colorbar()  # shows the colour bar with shown on image amplitudes
-    plt.tight_layout()
-    # plt.close(fig)
+        figure.colorbar(cm.ScalarMappable(cmap=cm.coolwarm))  # shows the colour bar with shown on image amplitudes
+    figure.tight_layout()
     return figure
 
 
@@ -482,4 +513,3 @@ if __name__ == '__main__':
     plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
     zernikes_set = [(-2, 2), (0, 2), (2, 2)]; coefficients = [1.0, 1.0, 1.0]  # 2nd orders
     plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients, show_amplitudes=True)
-    # figure = get_plot_zps_polar(orders)
