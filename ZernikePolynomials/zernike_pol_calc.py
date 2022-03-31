@@ -10,6 +10,7 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib import cm
 plt.close('all')  # closing all opened and pending figures
+from multiprocessing import Process, Queue
 
 
 # %% Functions definitions
@@ -173,14 +174,15 @@ def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_co
     """
     s = 0.0  # initial sum
     for i in range(len(orders)):
-        tuple_orders = orders[i]
-        if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
-            raise TypeError
-            break
-        else:
-            (m, n) = tuple_orders
-            if abs(alpha_coefficients[i]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+        if abs(alpha_coefficients[i]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+            tuple_orders = orders[i]
+            if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
+                raise TypeError; break
+            else:
+                (m, n) = tuple_orders
                 s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
+        else:
+            continue  # goes further on the loop for the next polynomial with non-zero amplitude
     return s
 
 
@@ -199,6 +201,10 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
         Step (in grades) for calculation of angle for a summing map (colormap). The default is 1.0.
     title : str, optional
         Title for placing on the plot, e.g. for specific single polynomial like X Tilt. The default is "Sum of Zernike polynomials".
+    tuned: bool, optional
+        Flag for the taking into account specified alpha_coefficients (amplitudes) for the specified polynomials.
+    alpha_coefficients: list, optional
+        List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
     show_amplitudes : bool, optional
         Shows the colourbar on the plot with amplitudes. The default is False.
 
@@ -229,8 +235,8 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
     plt.tight_layout()
 
 
-def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: float = 8.0, tuned: bool = True,
-                       alpha_coefficients: list = [], show_amplitudes: bool = False):
+def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: float = 0.01,
+                       step_theta: float = 8.0, show_amplitudes: bool = False):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle on the provided matplotlib.figure instance.
 
@@ -240,12 +246,12 @@ def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: f
         The Figure() class instance from matplotlib.figure module for plotting the Zernkike's polynomials sum on that.
     orders : list
         List of Zernike polynomials orders recorded in tuples (m, n) inside the list like [(m, n), ...].
+    alpha_coefficients: list
+        List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
     step_r : float, optional
         Step for calculation of radius for a summing map (colormap). The default is 0.01.
     step_theta : float, optional
         Step (in grades) for calculation of angle for a summing map (colormap). The default is 1.0.
-    title : str, optional
-        Title for placing on the plot, e.g. for specific single polynomial like X Tilt. The default is "Sum of Zernike polynomials".
     show_amplitudes : bool, optional
         Shows the colourbar on the plot with amplitudes. The default is False.
 
@@ -256,16 +262,18 @@ def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: f
 
     """
     R = np.arange(0.0, 1.0+step_r, step_r)  # steps on r (polar coordinate)
-    Theta = np.arange(0.0, 2*np.pi+np.radians(step_theta), np.radians(step_theta))  # steps on theta (polar coordinates)
+    Theta = np.arange(0.0, 2*np.pi, np.radians(step_theta))  # steps on theta (polar coordinates)
     (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
-    Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike\s polynomial values
+    Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
     # Calculation of sum of Zernike's polynomials
     for i in range(i_size):
         for j in range(j_size):
-            if tuned:
-                Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
-            else:
-                Z[i, j] = zernike_polynomials_sum(orders, R[i], Theta[j])
+            Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
+
+    # Speed up the calculation
+    # Queue1 = Queue(); Queue2 = Queue(); Queue3 = Queue(); Queue4 = Queue()
+    # p1 = Process(target=zernike_polynomials_sum_tuned, args=(orders, R[0:10], Theta[j], alpha_coefficients))
+
     # Plotting and formatting - Polar projection + plotting the colormap as colour mesh"
     # Below - clearing of picture axes, for preventing adding many axes to the single figure
     figure.clear(); axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
@@ -374,7 +382,7 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
         return 0.0
 
 
-def get_classical_polynomial_name(mode: tuple) -> str:
+def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str:
     """
     Return the classical name of Zernike polynomial.
 
@@ -385,6 +393,8 @@ def get_classical_polynomial_name(mode: tuple) -> str:
     ----------
     mode : tuple
         Zernike polynomial specification as (m, n).
+    short_names: bool, optional
+        Return shortened names for the polynomials. The default is false.
 
     Returns
     -------
@@ -396,44 +406,82 @@ def get_classical_polynomial_name(mode: tuple) -> str:
     (m, n) = mode
     if (m == -1) and (n == 1):
         name = "Vertical (Y) tilt"
+        if short_names:
+            name = "Vert. tilt"
     if (m == 1) and (n == 1):
         name = "Horizontal (X) tilt"
+        if short_names:
+            name = "Hor. tilt"
     if (m == -2) and (n == 2):
         name = "Oblique astigmatism"
+        if short_names:
+            name = "Obliq. astigm."
     if (m == 0) and (n == 2):
         name = "Defocus"
     if (m == 2) and (n == 2):
         name = "Vertical astigmatism"
+        if short_names:
+            name = "Vert. astigm."
     if (m == -3) and (n == 3):
         name = "Vertical trefoil"
+        if short_names:
+            name = "Vert. 3foil"
     if (m == -1) and (n == 3):
         name = "Vertical coma"
+        if short_names:
+            name = "Vert. coma"
     if (m == 1) and (n == 3):
         name = "Horizontal coma"
+        if short_names:
+            name = "Hor. coma"
     if (m == 3) and (n == 3):
         name = "Oblique trefoil"
+        if short_names:
+            name = "Obliq. 3foil"
     if (m == -4) and (n == 4):
         name = "Oblique quadrafoil"
+        if short_names:
+            name = "Obliq. 4foil"
     if (m == -2) and (n == 4):
-        name = "Obliq. 2nd astigmat."
+        name = "Oblique secondary astigmatism"
+        if short_names:
+            name = "Obliq. 2d ast."
     if (m == 0) and (n == 4):
         name = "Primary spherical"
+        if short_names:
+            name = "Spherical"
     if (m == 2) and (n == 4):
-        name = "Vert. 2nd astigmatism"
+        name = "Vertical secondary astigmatism"
+        if short_names:
+            name = "Vert. 2d ast."
     if (m == 4) and (n == 4):
         name = "Vertical quadrafoil"
+        if short_names:
+            name = "Vert. 4foil"
     if (m == -5) and (n == 5):
         name = "Vertical pentafoil"
+        if short_names:
+            name = "Vert. 5foil"
     if (m == -3) and (n == 5):
-        name = "Vertical 2nd trefoil"
+        name = "Vertical secondary trefoil"
+        if short_names:
+            name = "Vert. 2d 3foil"
     if (m == -1) and (n == 5):
-        name = "Vertical 2nd coma"
+        name = "Vertical secondary coma"
+        if short_names:
+            name = "Vert. 2d coma"
     if (m == 1) and (n == 5):
-        name = "Horizontal 2nd coma"
+        name = "Horizontal secondary coma"
+        if short_names:
+            name = "Hor. 2d coma"
     if (m == 3) and (n == 5):
-        name = "Oblique 2nd trefoil"
+        name = "Oblique secondary trefoil"
+        if short_names:
+            name = "Obliq. 2d 3foil"
     if (m == 5) and (n == 5):
         name = "Oblique pentafoil"
+        if short_names:
+            name = "Obliq. 5foil"
     return name
 
 
