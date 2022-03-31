@@ -179,7 +179,8 @@ def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_co
             break
         else:
             (m, n) = tuple_orders
-            s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
+            if abs(alpha_coefficients[i]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+                s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
     return s
 
 
@@ -228,7 +229,7 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
     plt.tight_layout()
 
 
-def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: float = 8.0, tuned: bool = False,
+def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: float = 8.0, tuned: bool = True,
                        alpha_coefficients: list = [], show_amplitudes: bool = False):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle on the provided matplotlib.figure instance.
@@ -277,10 +278,11 @@ def get_plot_zps_polar(figure, orders: list, step_r: float = 0.01, step_theta: f
     # !!!: using contourf function is too slow for providing refreshing upon calling by the button
     axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
     #  Below - plot the colour map by using the coordinates Z and according to Theta, R polar coordinates
-    axes.pcolormesh(Theta, R, Z, cmap=cm.coolwarm)  #
+    im = axes.pcolormesh(Theta, R, Z, cmap=cm.coolwarm)  #
     axes.axis('off')  # off polar coordnate axes
+    # print(np.min(Z), np.max(Z))  # FOR DEBUG
     if show_amplitudes:
-        figure.colorbar(cm.ScalarMappable(cmap=cm.coolwarm))  # shows the colour bar with shown on image amplitudes
+        figure.colorbar(im, ax=axes)  # shows the colour bar with shown on image amplitudes
     figure.tight_layout()
     return figure
 
@@ -413,23 +415,23 @@ def get_classical_polynomial_name(mode: tuple) -> str:
     if (m == -4) and (n == 4):
         name = "Oblique quadrafoil"
     if (m == -2) and (n == 4):
-        name = "Oblique secondary astigmatism"
+        name = "Obliq. 2nd astigmat."
     if (m == 0) and (n == 4):
         name = "Primary spherical"
     if (m == 2) and (n == 4):
-        name = "Vertical secondary astigmatism"
+        name = "Vert. 2nd astigmatism"
     if (m == 4) and (n == 4):
         name = "Vertical quadrafoil"
     if (m == -5) and (n == 5):
         name = "Vertical pentafoil"
     if (m == -3) and (n == 5):
-        name = "Vertical secondary trefoil"
+        name = "Vertical 2nd trefoil"
     if (m == -1) and (n == 5):
-        name = "Vertical secondary coma"
+        name = "Vertical 2nd coma"
     if (m == 1) and (n == 5):
-        name = "Horizontal secondary coma"
+        name = "Horizontal 2nd coma"
     if (m == 3) and (n == 5):
-        name = "Oblique secondary trefoil"
+        name = "Oblique 2nd trefoil"
     if (m == 5) and (n == 5):
         name = "Oblique pentafoil"
     return name
