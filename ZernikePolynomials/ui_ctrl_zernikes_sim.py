@@ -7,10 +7,10 @@ GUI for representing and controlling Zernike polynomials.
 # %% Imports
 import tkinter as tk
 # Below: themed buttons for tkinter, rewriting standard one from tk
-from tkinter.ttk import Button, Frame, Label, OptionMenu, Checkbutton
+from tkinter.ttk import Button, Frame, Label, OptionMenu, Checkbutton, Spinbox, Frame
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # import canvas container from matplotlib for tkinter
-from zernike_pol_calc import get_plot_zps_polar, get_classical_polynomial_name
+from zernike_pol_calc import get_plot_zps_polar, get_classical_polynomial_name, get_osa_standard_index
 import matplotlib.figure as plot_figure
 import time
 import numpy as np
@@ -32,20 +32,25 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         super().__init__(master)  # initialize the main window (frame) for all widgets
         self.plotColorbar = False
         self.master.title("Zernike's polynomials controls and respresentation")
-        master.geometry("+15+50")  # put the main window on the (+x, +y) coordinate away from the top left monitor coordinate
+        master.geometry("+5+50")  # put the main window on the (+x, +y) coordinate away from the top left monitor coordinate
         self.amplitudes = [0.0, 0.0]  # default amplitudes for the 1st order
         self.orders = [(-1, 1), (1, 1)]; self.flagFlattened = False; self.changedSliders = 1
         self.amplitudes_sliders_dict = {}
+        self.minV = 200; self.maxV = 400
         # Widgets creation and specification (almost all - buttons)
         self.refreshPlotButton = Button(self, text="Refresh Plot", command=self.plot_zernikes)
-        self.zernikesLabel = Label(self, text="Zernike's polynomials controls up to: ")
+        self.zernikesLabel = Label(self, text=" Zernike polynoms ctrls up to:")
         self.figure = plot_figure.Figure(figsize=(5, 5))  # Default empty figure for
         self.canvas = FigureCanvasTkAgg(self.figure, master=self); self.plotWidget = self.canvas.get_tk_widget()
         # !!! Below - the way of how associate tkinter buttons with the variables and their states! THEY ARE DECOUPLED!
         self.varPlotColorbarButton = tk.BooleanVar(); self.varPlotColorbarButton.set(False)
         self.plotColorbarButton = Checkbutton(self, text="Colorbar", command=self.colorBarPlotting, onvalue=True, offvalue=False,
                                               variable=self.varPlotColorbarButton)
+        self.loadInflMatrixButton = Button(self, text="Load Infl. Matrix", command=self.load_influence_matrix)
+        self.loadInflMatrixButton.state(['!disabled', 'disabled'])  # disable of ttk button
         self.flattenButton = Button(self, text="Flatten all", command=self.flattenAll)
+        self.getVoltsButton = Button(self, text="Get Volts", command=self.getVolts)
+        self.getVoltsButton.state(['disabled'])
         # Below - specification of OptionMenu from ttk for polynomials order selection, fixed 1st value not shown => StackOverflow
         self.order_n = ["1st ", "2nd ", "3rd ", "4th ", "5th ", "6th ", "7th "]
         self.order_list = [item + "order" for item in self.order_n]
@@ -53,11 +58,23 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.max_order_selector = OptionMenu(self, self.clickable_list, self.order_list[0], *self.order_list,
                                              command=self.numberOrdersChanged)
         # Specificiation of two case selectors: Simulation / Controlling DPP
-        self.listDevices = ["Pure Simulator", "DPP + simulator"]; self.device_selector = tk.StringVar()
-        self.device_selector.set(self.listDevices[0]); self.deviceSelectorButton = OptionMenu(self, self.device_selector, *self.listDevices)
+        self.listDevices = ["Pure Simulator", "DPP + Simulator"]; self.device_selector = tk.StringVar()
+        self.device_selector.set(self.listDevices[0]); self.deviceSelectorButton = OptionMenu(self, self.device_selector,
+                                                                                              self.listDevices[0],
+                                                                                              *self.listDevices,
+                                                                                              command=self.deviceSelected)
+        # Max voltage control
+        self.holderSelector = Frame(self); textVMaxLabel = Label(self.holderSelector, text=" Max Volts:")
+        self.maxV_selector_value = tk.IntVar(); self.maxV_selector_value.set(200)  # initial voltage
+        # !!! Below - add the association of updating of integer values of Spinbox input value:
+        self.maxV_selector_value.trace_add("write", self.maxV_changed)
+        self.maxV_selector = Spinbox(self.holderSelector, from_=self.minV, to=self.maxV, increment=10, state=tk.DISABLED, width=5,
+                                     exportselection=True, textvariable=self.maxV_selector_value)
+        textVMaxLabel.pack(side=tk.LEFT); self.maxV_selector.pack(side=tk.LEFT)
         # Below - additional window for holding the sliders with the amplitudes
         self.ampl_ctrls = tk.Toplevel(master=self)  # additional window, master - the main window
-        self.ampl_ctrls.geometry("+680+50")   # put this additional window with some offset for the representing it next to the main one
+        # put this additional window with some offset for the representing it next to the main
+        self.ampl_ctrls_offsets = "+658+50"; self.ampl_ctrls.geometry(self.ampl_ctrls_offsets)
         self.ampl_ctrls.wm_transient(self)  # Seems that it makes accessible the buttons values from the this window to the main
         self.ampl_ctrls.title("Amplitude controls"); self.ampl_ctrls.protocol("WM_DELETE_WINDOW", self.no_exit)
         # Placing all created widgets in the grid layout
@@ -67,15 +84,12 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.plotColorbarButton.grid(row=0, rowspan=1, column=3, columnspan=1)
         self.flattenButton.grid(row=0, rowspan=1, column=4, columnspan=1)
         self.deviceSelectorButton.grid(row=7, rowspan=1, column=0, columnspan=1)
-        self.plotWidget.grid(row=1, rowspan=6, column=0, columnspan=6)
-
+        self.loadInflMatrixButton.grid(row=7, rowspan=1, column=1, columnspan=1)
+        self.holderSelector.grid(row=7, rowspan=1, column=2, columnspan=1, padx=1)
+        self.getVoltsButton.grid(row=7, rowspan=1, column=3, columnspan=1)
+        self.plotWidget.grid(row=1, rowspan=6, column=0, columnspan=5)
         self.grid()
         # self.grid_propagate(False)  # Preventing of shrinking of windows to conform with all placed widgets (for pack and grid)
-        # Another approach - to pack all the buttons
-        # self.plotWidget.pack(side=tk.BOTTOM); self.z_11.pack(side=tk.RIGHT); self.z11.pack(side=tk.RIGHT)
-        # self.zernikesLabel.pack(side=tk.LEFT); self.max_order_selector.pack(side=tk.LEFT); self.refreshPlotButton.pack(side=tk.LEFT)
-        # self.pack()
-        self.plot_zernikes()  # initial flat image
         # set the value for the OptionMenu and call function for construction of ctrls
         self.clickable_list.set(self.order_list[3]); self.after(0, self.numberOrdersChanged(self.order_list[3]))
 
@@ -169,7 +183,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         # Refresh the TopLevel window and the associated dictionary with buttons
         self.ampl_ctrls.destroy(); self.ampl_ctrls = tk.Toplevel(master=self)
         self.ampl_ctrls.wm_transient(self); self.ampl_ctrls.protocol("WM_DELETE_WINDOW", self.no_exit)
-        self.ampl_ctrls.title("Amplitude controls"); self.ampl_ctrls.geometry("+645+50")
+        self.ampl_ctrls.title("Amplitude controls"); self.ampl_ctrls.geometry(self.ampl_ctrls_offsets)
         # Get the (m, n) values from the order specification
         self.orders = []; self.amplitudes_sliders_dict = {}; self.amplitudes = []  # refresh the associated controls and values
         for order in range(1, n_orders + 1):  # going through all specified orders
@@ -199,6 +213,111 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
                 m += 2; row_cursor += 1
         self.plot_zernikes()  # refresh the plot, not retain any values
         # print(self.orders)
+
+    def deviceSelected(self, new_device):
+        """
+        Handle the UI event of selecting of device.
+
+        Parameters
+        ----------
+        new_device : str
+            Selected device type.
+
+        Returns
+        -------
+        None.
+
+        """
+        if new_device == "DPP + Simulator":
+            try:
+                import getvolt as gv  # import developed in-house library available for the other parts of program
+                global gv  # make the name global for accessibility
+                self.loadInflMatrixButton.state(['!disabled'])  # activate the influence matrix
+                self.maxV_selector.state(['!disabled'])
+            except ImportError:
+                print("The in-house developed controlling library not installed on this computer.\n"
+                      "Get it for maintainers with instructions!")
+                print("The selection of device will go again to the Pure Simulated")
+                self.device_selector.set(self.listDevices[1])
+        else:
+            self.loadInflMatrixButton.state(['!disabled', 'disabled'])  # disable it again
+            self.maxV_selector.state(['disabled'])
+            self.getVoltsButton.state(['disabled'])
+
+    def load_influence_matrix(self):
+        """
+        Load the saved influence (calibration) matrix, handle the according button action.
+
+        Returns
+        -------
+        None.
+
+        """
+        # below - get the path to the influence matrix
+        influence_matrix_file_path = tk.filedialog.askopenfilename(filetypes=[("Matlab file", "*.mat"), ("Pickled file", "*.pkl")])
+        # print(influence_matrix_file_path[len(influence_matrix_file_path)-3:])
+        if influence_matrix_file_path[len(influence_matrix_file_path)-3:] == 'mat':
+            self.influence_matrix = gv.load_InfMat_matlab(influence_matrix_file_path)
+        elif influence_matrix_file_path[len(influence_matrix_file_path)-3:] == 'pkl':
+            self.influence_matrix = gv.load_InfMat(influence_matrix_file_path)
+        rows, cols = self.influence_matrix.shape
+        # Influence matrix successfully loaded => activate the possibility to calculate voltages
+        if (rows > 0) and (cols > 0):
+            self.getVoltsButton.state(['!disabled'])
+        else:
+            self.getVoltsButton.state(['disabled'])
+
+    def getVolts(self):
+        """
+        Calculate the voltages for sending them to the device, using the controlling library.
+
+        Returns
+        -------
+        None.
+
+        """
+        zernike_amplitudes = np.zeros(self.influence_matrix.shape[0])  # initial amplitudes of all polynomials = 0
+        # According to the documentation, piston is included, OSA index -= 1 from the definition
+        for key in self.amplitudes_sliders_dict.keys():  # loop through all Ui ctrls
+            if abs(self.amplitudes_sliders_dict[key].get()) > 1.0E-6:  # non-zero amplitude provided by the user
+                m, n = key
+                j = get_osa_standard_index(m, n); j -= 1  # according to the specification
+                zernike_amplitudes[j] = self.amplitudes_sliders_dict[key].get()
+        self.voltages = gv.solve_InfMat(self.influence_matrix, zernike_amplitudes, self.maxV_selector_value.get())
+        print(self.voltages)
+        # TODO - send the voltages using AmpCom to the device
+
+    def maxV_changed(self, *args):
+        """
+        Call it then the user input some value to the Spinbox field.
+
+        Parameters
+        ----------
+        *args
+            All arguments provided by the add_trace function of tk.IntVar.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.after(1000, self.validateMaxVoltageInput)  # sent request to validate the input value
+
+    def validateMaxVoltageInput(self):
+        """
+        Validate user input into the Spinbox, that should accept only integer values.
+
+        Returns
+        -------
+        None.
+
+        """
+        try:
+            val = self.maxV_selector_value.get()
+            if val < self.minV or val > self.maxV:
+                self.maxV_selector_value.set(self.minV)
+        except Exception:
+            self.maxV_selector_value.set(200)
 
     def no_exit(self):
         """
