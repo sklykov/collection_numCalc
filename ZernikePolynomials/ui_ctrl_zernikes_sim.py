@@ -46,12 +46,15 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.plotColorbarButton = Checkbutton(self, text="Colorbar", command=self.colorBarPlotting, onvalue=True, offvalue=False,
                                               variable=self.varPlotColorbarButton)
         self.flattenButton = Button(self, text="Flatten all", command=self.flattenAll)
-        # Below - specification of OptionMenu from ttk, fixed 1st value not shown => StackOverflow
+        # Below - specification of OptionMenu from ttk for polynomials order selection, fixed 1st value not shown => StackOverflow
         self.order_n = ["1st ", "2nd ", "3rd ", "4th ", "5th ", "6th ", "7th "]
         self.order_list = [item + "order" for item in self.order_n]
         self.clickable_list = tk.StringVar(); self.clickable_list.set(self.order_list[0])
         self.max_order_selector = OptionMenu(self, self.clickable_list, self.order_list[0], *self.order_list,
                                              command=self.numberOrdersChanged)
+        # Specificiation of two case selectors: Simulation / Controlling DPP
+        self.listDevices = ["Pure Simulator", "DPP + simulator"]; self.device_selector = tk.StringVar()
+        self.device_selector.set(self.listDevices[0]); self.deviceSelectorButton = OptionMenu(self, self.device_selector, *self.listDevices)
         # Below - additional window for holding the sliders with the amplitudes
         self.ampl_ctrls = tk.Toplevel(master=self)  # additional window, master - the main window
         self.ampl_ctrls.geometry("+680+50")   # put this additional window with some offset for the representing it next to the main one
@@ -63,6 +66,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.refreshPlotButton.grid(row=0, rowspan=1, column=2, columnspan=1)
         self.plotColorbarButton.grid(row=0, rowspan=1, column=3, columnspan=1)
         self.flattenButton.grid(row=0, rowspan=1, column=4, columnspan=1)
+        self.deviceSelectorButton.grid(row=7, rowspan=1, column=0, columnspan=1)
         self.plotWidget.grid(row=1, rowspan=6, column=0, columnspan=6)
 
         self.grid()
@@ -86,7 +90,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         """
         t1 = time.time()
         # below: update the plot
-        self.figure = get_plot_zps_polar(self.figure, orders=self.orders, step_r=0.01, step_theta=2.0,
+        self.figure = get_plot_zps_polar(self.figure, orders=self.orders, step_r=0.005, step_theta=0.8,
                                          alpha_coefficients=self.amplitudes, show_amplitudes=self.plotColorbar)
         # t3 = time.time(); print("plot time(ms):", int(np.round((t3-t1)*1000, 0)))
         self.canvas.draw()  # redraw the figure
@@ -178,7 +182,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
                 self.amplitudes_sliders_dict[(m, n)] = tk.Scale(self.ampl_ctrls, from_=-1.0, to=1.0, orient='horizontal',
                                                                 resolution=0.05, sliderlength=20, label=(f"Z{(m ,n)} " + classical_name),
                                                                 tickinterval=0.5, length=152, command=self.sliderValueChanged,
-                                                                repeatinterval=250)
+                                                                repeatinterval=220)
                 # self.amplitudes_sliders_dict[(m, n)].pack(side=tk.TOP)  # simplest way of packing - adding buttons on top of each other
                 self.amplitudes.append(0.0)  # assign all zeros as the flat field
                 m += 2  # according to the specification

@@ -10,7 +10,6 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib import cm
 plt.close('all')  # closing all opened and pending figures
-from multiprocessing import Process, Queue
 
 
 # %% Functions definitions
@@ -61,7 +60,7 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
     elif (m > n):
         return 0.0
     else:
-        # Recursion formula that should be more effective than direct calculation
+        # Recursion formula that should be more effective than direct calculation (only for high radial orders)
         return (r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) - radial_polynomial(m, n-2, r))
 
 
@@ -83,9 +82,9 @@ def triangular_function(m: int, theta: float) -> float:
 
     """
     if (m > 0):
-        return math.cos(m*theta)
+        return np.cos(m*theta)
     elif (m < 0):
-        return -math.sin(m*theta)
+        return -np.sin(m*theta)
     else:
         return 1.0
 
@@ -236,7 +235,7 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
 
 
 def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: float = 0.01,
-                       step_theta: float = 8.0, show_amplitudes: bool = False):
+                       step_theta: float = 2.0, show_amplitudes: bool = False):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle on the provided matplotlib.figure instance.
 
@@ -264,17 +263,24 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     R = np.arange(0.0, 1.0+step_r, step_r)  # steps on r (polar coordinate)
     Theta = np.arange(0.0, 2*np.pi, np.radians(step_theta))  # steps on theta (polar coordinates)
     (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
-    Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
-    # Calculation of sum of Zernike's polynomials
-    for i in range(i_size):
-        for j in range(j_size):
-            Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
-
-    # Speed up the calculation
-    # Queue1 = Queue(); Queue2 = Queue(); Queue3 = Queue(); Queue4 = Queue()
-    # p1 = Process(target=zernike_polynomials_sum_tuned, args=(orders, R[0:10], Theta[j], alpha_coefficients))
-
-    # Plotting and formatting - Polar projection + plotting the colormap as colour mesh"
+    # Calculation of sum of Zernike's polynomials (on all points sequentially => slow, deleted, see the drawing function above)
+    # Speed up the calculation by using vectorization of calculation on angles theta and using tabulated function values
+    Z2 = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
+    S = np.zeros((i_size, j_size), dtype='float')  # initial sum
+    for k in range(len(orders)):
+        if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+            tuple_orders = orders[k]
+            if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
+                raise TypeError; break
+            else:
+                (m, n) = tuple_orders
+                norm = normalization_factor(m, n)
+                for i in range(i_size):
+                    Z2[i, :] = alpha_coefficients[k]*norm*tabulated_radial_funciton(m, n, R[i])*(vectorized_triangular_function(m, Theta)[:])
+                S += Z2  # adding to the final sum of all contributed Zernike's polynomials
+        else:
+            continue  # goes further on the loop for the next polynomial with non-zero amplitude
+    # Plotting and formatting - Polar projection + plotting the colormap as colour mesh
     # Below - clearing of picture axes, for preventing adding many axes to the single figure
     figure.clear(); axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
     # Below - manual deletion and reinitializing of axes
@@ -285,14 +291,97 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     #     axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
     # !!!: using contourf function is too slow for providing refreshing upon calling by the button
     axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
-    #  Below - plot the colour map by using the coordinates Z and according to Theta, R polar coordinates
-    im = axes.pcolormesh(Theta, R, Z, cmap=cm.coolwarm)  #
+    im = axes.pcolormesh(Theta, R, S, cmap=cm.coolwarm)  # plot the colour map by using the Z map according to Theta, R polar coordinates
     axes.axis('off')  # off polar coordnate axes
     # print(np.min(Z), np.max(Z))  # FOR DEBUG
     if show_amplitudes:
         figure.colorbar(im, ax=axes)  # shows the colour bar with shown on image amplitudes
     figure.tight_layout()
     return figure
+
+
+def vectorized_triangular_function(m: int, Theta: np.ndarray) -> np.ndarray:
+    """
+    Calculate triangular Zernike function on the input array of angles theta (vectorization).
+
+    Parameters
+    ----------
+    m : int
+        Angular order of Zernike's polynomial.
+    Theta : np.ndarray
+        Angle in radians.
+
+    Returns
+    -------
+    np.ndarray
+        Calculated angular function, the size the same as input size of the angles array.
+
+    """
+    if m >= 0:
+        return np.cos(m*Theta)
+    else:
+        return np.sin(m*Theta)
+
+
+def tabulated_radial_funciton(m: int, n: int, r: float) -> float:
+    """
+    Return calculated by the explicit equation (from Lakshminarayanan V., Fleck A. (2011)) radial Zernike's polynomial value.
+
+    Return values only up to 7th order! (-3, 7) and (3, 7) in the sited above paper has the typo (2 instead of 21).
+
+    Parameters
+    ----------
+    m : int
+        Angular order of Zernike's polynomial.
+    n : int
+        Radial order of Zernike's polynomial.
+    r : float
+        Polar radial coordinate r (rho).
+
+    Returns
+    -------
+    float
+        Radial Zernike's polynomial value.
+
+    """
+    if ((m == -1) and (n == 1)) or ((m == 1) and (n == 1)):
+        return r
+    if ((m == -2) and (n == 2)) or ((m == 2) and (n == 2)):
+        return r*r  # r^2
+    if ((m == 0) and (n == 2)):
+        return (2*r*r - 1.0)  # 2r^2 - 1
+    if ((m == -3) and (n == 3)) or ((m == 3) and (n == 3)):
+        return r*r*r  # r^3
+    if ((m == -1) and (n == 3)) or ((m == 1) and (n == 3)):
+        return (3*r*r*r - 2*r)  # 3r^3 - 2r
+    if ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
+        return r*r*r*r  # r^4
+    if ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
+        return (4*r*r*r*r - 3*r*r)  # 4r^4 - 3r^2
+    if ((m == 0) and (n == 4)):
+        return (6*r*r*r*r - 6*r*r + 1.0)  # 6r^4 - 6r^2 + 1
+    if ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
+        return r*r*r*r*r  # r^5
+    if ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
+        return (5*r*r*r*r*r - 4*r*r*r)  # 5r^5 - 4r^3
+    if ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
+        return (10*r*r*r*r*r - 12*r*r*r + 3*r)  # 10r^5 - 12r^3 + 3r
+    if ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
+        return r*r*r*r*r*r  # r^6
+    if ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
+        return (6*r*r*r*r*r*r - 5*r*r*r*r)  # 6r^6 - 5r^4
+    if ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
+        return (15*r*r*r*r*r*r - 20*r*r*r*r + 6*r*r)  # 15r^6 - 20r^4 + 6r^2
+    if ((m == 0) and (n == 6)):
+        return (20*r*r*r*r*r*r - 30*r*r*r*r + 12*r*r - 1)  # 20r^6 - 30r^4 + 12r^2 - 1
+    if ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
+        return r*r*r*r*r*r*r  # r^7
+    if ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
+        return (7*r*r*r*r*r*r*r - 6*r*r*r*r*r)  # 7r^7 - 6r^5
+    if ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
+        return (21*r*r*r*r*r*r*r - 30*r*r*r*r*r + 10*r*r*r)  # 21r^7 - 30r^5 + 10r^3
+    if ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):
+        return (35*r*r*r*r*r*r*r - 60*r*r*r*r*r + 30*r*r*r - 4*r)  # 35r^7 - 60r^5 + 30r^3 - 4r
 
 
 def plot_zps_rectangular(orders: list, step_xy: float = 0.02):
@@ -485,6 +574,26 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
     return name
 
 
+def get_osa_standard_index(m: int, n: int) -> int:
+    """
+    Calculate OSA/ANSI standard single index for Zernike polynomial (m, n).
+
+    Parameters
+    ----------
+    m : int
+        Azimutal order.
+    n : int
+        Radial order.
+
+    Returns
+    -------
+    int
+        OSA/ANSI standard single index.
+
+    """
+    return (m + n*(n+2))//2
+
+
 def test():
     """
     Perform tests of implemented recurrence equations.
@@ -538,6 +647,45 @@ def test():
     m = 4; n = 6
     assert radial_polynomial(m, n, r) == 6*np.power(r, 6) - 5*np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
     assert radial_polynomial_derivative_dr(m, n, r) == 36*np.power(r, 5) - 20*r*r*r, f'Implemented dR{m, n} != to the derivative'
+    # Test the tabulated values, assuming that the recursive implemented correctly
+    m = -7; n = 7
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -5; n = 7
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -3; n = 7
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -1; n = 7
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -6; n = 6
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -4; n = 6
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -2; n = 6
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = 0; n = 6
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -5; n = 5
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -3; n = 5
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -1; n = 5
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -4; n = 4
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -2; n = 4
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = 0; n = 4
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -3; n = 3
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -1; n = 3
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -2; n = 2
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = 0; n = 2
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    m = -1; n = 1
+    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
     print("All tests passed")
 
 
@@ -545,8 +693,8 @@ def test():
 if __name__ == '__main__':
     r = 2.0; m = 1; n = 3; theta = 0.0
     # print(normalization_factor(0,0))
-    print("radial polynomial:", radial_polynomial(m, n, r))
-    print("derivative of the radial polynomial: ", radial_polynomial_derivative_dr(m, n, r))
+    # print("radial polynomial:", radial_polynomial(m, n, r))
+    # print("derivative of the radial polynomial: ", radial_polynomial_derivative_dr(m, n, r))
     # print("zernike polynomial:", zernike_polynomial(m, n, r, theta))
     # print("sum of two polynomials 1, 1 and 0, 2:", zernike_polynomials_sum([(1, 1), (0, 2)], r, theta))
     test()  # Testing implemented recurrence equations
@@ -556,10 +704,10 @@ if __name__ == '__main__':
     step_r = 0.005
     step_theta = 1  # in grads
     orders = [(-1, 1)]  # Y tilt
-    plot_zps_polar(orders, step_r, step_theta, "Y tilt")
+    # plot_zps_polar(orders, step_r, step_theta, "Y tilt")
     orders = [(1, 1)]  # X tilt
-    plot_zps_polar(orders, step_r, step_theta, "X tilt")
+    # plot_zps_polar(orders, step_r, step_theta, "X tilt")
     zernikes_set = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
     plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
     zernikes_set = [(-2, 2), (0, 2), (2, 2)]; coefficients = [1.0, 1.0, 1.0]  # 2nd orders
-    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients, show_amplitudes=True)
+    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum 2nd orders", tuned=True, alpha_coefficients=coefficients, show_amplitudes=True)
