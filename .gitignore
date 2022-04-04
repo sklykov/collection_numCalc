@@ -109,6 +109,9 @@ documentation/
 Docs/ 
 DIP/fluo_beads_sim/ 
 SimUscope/*.tiff
+# Driver library for the device - not public yet
+ZernikePolynomials/ampcom/*
+ZernikePolynomials/AmpCom.py
 
 # Specifics from PyCharm
 .idea/
