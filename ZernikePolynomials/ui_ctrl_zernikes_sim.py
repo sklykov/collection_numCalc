@@ -31,7 +31,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         # Values initialization
         super().__init__(master)  # initialize the main window (frame) for all widgets
         self.plotColorbar = False
-        self.master.title("Zernike's polynomials controls and respresentation")
+        self.master.title("Zernike's polynomials controls and representation")
         master.geometry("+5+50")  # put the main window on the (+x, +y) coordinate away from the top left monitor coordinate
         self.amplitudes = [0.0, 0.0]  # default amplitudes for the 1st order
         self.orders = [(-1, 1), (1, 1)]; self.flagFlattened = False; self.changedSliders = 1
@@ -39,12 +39,12 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.minV = 200; self.maxV = 400
         self.serialCommHandle = None  # holder for the opened serial communication handle
         self.serial_comm_ctrl = None  # empty holder for serial communication ctrl
-        # Below -matricies place holders for possible returning some placeholders instead of exception
+        # Below - matrices placeholders for possible returning some placeholders instead of exception
         self.voltages = np.empty(1); self.check_solution = np.empty(1); self.zernike_amplitudes = np.empty(1)
         self.diff_amplitudes = np.empty(1); self.influence_matrix = np.empty(1)
         # Widgets creation and specification (almost all - buttons)
         self.refreshPlotButton = Button(self, text="Refresh Plot", command=self.plot_zernikes)
-        self.zernikesLabel = Label(self, text=" Zernike polynoms ctrls up to:")
+        self.zernikesLabel = Label(self, text=" Zernike polynom-s ctrls up to:")
         self.figure = plot_figure.Figure(figsize=(5, 5))  # Default empty figure for
         self.canvas = FigureCanvasTkAgg(self.figure, master=self); self.plotWidget = self.canvas.get_tk_widget()
         # !!! Below - the way of how associate tkinter buttons with the variables and their states! THEY ARE DECOUPLED!
@@ -63,7 +63,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.clickable_list = tk.StringVar(); self.clickable_list.set(self.order_list[0])
         self.max_order_selector = OptionMenu(self, self.clickable_list, self.order_list[0], *self.order_list,
                                              command=self.numberOrdersChanged)
-        # Specificiation of two case selectors: Simulation / Controlling DPP
+        # Specification of two case selectors: Simulation / Controlling DPP
         self.listDevices = ["Pure Simulator", "DPP + Simulator"]; self.device_selector = tk.StringVar()
         self.device_selector.set(self.listDevices[0]); self.deviceSelectorButton = OptionMenu(self, self.device_selector,
                                                                                               self.listDevices[0],
@@ -195,7 +195,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         # Get the (m, n) values from the order specification
         self.orders = []; self.amplitudes_sliders_dict = {}; self.amplitudes = []  # refresh the associated controls
         for order in range(1, n_orders + 1):  # going through all specified orders
-            m = -order  # azimutal order
+            m = -order  # azimuthal order
             n = order  # radial order
             for polynomial in range(order + 1):  # number of polynomials = order + 1
                 self.orders.append((m, n))  # store the values as tuples
@@ -215,7 +215,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         for order in range(1, n_orders + 1):
             # rows_offset = n_orders - order
             rows_offset = 0
-            m = -order  # azimutal order
+            m = -order  # azimuthal order
             row_cursor = 0
             n = order  # radial order
             for polynomial in range(order + 1):  # number of polynomials = order + 1
@@ -313,7 +313,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         # print("Solution :", (self.influence_matrix*np.power(self.voltages, 2)))
         self.check_solution = self.influence_matrix*np.power(self.voltages, 2)
         k = 0  # index of collected amplitudes collected from the UI
-        if diff_amplitudes_size > 0:  # only if some non-zero amplitudes specified by an user
+        if diff_amplitudes_size > 0:  # only if some non-zero amplitudes specified by a user
             self.diff_amplitudes = np.zeros(diff_amplitudes_size)
             m = 0  # index for collecting calculated differences
         for ampl in self.zernike_amplitudes:
@@ -378,7 +378,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         None.
 
         """
-        # All initiliazation steps are analogue to the specified for amplitudes controls
+        # All initialization steps are analogue to the specified for amplitudes controls
         self.serial_comm_ctrl = tk.Toplevel(master=self)  # additional window, master - the main window
         self.serial_comm_ctrl_offsets = "+5+775"; self.serial_comm_ctrl.wm_transient(self)
         self.serial_comm_ctrl.geometry(self.serial_comm_ctrl_offsets)
@@ -397,7 +397,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         None.
 
         """
-        # Trying to import additional dependecies
+        # Trying to import additional dependencies
         libraryImported = False
         try:
             import serial; global serial

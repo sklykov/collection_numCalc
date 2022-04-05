@@ -119,7 +119,7 @@ def get_integr_limits_centralized_subapertures(image: np.ndarray, coms: np.ndarr
     coms : np.ndarray
         Coordinates of found center of masses on the image around the defined local peaks (focal spots formed by sub-apertures).
     coms_shifts : np.ndarray
-        Shifts of center of masses between non- and aberrated recorded iamges by Shack-Hartman sensor.
+        Shifts of center of masses between non- and aberrated recorded images by Shack-Hartman sensor.
     aperture_radius : float, optional
         Of each sub-aperture of lens, in pixels on the image. The default is 15.0.
     debug : bool, optional
@@ -174,7 +174,7 @@ def get_integr_limits_centralized_subapertures(image: np.ndarray, coms: np.ndarr
         plt.title("Estimated circular apertures of mircolenses array")
     # Calculation of integration limits - below
     j = 0
-    if not(swapXY):
+    if not swapXY:
         for i in range(np.size(detected_centers, 0)):
             # Plot found regions for CoM calculations
             if debug:
@@ -288,7 +288,7 @@ def rho_ab(rho0: float, theta: float, theta0: float, aperture_radius: float) -> 
     return (rho_a, rho_b)
 
 
-def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> float:
+def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> tuple:
     """
     Return 2 functions under the integration on X axis specified in the thesis.
 
@@ -299,14 +299,14 @@ def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> float:
     theta : float
         Polar coordinate (theta).
     m : int
-        Azimutal order of the Zernike polynomial.
+        Azimuthal order of the Zernike polynomial.
     n : int
         Radial order of the Zernike polynomial.
 
     Returns
     -------
-    float
-        Function value.
+    tuple
+        2 values composing sub-integral parts on axis X.
 
     """
     derivRmn = radial_polynomial_derivative_dr(m, n, r)
@@ -316,7 +316,7 @@ def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> float:
     return ((derivRmn*r*Angularmn*np.cos(theta)), (Rmn*derivAngularmn*np.sin(theta)))
 
 
-def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> float:
+def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> tuple:
     """
     Return 2 functions under the integration on Y axis specified in the thesis.
 
@@ -327,14 +327,14 @@ def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> float:
     theta : float
         Polar coordinate (theta).
     m : int
-        Azimutal order of the Zernike polynomial.
+        Azimuthal order of the Zernike polynomial.
     n : int
         Radial order of the Zernike polynomial.
 
     Returns
     -------
-    float
-        Function value.
+    tuple
+        2 values composing sub-integral parts on axis Y.
 
     """
     derivRmn = radial_polynomial_derivative_dr(m, n, r)
@@ -347,7 +347,7 @@ def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> float:
 def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
                                 n_polynomial: int = 1, aperture_radius: float = 15.0, n_steps: int = 50):
     """
-    Calculate integrals using trapezodial rule specified in the mentioned thesis on X and Y axes for the specified Zernike polynomial.
+    Calculate integrals using trapezoidal rule specified in the mentioned thesis on X and Y axes for the specified Zernike polynomial.
 
     Parameters
     ----------
@@ -392,7 +392,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
             # Getting limits for integration on rho
             (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
             # Integration on rho for X and Y axis (trapezoidal formula)
-            # !!!: Because of higher order Zernike start to depend heavily on the selected radius rho, then some calibration
+            # !!!: Because of higher order Zernike starts to depend heavily on the selected radius rho, then some calibration
             # should be performed. There are 3 options:1) To get the integral Integral(Integral(Zmn*rho*drho*dtheta))
             # in the range of sub-apertures sizes. 2) As it is on Wiki page about Zernike polynomials, the calibration
             # on the square of Zernike polynomials: Integral(Integral((Zmn^2)*rho*drho*dtheta)). BOTH TESTED!
@@ -435,7 +435,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
             theta += delta_theta
         integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
         # integral_sumX /= integral_sum_Zernike; integral_sumY /= integral_sum_Zernike  # Calibration on the integrals of Zmn
-        # ???: the results of calculation using this definitions are disappointing!
+        # ???: the results of calculation using these definitions are disappointing!
 
         # The final integral values should be also calibrated to focal and wavelengths
         integral_values[i_subaperture, 1] = calibration*integral_sumX  # Partially calibration on the area of sub-aperture
@@ -525,7 +525,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
         # integral values should be also calibrated to the areas of sub-apertures - but in which form?
         # integral_sumX /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
         # integral_sumY /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
-        # actually, the integral values should be calibrated to the each sub-aperture area - depedning on the integration limits
+        # actually, the integral values should be calibrated to each sub-aperture area - depending on the integration limits
         integral_sumX /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
         integral_sumY /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
         # The final integral values should be also calibrated to focal and wavelengths, but it's not yet implemented
@@ -555,10 +555,6 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
         Polar coordinates theta of sub-aperture centers.
     rho0 : np.ndarray
         Polar coordinates r of sub-aperture centers.
-    m : int
-        Azimutal order of the Zernike polynomial.
-    n : int
-        Radial order of the Zernike polynomial..
     aperture_radius : float, optional
         Radius of sub-aperture in pixels on the image. The default is 15.0.
     n_steps : int, optional
@@ -600,7 +596,7 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
                                                                               swapXY=swapXY)
                 else:
                     integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                                  aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
+                                                                  aperture_radius=aperture_radius, n_steps=n_steps)
                 integral_matrix[:, 2*i] = integral_values[:, 0]
                 integral_matrix[:, 2*i+1] = integral_values[:, 1]
         else:
@@ -610,7 +606,7 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
                                                                           aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
             else:
                 integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                              aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
+                                                              aperture_radius=aperture_radius, n_steps=n_steps)
             integral_matrix[:, 2*i] = integral_values[:, 0]
             integral_matrix[:, 2*i+1] = integral_values[:, 1]
         print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
@@ -733,14 +729,14 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
         diff_aberrated = np.uint8(diff_aberrated)
         if plot_found_focal_spots:
             plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated")
-    # If the recorded background helps to enhance the contrast, then preserve the operation of background substraction
+    # If the recorded background helps to enhance the contrast, then preserve the operation of background subtraction
     if plot_found_focal_spots and substract_background:
         plt.figure(); plt.imshow(background); plt.tight_layout(); plt.title("Background")
         plt.figure(); plt.imshow(nonaberrated); plt.tight_layout(); plt.title("Non-aberrated")
         plt.figure(); plt.imshow(diff_nonaberrated); plt.tight_layout(); plt.title("Non-aberrated - Background")
         plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated - Background")
     # Below all if statements - for substite default threshold values for normal starting value for searching for a local peak
-    if not(substract_background):
+    if not substract_background:
         if (threshold_abs == 2.0):
             threshold_abs_nonaber = np.round(np.mean(diff_nonaberrated), 0) + 1
             threshold_abs_aber = np.round(np.mean(diff_aberrated), 0) + 1
@@ -748,7 +744,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
             # Assign specified threshold values for searching of local peaks (including default values)
             threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
     else:
-        # If background substracted, then assign the specified threshold or keep the the default value
+        # If background subtracted, then assign the specified threshold or keep the default value
         threshold_abs_nonaber = threshold_abs; threshold_abs_aber = threshold_abs
     # Plotting of results on an image for debugging (for coms_nonaberrated)
     # CoMs = center of masses, calculated in the areas around found local peaks
@@ -783,7 +779,7 @@ def get_overall_coms_shifts(pics_folder: str = "pics", background_pic_name: str 
                         coms_shifts[i, 0] = diffY_sign; coms_shifts[i, 1] = diffX_sign; break  # Stop if the candidate found
     else:
         # If the number of detected peaks is different for aberrated and non-aberrated pictures, then use the aberrated one
-        # Removed - checking sizes of detected CoMs for aberrated and non-aberrated, in general case last one should more then another
+        # Removed - checking sizes of detected CoMs for aberrated and non-aberrated, in general case last one should more than another
         coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')  # coms shifts calculation - relative to the
         pic_integral_limits = diff_aberrated; coms_integral_limits = coms_aberrated  # diff_nonaberrated => non=aberrated picture
         for i in range(np.size(coms_aberrated, 0)):
@@ -830,7 +826,7 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
     region_size : int, optional
         Size of local rectangle, there the center of mass is calculated. The default is 20.
     substract_background : bool, optional
-        If False, from the opened images the stored background picture won't be substracted. The default is False.
+        If False, from the opened images the stored background picture won't be subtracted. The default is False.
     aperture_radius : float, optional
         Radius of sub-aperture in pixels on the image. The default is 15.0.
     plot_results : bool, optional
@@ -877,7 +873,7 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
         diff_nonaberrated = (nonaberrated - background); diff_nonaberrated = img_as_ubyte(diff_nonaberrated)
         threshold_abs = np.round(np.mean(diff_nonaberrated), 0) + 1
     else:
-        # Substracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
+        # Subtracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
         # Additionally, stretch a bit the contrast
         diff_nonaberrated = nonaberrated - abs(np.min(nonaberrated)); diff_nonaberrated *= (255/np.max(diff_nonaberrated))
         diff_nonaberrated = np.uint8(diff_nonaberrated)
@@ -1016,18 +1012,18 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
     # Open the stored files and extracting the recorded background from the wavefronts
     aberrated = (io.imread(aberratedPath, as_gray=True))
     if substract_background:
-        # Substracting from the recorded pictures (non- and aberrated) the recorded background
+        # Subtracting from the recorded pictures (non- and aberrated) the recorded background
         background = (io.imread(backgroundPath, as_gray=True))
         diff_aberrated = (aberrated - background); diff_aberrated = img_as_ubyte(diff_aberrated)
         threshold_abs = np.round(np.mean(diff_aberrated), 0) + 1
     else:
-        # Substracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
+        # Subtracting background as the minimal value on the picture and manually transferring the pictures into the U8 (ubyte) type
         # Additionally, stretch a bit the contrast
         diff_aberrated = aberrated - abs(np.min(aberrated)); diff_aberrated *= (255/np.max(diff_aberrated))
         diff_aberrated = np.uint8(diff_aberrated)
         if plot_results and not(substract_background):
             plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated")
-    # If the recorded background helps to enhance the contrast, then preserve the operation of background substraction
+    # If the recorded background helps to enhance the contrast, then preserve the operation of background subtraction
     if plot_results and substract_background:
         plt.figure(); plt.imshow(background); plt.tight_layout(); plt.title("Background")
         plt.figure(); plt.imshow(diff_aberrated); plt.tight_layout(); plt.title("Aberrated - Background")

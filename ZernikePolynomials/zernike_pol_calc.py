@@ -139,7 +139,6 @@ def zernike_polynomials_sum(orders: list, r: float, theta: float) -> float:
     for tuple_orders in orders:
         if not (isinstance(tuple_orders, tuple)):
             raise TypeError
-            break
         else:
             (m, n) = tuple_orders
             s += zernike_polynomial(m, n, r, theta)
@@ -176,7 +175,7 @@ def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_co
         if abs(alpha_coefficients[i]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
             tuple_orders = orders[i]
             if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
-                raise TypeError; break
+                raise TypeError
             else:
                 (m, n) = tuple_orders
                 s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
@@ -271,7 +270,7 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
         if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
             tuple_orders = orders[k]
             if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
-                raise TypeError; break
+                raise TypeError
             else:
                 (m, n) = tuple_orders
                 norm = normalization_factor(m, n)
@@ -348,17 +347,17 @@ def tabulated_radial_funciton(m: int, n: int, r: float) -> float:
         return r
     if ((m == -2) and (n == 2)) or ((m == 2) and (n == 2)):
         return r*r  # r^2
-    if ((m == 0) and (n == 2)):
-        return (2*r*r - 1.0)  # 2r^2 - 1
+    if (m == 0) and (n == 2):
+        return 2*r*r - 1.0  # 2r^2 - 1
     if ((m == -3) and (n == 3)) or ((m == 3) and (n == 3)):
         return r*r*r  # r^3
     if ((m == -1) and (n == 3)) or ((m == 1) and (n == 3)):
-        return (3*r*r*r - 2*r)  # 3r^3 - 2r
+        return 3*r*r*r - 2*r  # 3r^3 - 2r
     if ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
         return r*r*r*r  # r^4
     if ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
         return (4*r*r*r*r - 3*r*r)  # 4r^4 - 3r^2
-    if ((m == 0) and (n == 4)):
+    if (m == 0) and (n == 4):
         return (6*r*r*r*r - 6*r*r + 1.0)  # 6r^4 - 6r^2 + 1
     if ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
         return r*r*r*r*r  # r^5
@@ -372,8 +371,8 @@ def tabulated_radial_funciton(m: int, n: int, r: float) -> float:
         return (6*r*r*r*r*r*r - 5*r*r*r*r)  # 6r^6 - 5r^4
     if ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
         return (15*r*r*r*r*r*r - 20*r*r*r*r + 6*r*r)  # 15r^6 - 20r^4 + 6r^2
-    if ((m == 0) and (n == 6)):
-        return (20*r*r*r*r*r*r - 30*r*r*r*r + 12*r*r - 1)  # 20r^6 - 30r^4 + 12r^2 - 1
+    if (m == 0) and (n == 6):
+        return (20*r*r*r*r*r*r - 30*r*r*r*r + 12*r*r - 1.0)  # 20r^6 - 30r^4 + 12r^2 - 1
     if ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
         return r*r*r*r*r*r*r  # r^7
     if ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
@@ -607,7 +606,7 @@ def test():
     None if all tests passed.
 
     """
-    m = 1; n = 1; r = 1.5; theta = np.radians(30.0)
+    m = 1; n = 1; r = 1.5; theta = np.radians(30.0); theta = float(theta)
     assert radial_polynomial(m, n, r) == r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
     assert radial_polynomial_derivative_dr(m, n, r) == 1.0, f'Implemented dR{m, n} != to the calculated derivative'
     assert zernike_polynomial(m, n, r, theta) == 2*r*np.cos(theta), f'Implemented Z{m, n} not equal to tabulated Zernike polynomial'
@@ -703,7 +702,7 @@ if __name__ == '__main__':
     # Plotting as the radial surface - Y tilt and Defocus
     step_r = 0.005
     step_theta = 1  # in grads
-    orders = [(-1, 1)]  # Y tilt
+    # orders = [(-1, 1)]  # Y tilt
     # plot_zps_polar(orders, step_r, step_theta, "Y tilt")
     orders = [(1, 1)]  # X tilt
     # plot_zps_polar(orders, step_r, step_theta, "X tilt")

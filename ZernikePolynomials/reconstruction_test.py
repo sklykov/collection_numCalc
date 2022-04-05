@@ -69,7 +69,7 @@ if shwfs:
                          (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         for i in range(len(set14zernikes)):
             print(get_classical_polynomial_name(set14zernikes[i]), ":", np.round(alpha_coefficients[i], 4))
-        plot_zps_polar(set14zernikes, title="reconstraction of " + "actual astigmatism",
+        plot_zps_polar(set14zernikes, title="reconstruction of " + "actual astigmatism",
                        tuned=True, alpha_coefficients=alpha_coefficients)
 
 # %% Calibration of pictures shared in the repository
@@ -105,7 +105,7 @@ if repo_pics:
         alpha_coefficients = list(get_polynomials_coefficients(integral_matrix, coms_shifts))
         set14zernikes = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3),
                          (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
-        plot_zps_polar(set14zernikes, title="reconstraction of pics from the open repository",
+        plot_zps_polar(set14zernikes, title="reconstruction of pics from the open repository",
                        tuned=True, alpha_coefficients=alpha_coefficients)
         # Plotting the 14 Zernikes, assuming that the graph from the calculation gives the coefficients for Zernike polynomials
         repo_coefficients = [-0.987, 0.367, 0.341, -1.434, 0.843, -0.306, 0.192, 0.375, -0.277, 0.343, -0.159, 0.171, -0.037, -0.016]
