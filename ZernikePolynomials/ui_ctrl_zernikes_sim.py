@@ -37,14 +37,15 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.orders = [(-1, 1), (1, 1)]; self.flagFlattened = False; self.changedSliders = 1
         self.amplitudes_sliders_dict = {}
         self.minV = 200; self.maxV = 400
-        self.serialCommHandle = None  # holder for the opened serial communication handle
+        self.deviceHandle = None  # holder for the opened serial communication handle
         self.serial_comm_ctrl = None  # empty holder for serial communication ctrl
+        self.librariesImported = False  # libraries for import - PySeriral and local device controlling library
         # Below - matrices placeholders for possible returning some placeholders instead of exception
         self.voltages = np.empty(1); self.check_solution = np.empty(1); self.zernike_amplitudes = np.empty(1)
         self.diff_amplitudes = np.empty(1); self.influence_matrix = np.empty(1)
         # Widgets creation and specification (almost all - buttons)
         self.refreshPlotButton = Button(self, text="Refresh Plot", command=self.plot_zernikes)
-        self.zernikesLabel = Label(self, text=" Zernike polynom-s ctrls up to:")
+        self.zernikesLabel = Label(self, text=" Zernike polynoms ctrls up to:")
         self.figure = plot_figure.Figure(figsize=(5, 5))  # Default empty figure for
         self.canvas = FigureCanvasTkAgg(self.figure, master=self); self.plotWidget = self.canvas.get_tk_widget()
         # !!! Below - the way of how associate tkinter buttons with the variables and their states! THEY ARE DECOUPLED!
@@ -383,7 +384,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.serial_comm_ctrl_offsets = "+5+775"; self.serial_comm_ctrl.wm_transient(self)
         self.serial_comm_ctrl.geometry(self.serial_comm_ctrl_offsets)
         # Add the additional window evoked by the button for communication with the device
-        self.openSerialCommButton = Button(self.serial_comm_ctrl, text="Open Communication", command=self.send_voltages)
+        self.openSerialCommButton = Button(self.serial_comm_ctrl, text="Send voltages", command=self.send_voltages)
         self.serialCommLabel = Label(self.serial_comm_ctrl, text="Experimental, sends the calculated voltages: ")
         self.serialCommLabel.pack(side=tk.LEFT); self.openSerialCommButton.pack(side=tk.LEFT)
         self.openSerialCommButton.state(['disabled'])  # after opening the window, set to disabled, before voltages
@@ -398,24 +399,33 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
 
         """
         # Trying to import additional dependencies
-        libraryImported = False
-        try:
-            import serial; global serial
-            print("Serial library imported")
-            import ampcom; global ampcom
-            print("Device controlling library imported")
-            libraryImported = True
-        except ValueError:
-            print("Serial library (https://pyserial.readthedocs.io/en/latest/index.html) or device control "
-                  + "communication library are not importable")
-        if libraryImported:
+        if not self.librariesImported:
             try:
-                VMAX = self.maxV_selector_value.get(); print("Maximum voltage:", VMAX)
-                deviceHandle = ampcom.AmpCom.AmpConnect()  # connect to the device
-                ampcom.AmpCom.AmpStatus(deviceHandle)  # should print the device status
-
-            except Exception:
-                print("Connection hasn't been established, check connection settings")
+                import serial; global serial
+                print("Serial library imported")
+                import ampcom; global ampcom
+                print("Device controlling library imported")
+                self.librariesImported = True
+            except ValueError:
+                print("Serial library https://pyserial.readthedocs.io/en/latest/index.html or device control "
+                      + "communication library are not importable")
+        if self.librariesImported:
+            if self.deviceHandle is None:  # open serial communication and send voltages
+                try:
+                    self.deviceHandle = ampcom.AmpCom.AmpConnect()  # connect to the device
+                    VMAX = self.maxV_selector_value.get(); print("Maximum voltage:", VMAX)
+                    ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
+                    converted_voltages = ampcom.AmpCom.create_varr2(self.voltages, VMAX)  # made out of found voltages bits
+                    ampcom.AmpCom.AmpWrite(self.deviceHandle, converted_voltages)  # send converted V to bits to a device
+                    ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
+                except Exception:
+                    print("Connection hasn't been established, check connection settings")
+            else:  # the connection was established already
+                VMAX = self.maxV_selector_value.get()  # get maximal voltage
+                ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
+                converted_voltages = ampcom.AmpCom.create_varr2(self.voltages, VMAX)  # made out of found voltages bits
+                ampcom.AmpCom.AmpWrite(self.deviceHandle, converted_voltages)  # send converted V to bits to a device
+                ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
 
     def destroy(self):
         """
@@ -426,10 +436,14 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         None.
 
         """
+        if self.deviceHandle is not None:
+            try:
+                ampcom.AmpCom.AmpZero(self.deviceHandle)
+            except Exception:
+                print("The device not zeroed")
+            finally:
+                self.deviceHandle.close()  # close the serial connection anyway
         print("The GUI closed")
-
-
-# %% Functions
 
 
 # %% Launch section
