@@ -474,9 +474,9 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
     """
     Return the classical name of Zernike polynomial.
 
-    Till the 4th order (including) - the names taken from the Wikipedia artuicle ( https://en.wikipedia.org/wiki/Zernike_polynomials ).
+    Till the 4th order (including) - the names taken from the Wikipedia artuicle https://en.wikipedia.org/wiki/Zernike_polynomials
     5th order names - from the website https://www.telescope-optics.net/monochromatic_eye_aberrations.htm.
-
+    6th order names - my guess about the naming.
     Parameters
     ----------
     mode : tuple
@@ -570,6 +570,36 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
         name = "Oblique pentafoil"
         if short_names:
             name = "Obliq. 5foil"
+    # My guess of naming below
+    if (m == 0) and (n == 6):
+        name = "Secondary spherical"
+        if short_names:
+            name = "2d spherical"
+    if (m == 6) and (n == 6):
+        name = "Vertical sexfoil"
+        if short_names:
+            name = "Vert. 6foil"
+    if (m == -6) and (n == 6):
+        name = "Oblique sexfoil"
+        if short_names:
+            name = "Obliq. 6foil"
+    if (m == 4) and (n == 6):
+        name = "Vertical secondary quadrafoil"
+        if short_names:
+            name = "Vert. 2d 4foil"
+    if (m == -4) and (n == 6):
+        name = "Oblique secondary quadrafoil"
+        if short_names:
+            name = "Obliq.2d 4foil"
+    if (m == -2) and (n == 6):
+        name = "Oblique thirdly astigmatism"
+        if short_names:
+            name = "Obliq. 3d ast."
+    if (m == 2) and (n == 6):
+        name = "Vertical thirdly astigmatism"
+        if short_names:
+            name = "Vert. 3d ast."
+
     return name
 
 
