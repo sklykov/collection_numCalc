@@ -14,7 +14,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = False; repo_pics2 = True; shwfs2 = False; n_zernikes = 14
+shwfs = False; repo_pics = False; repo_pics2 = True; shwfs2 = False; n_zernikes = 20
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set1 = [(-1, 1), (1, 1)]
@@ -116,10 +116,10 @@ if repo_pics:
 
 # %% Testing the another calibration mechanism - calculate only once the integral matrix for the non-aberrated image
 if repo_pics2:
-    plot = False; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 80; min_dist_peaks = 20
+    plot = False; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 70; min_dist_peaks = 20
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix14TabularZernike_RepoPics.npy")
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20TabularZernike_RepoPics.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RepoPics.npy")
     if not(os.path.exists(precalculated_zernikes)):
         t1 = time.time()  # get the current time measurement
@@ -142,16 +142,16 @@ if repo_pics2:
         integral_matrix = np.load(precalculated_zernikes); coms_nonaberrated = np.load(precalculated_nonaberration)
         (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix, plot_results=plot,
                                                                    threshold_abs=threshold, region_size=region_size)
-        alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts))
+        alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)*np.pi)  # !!! * by pi
         # set14zernikes = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3),
         #                  (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         plot_zps_polar(zernikes_set, title="reconstraction of pics from the open repository",
-                       tuned=True, alpha_coefficients=alpha_coefficients)
+                       tuned=True, alpha_coefficients=(alpha_coefficients))
         # Plotting the 14 Zernikes, assuming that the graph from the calculation gives the coefficients for Zernike polynomials
         repo_coefficients = [-0.987, 0.367, 0.341, -1.434, 0.843, -0.306, 0.192, 0.375, -0.277, 0.343, -0.159, 0.171, -0.037, -0.016,
                              0.0, -0.01, 0.25, 0.0, 0.004, 0.0]
         for i in range(len(zernikes_set)):
-            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3), "(SK) ",
+            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i], 3), "(SK) ",
                   repo_coefficients[i], "(Jacopo's)")
         plot_zps_polar(zernikes_set, title="profile reconstructed by Jacopo", tuned=True, alpha_coefficients=repo_coefficients)
 

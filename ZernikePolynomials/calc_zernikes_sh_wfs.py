@@ -18,7 +18,7 @@ import time
 from matplotlib.patches import Rectangle, Circle
 from scipy import ndimage
 from zernike_pol_calc import radial_polynomial, radial_polynomial_derivative_dr, triangular_function
-from zernike_pol_calc import triangular_derivative_dtheta
+from zernike_pol_calc import triangular_derivative_dtheta, normalization_factor
 from zernike_pol_calc import tabular_radial_polynomial, tabular_radial_derivative_dr  # for speeding up calculations
 from numpy.linalg import lstsq
 plt.close('all')
@@ -536,6 +536,9 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
     """
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
     calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
+    # Introduction of Zernike's polynomials normalization numbers, tested => introduced more differences in comparisons
+    # if use_tabular_functions:  #  Save it for possible reusing, needed - ???
+    #     calibration = normalization_factor(m, n)  # use it for recalculate integral values for testing
     rho_unit_calibration = np.max(rho0) + aperture_radius  # For making integration on rho on unit circle
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
