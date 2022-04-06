@@ -14,7 +14,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = False; repo_pics2 = False; shwfs2 = True; n_zernikes = 20
+shwfs = False; repo_pics = False; repo_pics2 = True; shwfs2 = False; n_zernikes = 14
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set1 = [(-1, 1), (1, 1)]
@@ -116,10 +116,10 @@ if repo_pics:
 
 # %% Testing the another calibration mechanism - calculate only once the integral matrix for the non-aberrated image
 if repo_pics2:
-    plot = True; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 60; min_dist_peaks = 20
+    plot = False; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 80; min_dist_peaks = 20
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20Zernike_RepoPics.npy")
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix14TabularZernike_RepoPics.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RepoPics.npy")
     if not(os.path.exists(precalculated_zernikes)):
         t1 = time.time()  # get the current time measurement
@@ -129,7 +129,7 @@ if repo_pics2:
                                                                                       aperture_radius=aperture_radius,
                                                                                       min_dist_peaks=min_dist_peaks)
         integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0, aperture_radius=aperture_radius,
-                                                       n_steps=n_integration_steps)
+                                                       n_steps=n_integration_steps, use_tabular_functions=True)
         np.save(precalculated_zernikes, integral_matrix)
         if not(os.path.exists(precalculated_nonaberration)):  # if CoMs from non-aberrated image not saved, save them
             np.save(precalculated_nonaberration, coms_nonaberrated)

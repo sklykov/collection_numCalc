@@ -19,6 +19,7 @@ from matplotlib.patches import Rectangle, Circle
 from scipy import ndimage
 from zernike_pol_calc import radial_polynomial, radial_polynomial_derivative_dr, triangular_function
 from zernike_pol_calc import triangular_derivative_dtheta
+from zernike_pol_calc import tabular_radial_polynomial, tabular_radial_derivative_dr  # for speeding up calculations
 from numpy.linalg import lstsq
 plt.close('all')
 
@@ -290,7 +291,7 @@ def rho_ab(rho0: float, theta: float, theta0: float, aperture_radius: float) -> 
 
 def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> tuple:
     """
-    Return 2 functions under the integration on X axis specified in the thesis.
+    Return 2 functions under the integral equation on X axis specified in the thesis.
 
     Parameters
     ----------
@@ -316,9 +317,37 @@ def rho_integral_funcX(r: float, theta: float, m: int, n: int) -> tuple:
     return ((derivRmn*r*Angularmn*np.cos(theta)), (Rmn*derivAngularmn*np.sin(theta)))
 
 
+def r_integral_tabular_funcX(r: float, theta: float, m: int, n: int) -> tuple:
+    """
+    Return 2 functions under the integral equation on X axis specified in the thesis, using tabular functions as called ones.
+
+    Parameters
+    ----------
+    r : float
+        Polar coordinate (rho).
+    theta : float
+        Polar coordinate (theta).
+    m : int
+        Azimuthal order of the Zernike polynomial.
+    n : int
+        Radial order of the Zernike polynomial.
+
+    Returns
+    -------
+    tuple
+        2 values composing sub-integral parts on axis X.
+
+    """
+    derivRmn = tabular_radial_derivative_dr(m, n, r)
+    Rmn = tabular_radial_polynomial(m, n, r)
+    Angularmn = triangular_function(m, theta)
+    derivAngularmn = triangular_derivative_dtheta(m, theta)
+    return ((derivRmn*r*Angularmn*np.cos(theta)), (Rmn*derivAngularmn*np.sin(theta)))
+
+
 def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> tuple:
     """
-    Return 2 functions under the integration on Y axis specified in the thesis.
+    Return 2 functions under the integral equation on Y axis specified in the thesis.
 
     Parameters
     ----------
@@ -339,6 +368,34 @@ def rho_integral_funcY(r: float, theta: float, m: int, n: int) -> tuple:
     """
     derivRmn = radial_polynomial_derivative_dr(m, n, r)
     Rmn = radial_polynomial(m, n, r)
+    Angularmn = triangular_function(m, theta)
+    derivAngularmn = triangular_derivative_dtheta(m, theta)
+    return ((derivRmn*r*Angularmn*np.sin(theta)), (Rmn*derivAngularmn*np.cos(theta)))
+
+
+def r_integral_tabular_funcY(r: float, theta: float, m: int, n: int) -> tuple:
+    """
+    Return 2 functions under the integral equation on Y axis specified in the thesis, using tabular functions as called ones.
+
+    Parameters
+    ----------
+    r : float
+        Polar coordinate (rho).
+    theta : float
+        Polar coordinate (theta).
+    m : int
+        Azimuthal order of the Zernike polynomial.
+    n : int
+        Radial order of the Zernike polynomial.
+
+    Returns
+    -------
+    tuple
+        2 values composing sub-integral parts on axis Y.
+
+    """
+    derivRmn = tabular_radial_derivative_dr(m, n, r)
+    Rmn = tabular_radial_polynomial(m, n, r)
     Angularmn = triangular_function(m, theta)
     derivAngularmn = triangular_derivative_dtheta(m, theta)
     return ((derivRmn*r*Angularmn*np.sin(theta)), (Rmn*derivAngularmn*np.cos(theta)))
@@ -376,9 +433,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
     """
     # Integration on theta and rho - for X, Y integrals of Zernike polynonial made on the sub-aperture
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
-    # TODO: Calibration taking into account the wavelength, focal length should be implemented later
     calibration = 1.0
-    # print("# of used integration steps:", n_steps)
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
         print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
@@ -398,6 +453,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
             # on the square of Zernike polynomials: Integral(Integral((Zmn^2)*rho*drho*dtheta)). BOTH TESTED!
             # 3) Option - attempt to resemble the dependency on rho order - since the derivative guides to loosing 1 order,
             # then calibration should be only calculated up to Rmn order (not Rmn*rho or Rmn*Rmn*rho))
+            # Anyway, the calculation on the unit circle seems to be solution, it conforms with several tests
             rho = rho_a  # Lower integration boundary
             delta_rho = (rho_b - rho_a)/n_steps
             integral_sum_rhoX1 = 0.0; integral_sum_rhoX2 = 0.0; integral_sum_rhoY1 = 0.0; integral_sum_rhoY2 = 0.0
@@ -435,8 +491,6 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
             theta += delta_theta
         integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
         # integral_sumX /= integral_sum_Zernike; integral_sumY /= integral_sum_Zernike  # Calibration on the integrals of Zmn
-        # ???: the results of calculation using these definitions are disappointing!
-
         # The final integral values should be also calibrated to focal and wavelengths
         integral_values[i_subaperture, 1] = calibration*integral_sumX  # Partially calibration on the area of sub-aperture
         integral_values[i_subaperture, 0] = calibration*integral_sumY  # Partially calibration on the area of sub-aperture
@@ -446,7 +500,7 @@ def calc_integrals_on_apertures(integration_limits: np.ndarray, theta0: np.ndarr
 
 def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
                                             n_polynomial: int = 1, aperture_radius: float = 15.0, n_steps: int = 50,
-                                            swapXY: bool = True):
+                                            swapXY: bool = True, use_tabular_functions: bool = False) -> np.ndarray:
     """
     Calculate integrals using trapezodial rule inside the sub-apertures, which lies inside the unit circle.
 
@@ -470,7 +524,9 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
         Number of integration steps for both integrals. The default is 50.
     swapXY: bool, optional
         For swapping the direction of Y axis pointing up on the picture, instead down as for pixel coordinates (y, x),
-        for conforming with the thesis calculations. The default is True
+        for conforming with the thesis calculations. The default is True.
+    use_tabular_functions: bool, optional
+        If True, then the tabular functions up to 7th order will be used for integrals calculation. The default is False.
 
     Returns
     -------
@@ -479,7 +535,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
 
     """
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
-    calibration = 1.0  # Calibration taking into account the wavelength, focal length should be implemented later
+    calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
     rho_unit_calibration = np.max(rho0) + aperture_radius  # For making integration on rho on unit circle
     # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
     for i_subaperture in range(len(integration_limits)):
@@ -502,14 +558,26 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
             integral_sum_rhoX1 = 0.0; integral_sum_rhoX2 = 0.0; integral_sum_rhoY1 = 0.0; integral_sum_rhoY2 = 0.0
             for j_rho in range(n_steps+1):
                 if (j_rho == 0) or (j_rho == n_steps):
-                    (X1, X2) = rho_integral_funcX(rho, theta, m, n)
+                    if use_tabular_functions:
+                        (X1, X2) = r_integral_tabular_funcX(rho, theta, m, n)
+                    else:
+                        (X1, X2) = rho_integral_funcX(rho, theta, m, n)
                     integral_sum_rhoX1 += 0.5*X1; integral_sum_rhoX2 += 0.5*X2  # on X axis
-                    (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
+                    if use_tabular_functions:
+                        (Y1, Y2) = r_integral_tabular_funcY(rho, theta, m, n)
+                    else:
+                        (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
                     integral_sum_rhoY1 += 0.5*Y1; integral_sum_rhoY2 += 0.5*Y2  # on Y axis
                 else:
-                    (X1, X2) = rho_integral_funcX(rho, theta, m, n)
+                    if use_tabular_functions:
+                        (X1, X2) = r_integral_tabular_funcX(rho, theta, m, n)
+                    else:
+                        (X1, X2) = rho_integral_funcX(rho, theta, m, n)
                     integral_sum_rhoX1 += X1; integral_sum_rhoX2 += X2
-                    (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
+                    if use_tabular_functions:
+                        (Y1, Y2) = r_integral_tabular_funcY(rho, theta, m, n)
+                    else:
+                        (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
                     integral_sum_rhoY1 += Y1; integral_sum_rhoY2 += Y2
                 rho += delta_rho
             integral_sum_rhoX = (integral_sum_rhoX1 - integral_sum_rhoX2)  # From thesis equations
@@ -541,7 +609,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
 
 def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_limits: np.ndarray, theta0: np.ndarray,
                                  rho0: np.ndarray, aperture_radius: float = 15.0, n_steps: int = 50, on_unit_circle: bool = True,
-                                 swapXY: bool = True) -> np.ndarray:
+                                 swapXY: bool = True, use_tabular_functions: bool = False) -> np.ndarray:
     """
     Wrap for calculation of integral values on sub-apertures performing on several Zernike polynomials.
 
@@ -563,7 +631,9 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
         If True, then integration goes on the unit circle, in attempt to reproduce the thesis results. The default is True.
     swapXY: bool, optional
         For swapping the direction of Y axis pointing up on the picture, instead down as for pixel coordinates (y, x),
-        for conforming with the thesis calculations. The default is True
+        for conforming with the thesis calculations. The default is True.
+    use_tabular_functions: bool, optional
+        If True, then the tabular functions up to 7th order will be used for integrals calculation. The default is False.
 
     Returns
     -------
@@ -593,7 +663,7 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
                 if on_unit_circle:
                     integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
                                                                               aperture_radius=aperture_radius, n_steps=n_steps,
-                                                                              swapXY=swapXY)
+                                                                              swapXY=swapXY, use_tabular_functions=use_tabular_functions)
                 else:
                     integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
                                                                   aperture_radius=aperture_radius, n_steps=n_steps)
@@ -603,7 +673,8 @@ def calc_integral_matrix_zernike(zernike_polynomials_list: list, integration_lim
             # Normal integrals calculation
             if on_unit_circle:
                 integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
-                                                                          aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY)
+                                                                          aperture_radius=aperture_radius, n_steps=n_steps, swapXY=swapXY,
+                                                                          use_tabular_functions=use_tabular_functions)
             else:
                 integral_values = calc_integrals_on_apertures(integration_limits, theta0, rho0, m, n, n_polynomial=i+1,
                                                               aperture_radius=aperture_radius, n_steps=n_steps)
@@ -1062,9 +1133,8 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
 # %% Tests of functionality
 # Calculation of shifts between non- and aberrated images, integrals of Zernike polynomials on sub-apertures
 if __name__ == '__main__':
-    t1 = time.time()
+    t1 = time.time(); zernikes_set = [(-3, 3), (3, 3)]
     show_plots = False; min_dist_peaks = 18; threshold = 60.0; region_size = 20; aperture_radius = 14.0  # Parameters
-    zernikes_set = [(-3, 3), (3, 3)]
     # Get the shifts in center of masses and aberrated image with extracted background
     # (coms_shifts2, coms_aberrated2, pic_integral_limits) = get_overall_coms_shifts(plot_found_focal_spots=False,
     #                                                                                substract_background=False,
@@ -1073,7 +1143,8 @@ if __name__ == '__main__':
     #                                                                                region_size=region_size)
     # (integration_limits2, theta02, rho02,
     #  coms_aberrated2, coms_shifts2) = get_integr_limits_centralized_subapertures(pic_integral_limits, coms_aberrated2, coms_shifts2,
-    #                                                                              aperture_radius=aperture_radius, debug=False, swapXY=True)
+    #                                                                              aperture_radius=aperture_radius, debug=False,
+    #                                                                              swapXY=True)
     # integral_matrix2 = calc_integral_matrix_zernike(zernikes_set, integration_limits2, theta02, rho02,
     #                                                 aperture_radius=aperture_radius, n_steps=10)
 
@@ -1089,3 +1160,9 @@ if __name__ == '__main__':
                                                                min_dist_peaks=min_dist_peaks)
     t2 = time.time(); print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     alpha_coefficients = get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)
+    t3 = time.time(); use_tabular_functions = True
+    integral_matrix2 = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,
+                                                    aperture_radius=aperture_radius, n_steps=20,
+                                                    use_tabular_functions=use_tabular_functions)
+    diff_integral_matricies = np.absolute(integral_matrix2 - integral_matrix)
+    t4 = time.time(); print(f"Integration using tabular polynomials ({zernikes_set}) takes:", np.round(t4-t3, 3), "s")

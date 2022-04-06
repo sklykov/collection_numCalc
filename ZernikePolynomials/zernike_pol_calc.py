@@ -275,7 +275,8 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
                 (m, n) = tuple_orders
                 norm = normalization_factor(m, n)
                 for i in range(i_size):
-                    Z2[i, :] = alpha_coefficients[k]*norm*tabulated_radial_funciton(m, n, R[i])*(vectorized_triangular_function(m, Theta)[:])
+                    Z2[i, :] = (alpha_coefficients[k]*norm*tabular_radial_polynomial(m, n, R[i])
+                                * (vectorized_triangular_function(m, Theta)[:]))
                 S += Z2  # adding to the final sum of all contributed Zernike's polynomials
         else:
             continue  # goes further on the loop for the next polynomial with non-zero amplitude
@@ -322,11 +323,12 @@ def vectorized_triangular_function(m: int, Theta: np.ndarray) -> np.ndarray:
         return np.sin(m*Theta)
 
 
-def tabulated_radial_funciton(m: int, n: int, r: float) -> float:
+def tabular_radial_polynomial(m: int, n: int, r: float) -> float:
     """
     Return calculated by the explicit equation (from Lakshminarayanan V., Fleck A. (2011)) radial Zernike's polynomial value.
 
-    Return values only up to 7th order! (-3, 7) and (3, 7) in the sited above paper has the typo (2 instead of 21).
+    Return values only up to 7th order! (-3, 7) and (3, 7) in the sited above paper have the typos (2 instead of 21).
+    For the orders higher than 7, return 0.0 value.
 
     Parameters
     ----------
@@ -345,42 +347,106 @@ def tabulated_radial_funciton(m: int, n: int, r: float) -> float:
     """
     if ((m == -1) and (n == 1)) or ((m == 1) and (n == 1)):
         return r
-    if ((m == -2) and (n == 2)) or ((m == 2) and (n == 2)):
+    elif ((m == -2) and (n == 2)) or ((m == 2) and (n == 2)):
         return r*r  # r^2
-    if (m == 0) and (n == 2):
-        return 2*r*r - 1.0  # 2r^2 - 1
-    if ((m == -3) and (n == 3)) or ((m == 3) and (n == 3)):
+    elif (m == 0) and (n == 2):
+        return 2.0*r*r - 1.0  # 2r^2 - 1
+    elif ((m == -3) and (n == 3)) or ((m == 3) and (n == 3)):
         return r*r*r  # r^3
-    if ((m == -1) and (n == 3)) or ((m == 1) and (n == 3)):
-        return 3*r*r*r - 2*r  # 3r^3 - 2r
-    if ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
+    elif ((m == -1) and (n == 3)) or ((m == 1) and (n == 3)):
+        return 3.0*r*r*r - 2.0*r  # 3r^3 - 2r
+    elif ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
         return r*r*r*r  # r^4
-    if ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
-        return (4*r*r*r*r - 3*r*r)  # 4r^4 - 3r^2
-    if (m == 0) and (n == 4):
-        return (6*r*r*r*r - 6*r*r + 1.0)  # 6r^4 - 6r^2 + 1
-    if ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
+    elif ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
+        return (4.0*r*r*r*r - 3.0*r*r)  # 4r^4 - 3r^2
+    elif (m == 0) and (n == 4):
+        return (6.0*r*r*r*r - 6.0*r*r + 1.0)  # 6r^4 - 6r^2 + 1
+    elif ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
         return r*r*r*r*r  # r^5
-    if ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
-        return (5*r*r*r*r*r - 4*r*r*r)  # 5r^5 - 4r^3
-    if ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
-        return (10*r*r*r*r*r - 12*r*r*r + 3*r)  # 10r^5 - 12r^3 + 3r
-    if ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
+    elif ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
+        return (5.0*r*r*r*r*r - 4.0*r*r*r)  # 5r^5 - 4r^3
+    elif ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
+        return (10.0*r*r*r*r*r - 12.0*r*r*r + 3.0*r)  # 10r^5 - 12r^3 + 3r
+    elif ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
         return r*r*r*r*r*r  # r^6
-    if ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
-        return (6*r*r*r*r*r*r - 5*r*r*r*r)  # 6r^6 - 5r^4
-    if ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
-        return (15*r*r*r*r*r*r - 20*r*r*r*r + 6*r*r)  # 15r^6 - 20r^4 + 6r^2
-    if (m == 0) and (n == 6):
-        return (20*r*r*r*r*r*r - 30*r*r*r*r + 12*r*r - 1.0)  # 20r^6 - 30r^4 + 12r^2 - 1
-    if ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
+    elif ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
+        return (6.0*r*r*r*r*r*r - 5.0*r*r*r*r)  # 6r^6 - 5r^4
+    elif ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
+        return (15.0*r*r*r*r*r*r - 20.0*r*r*r*r + 6.0*r*r)  # 15r^6 - 20r^4 + 6r^2
+    elif (m == 0) and (n == 6):
+        return (20.0*r*r*r*r*r*r - 30.0*r*r*r*r + 12.0*r*r - 1.0)  # 20r^6 - 30r^4 + 12r^2 - 1
+    elif ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
         return r*r*r*r*r*r*r  # r^7
-    if ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
-        return (7*r*r*r*r*r*r*r - 6*r*r*r*r*r)  # 7r^7 - 6r^5
-    if ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
-        return (21*r*r*r*r*r*r*r - 30*r*r*r*r*r + 10*r*r*r)  # 21r^7 - 30r^5 + 10r^3
-    if ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):
-        return (35*r*r*r*r*r*r*r - 60*r*r*r*r*r + 30*r*r*r - 4*r)  # 35r^7 - 60r^5 + 30r^3 - 4r
+    elif ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
+        return (7.0*r*r*r*r*r*r*r - 6.0*r*r*r*r*r)  # 7r^7 - 6r^5
+    elif ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
+        return (21.0*r*r*r*r*r*r*r - 30.0*r*r*r*r*r + 10.0*r*r*r)  # 21r^7 - 30r^5 + 10r^3
+    elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):
+        return (35.0*r*r*r*r*r*r*r - 60.0*r*r*r*r*r + 30.0*r*r*r - 4.0*r)  # 35r^7 - 60r^5 + 30r^3 - 4r
+    else:
+        return 0.0  # default return value for the orders more than 7.
+
+
+def tabular_radial_derivative_dr(m: int, n: int, r: float) -> float:
+    """
+    Return calculated by the explicit equation derivative on r of radial polynomial specified above.
+
+    Return values only up to 7th order! For the orders higher than 7, return 0.0 value.
+
+    Parameters
+    ----------
+    m : int
+        Angular order of Zernike's polynomial.
+    n : int
+        Radial order of Zernike's polynomial.
+    r : float
+        Polar radial coordinate r (rho).
+
+    Returns
+    -------
+    float
+        Derivative of radial Zernike's polynomial on r value.
+    """
+    if ((m == -1) and (n == 1)) or ((m == 1) and (n == 1)):
+        return 1.0  # dr/dr = 1.0
+    elif ((m == -2) and (n == 2)) or ((m == 2) and (n == 2)):
+        return 2.0*r  # dr^2/dr = 2r
+    elif (m == 0) and (n == 2):
+        return 4.0*r  # d(2r^2 - 1)/dr = 4r
+    elif ((m == -3) and (n == 3)) or ((m == 3) and (n == 3)):
+        return 3.0*r*r  # d(r^3)/dr = 3*(r^2)
+    elif ((m == -1) and (n == 3)) or ((m == 1) and (n == 3)):
+        return 9.0*r*r - 2.0  # d(3r^3 - 2r)/dr = 9*(r^2) - 2
+    elif ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
+        return 4.0*r*r*r  # d(r^4)/dr = 4*(r^3)
+    elif ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
+        return (16.0*r*r*r - 6.0*r)  # d(4r^4 - 3r^2)/dr = 16*(r^3) - 6r
+    elif (m == 0) and (n == 4):
+        return (24.0*r*r*r - 12.0*r)  # d(6r^4 - 6r^2 + 1)/dr = 24*(r^3) - 12r
+    elif ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
+        return 5.0*r*r*r*r  # d(r^5)/dr = 5*(r^4)
+    elif ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
+        return (25.0*r*r*r*r - 12.0*r*r)  # d(5r^5 - 4r^3)/dr = 25*(r^4) - 12*(r^2)
+    elif ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
+        return (50.0*r*r*r*r - 36.0*r*r + 3.0)  # d(10r^5 - 12r^3 + 3r)/dr = 50*(r^4) - 36*(r^2) + 3
+    elif ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
+        return 6.0*r*r*r*r*r  # d(r^6)/dr = 6*(r^5)
+    elif ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
+        return (36.0*r*r*r*r*r - 20.0*r*r*r)  # d(6r^6 - 5r^4)/dr = 36*(r^5) - 20*(r^3)
+    elif ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
+        return (90.0*r*r*r*r*r - 80.0*r*r*r + 12.0*r)  # d(15r^6 - 20r^4 + 6r^2)/dr = 90*(r^5) - 80*(r^3) + 12r
+    elif (m == 0) and (n == 6):
+        return (120.0*r*r*r*r*r - 120.0*r*r*r + 24.0*r)  # d(20r^6 - 30r^4 + 12r^2 - 1)/dr = 120*(r^5) - 120*(r^3) + 24r
+    elif ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
+        return 7.0*r*r*r*r*r*r  # d(r^7)/dr = 7*(r^6)
+    elif ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
+        return (49.0*r*r*r*r*r*r - 30.0*r*r*r*r)  # d(7r^7 - 6r^5)/dr = 49*(r^6) - 30*(r^4)
+    elif ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
+        return (147.0*r*r*r*r*r*r - 150.0*r*r*r*r + 30.0*r*r)  # d(21r^7 - 30r^5 + 10r^3)/dr = 147*(r^6) - 150*(r^4) + 30*(r^2)
+    elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):  # d(35r^7 - 60r^5 + 30r^3 - 4r) = 245*(r^6) - 300*(r^4) + 90*(r^2) - 4
+        return (245.0*r*r*r*r*r*r - 300.0*r*r*r*r + 90.0*r*r - 4.0)
+    else:
+        return 0.0  # default return value for the orders more than 7.
 
 
 def plot_zps_rectangular(orders: list, step_xy: float = 0.02):
@@ -476,7 +542,8 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
 
     Till the 4th order (including) - the names taken from the Wikipedia artuicle https://en.wikipedia.org/wiki/Zernike_polynomials
     5th order names - from the website https://www.telescope-optics.net/monochromatic_eye_aberrations.htm.
-    6th order names - my guess about the naming.
+    6th order and 7th names - my guess about the naming.
+
     Parameters
     ----------
     mode : tuple
@@ -599,6 +666,38 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
         name = "Vertical thirdly astigmatism"
         if short_names:
             name = "Vert. 3d ast."
+    if (m == -7) and (n == 7):
+        name = "Vertical septfoil"
+        if short_names:
+            name = "Vert. 7foil"
+    if (m == -5) and (n == 7):
+        name = "Vertical secondary pentafoil"
+        if short_names:
+            name = "Vert. 2d 5foil"
+    if (m == -3) and (n == 7):
+        name = "Vertical thirdly trefoil"
+        if short_names:
+            name = "Vert. 3d 3foil"
+    if (m == -1) and (n == 7):
+        name = "Vertical thirdly coma"
+        if short_names:
+            name = "Vert. 3d coma"
+    if (m == 1) and (n == 7):
+        name = "Horizontal thirdly coma"
+        if short_names:
+            name = "Hor. 3d coma"
+    if (m == 3) and (n == 7):
+        name = "Oblique thirdly trefoil"
+        if short_names:
+            name = "Obliq.3d 3foil"
+    if (m == 5) and (n == 7):
+        name = "Oblique secondary pentafoil"
+        if short_names:
+            name = "Obliq.2d 5foil"
+    if (m == 7) and (n == 7):
+        name = "Oblique septfoil"
+        if short_names:
+            name = "Obliq. 7foil"
 
     return name
 
@@ -636,85 +735,31 @@ def test():
     None if all tests passed.
 
     """
-    m = 1; n = 1; r = 1.5; theta = np.radians(30.0); theta = float(theta)
-    assert radial_polynomial(m, n, r) == r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 1.0, f'Implemented dR{m, n} != to the calculated derivative'
-    assert zernike_polynomial(m, n, r, theta) == 2*r*np.cos(theta), f'Implemented Z{m, n} not equal to tabulated Zernike polynomial'
-    m = -1; n = 1
-    assert zernike_polynomial(m, n, r, theta) == 2*r*np.sin(theta), f'Implemented Z{m, n} not equal to tabulated Zernike polynomial'
-    m = 0; n = 2
-    assert radial_polynomial(m, n, r) == 2*r*r-1, f'Implemented R{m, n} not equal to tabulated radial polynomial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 4*r, f'Implemented dR{m, n} != to the calculated derivative'
-    assert zernike_polynomial(m, n, r, theta) == np.sqrt(3)*(2*r*r-1), f'Implemented Z{m, n} != tabulated value'
-    m = -2; n = 2
-    assert zernike_polynomial(m, n, r, theta) == np.sqrt(6)*r*r*np.sin(2*theta), f'Implemented Z{m, n} != tabulated value'
-    m = 2; n = 2
-    assert radial_polynomial(m, n, r) == r*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 2*r, f'Implemented dR{m, n} != to the calculated derivative'
-    m = 1; n = 3
-    assert radial_polynomial(m, n, r) == 3*r*r*r-2*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 9*r*r-2.0, f'Implemented dR{m, n} != to the calculated derivative'
-    assert zernike_polynomial(m, n, r, theta) == np.sqrt(8)*(3*r*r*r-2*r)*np.cos(theta), f'Implemented Z{m, n} != tabulated value'
-    m = 3; n = 3
-    assert radial_polynomial(m, n, r) == r*r*r, f'Implemented R{m, n} not equal to tabulated radial polynomial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 3*r*r, f'Implemented dR{m, n} != to the calculated derivative'
-    m = 0; n = 4
-    assert radial_polynomial(m, n, r) == 6*(np.power(r, 4)-np.power(r, 2)) + 1, f'Implemented R{m, n} not equal to tabulated radial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 6*(4*r*r*r-2*r), f'Implemented dR{m, n} != to the calculated derivative'
-    m = 2; n = 4
-    assert radial_polynomial(m, n, r) == 4*np.power(r, 4)-3*np.power(r, 2), f'Implemented R{m, n} not equal to tabulated radial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 16*r*r*r - 6*r, f'Implemented dR{m, n} != to the calculated derivative'
-    m = 4; n = 4
-    assert radial_polynomial(m, n, r) == np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 4*r*r*r, f'Implemented dR{m, n} != to the calculated derivative'
-    assert abs(zernike_polynomial(m, n, r, theta) - np.sqrt(10)*r*r*r*r*np.cos(4*theta)) < 0.001, f'Z{m, n} != tabulated value'
-    m = -4; n = 4
-    assert abs(zernike_polynomial(m, n, r, theta) - np.sqrt(10)*r*r*r*r*np.sin(4*theta)) < 0.001, f'Z{m, n} != tabulated value'
-    m = 1; n = 5
-    assert radial_polynomial(m, n, r) == 10*np.power(r, 5) - 12*r*r*r + 3*r, f'Implemented R{m, n} not equal to tabulated radial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 50*np.power(r, 4) - 36*r*r + 3, f'Implemented dR{m, n} != to the derivative'
-    m = 4; n = 6
-    assert radial_polynomial(m, n, r) == 6*np.power(r, 6) - 5*np.power(r, 4), f'Implemented R{m, n} not equal to tabulated radial'
-    assert radial_polynomial_derivative_dr(m, n, r) == 36*np.power(r, 5) - 20*r*r*r, f'Implemented dR{m, n} != to the derivative'
+    r = 0.841; theta = np.radians(30.0); theta = float(theta)  # some predefined values for polar coordinates
+    # Tests of implemented recursive values using the equations from Wiki as tabulated
+    m = 1; n = 1; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - 2*r*np.cos(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
+    m = -1; n = 1; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - 2*r*np.sin(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
+    m = 0; n = 2; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - np.sqrt(3.0)*(2.0*r*r - 1.0)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
+    m = -2; n = 2; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - np.sqrt(6.0)*r*r*np.sin(2.0*theta)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
+    m = 1; n = 3; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - np.sqrt(8.0)*(3.0*r*r*r - 2.0*r)*np.cos(theta)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
+    m = -4; n = 4; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - np.sqrt(10.0)*r*r*r*r*np.sin(4.0*theta)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
+    m = 0; n = 4; zrp = zernike_polynomial(m, n, r, theta)
+    assert abs(zrp - np.sqrt(5.0)*(6.0*r*r*r*r - 6.0*r*r + 1.0)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
     # Test the tabulated values, assuming that the recursive implemented correctly
-    m = -7; n = 7
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -5; n = 7
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -3; n = 7
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -1; n = 7
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -6; n = 6
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -4; n = 6
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -2; n = 6
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = 0; n = 6
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -5; n = 5
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -3; n = 5
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -1; n = 5
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -4; n = 4
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -2; n = 4
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = 0; n = 4
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -3; n = 3
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -1; n = 3
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -2; n = 2
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = 0; n = 2
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
-    m = -1; n = 1
-    assert abs(radial_polynomial(m, n, r)-tabulated_radial_funciton(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+    test_orders = [(-7, 7), (-5, 7), (-3, 7), (-1, 7), (-6, 6), (-4, 6), (-2, 6), (-5, 5), (-3, 5),
+                   (-1, 5), (-4, 4), (-2, 4), (0, 4), (-3, 3), (-1, 3), (-2, 2), (0, 2), (-1, 1)]
+    for test_order in test_orders:
+        (m, n) = test_order
+        assert abs(radial_polynomial(m, n, r)-tabular_radial_polynomial(m, n, r)) < 1.0E-6, f'Check tabulated R{m, n}'
+        assert abs(radial_polynomial_derivative_dr(m, n, r)-tabular_radial_derivative_dr(m, n, r)) < 1.0E-6, f'Tab. dR{m, n}!'
+        # print(radial_polynomial_derivative_dr(m, n, r), tabular_radial_derivative_dr(m, n, r))
+        # print(radial_polynomial(m, n, r), tabular_radial_polynomial(m, n, r))
     print("All tests passed")
 
 
