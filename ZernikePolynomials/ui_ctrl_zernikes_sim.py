@@ -65,10 +65,11 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
                                              command=self.numberOrdersChanged)
         # Specification of two case selectors: Simulation / Controlling DPP
         self.listDevices = ["Pure Simulator", "DPP + Simulator"]; self.device_selector = tk.StringVar()
-        self.device_selector.set(self.listDevices[0]); self.deviceSelectorButton = OptionMenu(self, self.device_selector,
-                                                                                              self.listDevices[0],
-                                                                                              *self.listDevices,
-                                                                                              command=self.deviceSelected)
+        self.device_selector.set(self.listDevices[0])
+        self.deviceSelectorButton = OptionMenu(self, self.device_selector,
+                                               self.listDevices[0],
+                                               *self.listDevices,
+                                               command=self.deviceSelected)
         # Max voltage control with the named label and Combobox for controlling voltage
         self.holderSelector = Frame(self); textVMaxLabel = Label(self.holderSelector, text=" Max Volts:")
         self.maxV_selector_value = tk.IntVar(); self.maxV_selector_value.set(200)  # initial voltage
@@ -82,7 +83,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         self.ampl_ctrls = tk.Toplevel(master=self)  # additional window, master - the main window
         # put this additional window with some offset for the representing it next to the main
         self.ampl_ctrls_offsets = "+658+50"; self.ampl_ctrls.geometry(self.ampl_ctrls_offsets)
-        # Seems, that command below makes accessible the button values from the this window to the main
+        # Seems, that command below makes accessible the button values from this window to the main
         self.ampl_ctrls.wm_transient(self); self.ampl_ctrls.title("Amplitude controls")
         self.ampl_ctrls.protocol("WM_DELETE_WINDOW", self.no_exit)  # !!! Associate clicking on quit button (X) with the function
         # Placing all created widgets in the grid layout on the main window

@@ -20,7 +20,7 @@ def normalization_factor(m: int, n: int) -> float:
     Parameters
     ----------
     m : int
-        Azimutal order.
+        Azimuthal order.
     n : int
         Radial order.
 
@@ -44,7 +44,7 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
     Parameters
     ----------
     m: int
-        Azimutal order.
+        Azimuthal order.
     n: int
         Radial order.
     r: float
@@ -57,11 +57,11 @@ def radial_polynomial(m: int, n: int, r: float) -> float:
     """
     if (n == 0) and (m == 0):
         return 1.0
-    elif (m > n):
+    elif m > n:
         return 0.0
     else:
         # Recursion formula that should be more effective than direct calculation (only for high radial orders)
-        return (r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) - radial_polynomial(m, n-2, r))
+        return r*(radial_polynomial(abs(m-1), n-1, r) + radial_polynomial(m+1, n-1, r)) - radial_polynomial(m, n-2, r)
 
 
 def triangular_function(m: int, theta: float) -> float:
@@ -81,9 +81,9 @@ def triangular_function(m: int, theta: float) -> float:
         Calculated value.
 
     """
-    if (m > 0):
+    if m > 0:
         return np.cos(m*theta)
-    elif (m < 0):
+    elif m < 0:
         return -np.sin(m*theta)
     else:
         return 1.0
@@ -96,7 +96,7 @@ def zernike_polynomial(m: int, n: int, r: float, theta: float) -> float:
     Parameters
     ----------
     m: int
-        Azimutal order.
+        Azimuthal order.
     n: int
         Radial order.
     r: float
@@ -109,7 +109,7 @@ def zernike_polynomial(m: int, n: int, r: float, theta: float) -> float:
     float:
         Recursively calculated Zernike polynomial.
     """
-    return (normalization_factor(m, n)*radial_polynomial(m, n, r)*triangular_function(m, theta))
+    return normalization_factor(m, n)*radial_polynomial(m, n, r)*triangular_function(m, theta)
 
 
 def zernike_polynomials_sum_tuned(orders: list, alpha_coefficients: list, step_r: float = 0.01,
@@ -118,7 +118,7 @@ def zernike_polynomials_sum_tuned(orders: list, alpha_coefficients: list, step_r
     Calculate sum of Zernike's polynomials using specified amplitudes (alpha coefficients).
 
     NOTE: this sum calculation using the tabular values up to 7th order and vectorization of triangular function calculation.
-    It's speeded up, but not universal. Rewrite in the need of customizing to the arbitrary order calculation.
+    It's speed up, but not universal. Rewrite in the need of customizing to the arbitrary order calculation.
 
     Parameters
     ----------
@@ -151,21 +151,21 @@ def zernike_polynomials_sum_tuned(orders: list, alpha_coefficients: list, step_r
     Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
     S = np.zeros((i_size, j_size), dtype='float')  # initial sum
     for k in range(len(orders)):
-        if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+        if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coefficient is actually non-zero
             tuple_orders = orders[k]
             if (not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients))
-                    and len(tuple_orders != 2)):
+                    and len(tuple_orders != 2)):  # checking for conformity with specification of orders
                 raise TypeError
             else:
                 (m, n) = tuple_orders
                 norm = normalization_factor(m, n)
                 for i in range(i_size):
                     Z[i, :] = (alpha_coefficients[k]*norm*tabular_radial_polynomial(m, n, R[i])
-                               * (vectorized_triangular_function(m, Theta)[:]))
+                               * (vectorized_triangular_function(m, Theta)[:]))  # get the pol. value
                 S += Z  # adding to the final sum of all contributed Zernike's polynomials
         else:
             continue  # goes further on the loop for the next polynomial with non-zero amplitude
-    return (R, Theta, S)
+    return R, Theta, S    # tuple can be defined by coma separation
 
 
 def plot_zps_polar(orders: list, step_r: float = 0.005, step_theta: float = 0.5, title: str = "Sum of Zernike polynomials",
@@ -186,7 +186,7 @@ def plot_zps_polar(orders: list, step_r: float = 0.005, step_theta: float = 0.5,
     alpha_coefficients: list, optional
         List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
     show_amplitudes : bool, optional
-        Shows the colourbar on the plot with amplitudes. The default is False.
+        Shows the colour-bar on the plot with amplitudes. The default is False.
 
     Returns
     -------
@@ -194,7 +194,7 @@ def plot_zps_polar(orders: list, step_r: float = 0.005, step_theta: float = 0.5,
 
     """
     if len(alpha_coefficients) == 0:
-        alpha_coefficients = [1.0 for i in orders]
+        alpha_coefficients = [1.0]*len(orders)
     R, Theta, Z = zernike_polynomials_sum_tuned(orders, alpha_coefficients, step_r=step_r, step_theta=step_theta)
     # Plotting and formatting - Polar projection + plotting the colormap
     plt.figure(); axes = plt.axes(projection='polar'); axes.set_theta_direction(-1)  # set the clockwise counting of theta
@@ -218,7 +218,7 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     orders : list
         List of Zernike polynomials orders recorded in tuples (m, n) inside the list like [(m, n), ...].
     alpha_coefficients: list
-        List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
+        List with tuning coefficients (amplitudes) of each polynomial for their sum calculation.
     step_r : float, optional
         Step for calculation of radius for a summing map (colormap). The default is 0.01.
     step_theta : float, optional
@@ -250,7 +250,7 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     # !!!: using contourf function is too slow for providing refreshing upon calling by the button
     axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
     im = axes.pcolormesh(Theta, R, S, cmap=cm.coolwarm)  # plot the colour map by using the Z map according to Theta, R polar coordinates
-    axes.axis('off')  # off polar coordnate axes
+    axes.axis('off')  # off polar coordinate axes
     axes.set_theta_direction(-1)  # the counterclockwise counting of angle switched to clockwise!
     if show_amplitudes:
         figure.colorbar(im, ax=axes)  # shows the colour bar with shown on image amplitudes
@@ -316,31 +316,31 @@ def tabular_radial_polynomial(m: int, n: int, r: float) -> float:
     elif ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
         return r*r*r*r  # r^4
     elif ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
-        return (4.0*r*r*r*r - 3.0*r*r)  # 4r^4 - 3r^2
+        return 4.0*r*r*r*r - 3.0*r*r  # 4r^4 - 3r^2
     elif (m == 0) and (n == 4):
-        return (6.0*r*r*r*r - 6.0*r*r + 1.0)  # 6r^4 - 6r^2 + 1
+        return 6.0*r*r*r*r - 6.0*r*r + 1.0  # 6r^4 - 6r^2 + 1
     elif ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
         return r*r*r*r*r  # r^5
     elif ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
-        return (5.0*r*r*r*r*r - 4.0*r*r*r)  # 5r^5 - 4r^3
+        return 5.0*r*r*r*r*r - 4.0*r*r*r  # 5r^5 - 4r^3
     elif ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
-        return (10.0*r*r*r*r*r - 12.0*r*r*r + 3.0*r)  # 10r^5 - 12r^3 + 3r
+        return 10.0*r*r*r*r*r - 12.0*r*r*r + 3.0*r  # 10r^5 - 12r^3 + 3r
     elif ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
         return r*r*r*r*r*r  # r^6
     elif ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
-        return (6.0*r*r*r*r*r*r - 5.0*r*r*r*r)  # 6r^6 - 5r^4
+        return 6.0*r*r*r*r*r*r - 5.0*r*r*r*r  # 6r^6 - 5r^4
     elif ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
-        return (15.0*r*r*r*r*r*r - 20.0*r*r*r*r + 6.0*r*r)  # 15r^6 - 20r^4 + 6r^2
+        return 15.0*r*r*r*r*r*r - 20.0*r*r*r*r + 6.0*r*r  # 15r^6 - 20r^4 + 6r^2
     elif (m == 0) and (n == 6):
-        return (20.0*r*r*r*r*r*r - 30.0*r*r*r*r + 12.0*r*r - 1.0)  # 20r^6 - 30r^4 + 12r^2 - 1
+        return 20.0*r*r*r*r*r*r - 30.0*r*r*r*r + 12.0*r*r - 1.0  # 20r^6 - 30r^4 + 12r^2 - 1
     elif ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
         return r*r*r*r*r*r*r  # r^7
     elif ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
-        return (7.0*r*r*r*r*r*r*r - 6.0*r*r*r*r*r)  # 7r^7 - 6r^5
+        return 7.0*r*r*r*r*r*r*r - 6.0*r*r*r*r*r  # 7r^7 - 6r^5
     elif ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
-        return (21.0*r*r*r*r*r*r*r - 30.0*r*r*r*r*r + 10.0*r*r*r)  # 21r^7 - 30r^5 + 10r^3
+        return 21.0*r*r*r*r*r*r*r - 30.0*r*r*r*r*r + 10.0*r*r*r  # 21r^7 - 30r^5 + 10r^3
     elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):
-        return (35.0*r*r*r*r*r*r*r - 60.0*r*r*r*r*r + 30.0*r*r*r - 4.0*r)  # 35r^7 - 60r^5 + 30r^3 - 4r
+        return 35.0*r*r*r*r*r*r*r - 60.0*r*r*r*r*r + 30.0*r*r*r - 4.0*r  # 35r^7 - 60r^5 + 30r^3 - 4r
     else:
         return 0.0  # default return value for the orders more than 7.
 
@@ -378,31 +378,31 @@ def tabular_radial_derivative_dr(m: int, n: int, r: float) -> float:
     elif ((m == -4) and (n == 4)) or ((m == 4) and (n == 4)):
         return 4.0*r*r*r  # d(r^4)/dr = 4*(r^3)
     elif ((m == -2) and (n == 4)) or ((m == 2) and (n == 4)):
-        return (16.0*r*r*r - 6.0*r)  # d(4r^4 - 3r^2)/dr = 16*(r^3) - 6r
+        return 16.0*r*r*r - 6.0*r  # d(4r^4 - 3r^2)/dr = 16*(r^3) - 6r
     elif (m == 0) and (n == 4):
-        return (24.0*r*r*r - 12.0*r)  # d(6r^4 - 6r^2 + 1)/dr = 24*(r^3) - 12r
+        return 24.0*r*r*r - 12.0*r  # d(6r^4 - 6r^2 + 1)/dr = 24*(r^3) - 12r
     elif ((m == -5) and (n == 5)) or ((m == 5) and (n == 5)):
         return 5.0*r*r*r*r  # d(r^5)/dr = 5*(r^4)
     elif ((m == -3) and (n == 5)) or ((m == 3) and (n == 5)):
-        return (25.0*r*r*r*r - 12.0*r*r)  # d(5r^5 - 4r^3)/dr = 25*(r^4) - 12*(r^2)
+        return 25.0*r*r*r*r - 12.0*r*r  # d(5r^5 - 4r^3)/dr = 25*(r^4) - 12*(r^2)
     elif ((m == -1) and (n == 5)) or ((m == 1) and (n == 5)):
-        return (50.0*r*r*r*r - 36.0*r*r + 3.0)  # d(10r^5 - 12r^3 + 3r)/dr = 50*(r^4) - 36*(r^2) + 3
+        return 50.0*r*r*r*r - 36.0*r*r + 3.0  # d(10r^5 - 12r^3 + 3r)/dr = 50*(r^4) - 36*(r^2) + 3
     elif ((m == -6) and (n == 6)) or ((m == 6) and (n == 6)):
         return 6.0*r*r*r*r*r  # d(r^6)/dr = 6*(r^5)
     elif ((m == -4) and (n == 6)) or ((m == 4) and (n == 6)):
-        return (36.0*r*r*r*r*r - 20.0*r*r*r)  # d(6r^6 - 5r^4)/dr = 36*(r^5) - 20*(r^3)
+        return 36.0*r*r*r*r*r - 20.0*r*r*r  # d(6r^6 - 5r^4)/dr = 36*(r^5) - 20*(r^3)
     elif ((m == -2) and (n == 6)) or ((m == 2) and (n == 6)):
-        return (90.0*r*r*r*r*r - 80.0*r*r*r + 12.0*r)  # d(15r^6 - 20r^4 + 6r^2)/dr = 90*(r^5) - 80*(r^3) + 12r
+        return 90.0*r*r*r*r*r - 80.0*r*r*r + 12.0*r  # d(15r^6 - 20r^4 + 6r^2)/dr = 90*(r^5) - 80*(r^3) + 12r
     elif (m == 0) and (n == 6):
-        return (120.0*r*r*r*r*r - 120.0*r*r*r + 24.0*r)  # d(20r^6 - 30r^4 + 12r^2 - 1)/dr = 120*(r^5) - 120*(r^3) + 24r
+        return 120.0*r*r*r*r*r - 120.0*r*r*r + 24.0*r  # d(20r^6 - 30r^4 + 12r^2 - 1)/dr = 120*(r^5) - 120*(r^3) + 24r
     elif ((m == -7) and (n == 7)) or ((m == 7) and (n == 7)):
         return 7.0*r*r*r*r*r*r  # d(r^7)/dr = 7*(r^6)
     elif ((m == -5) and (n == 7)) or ((m == 5) and (n == 7)):
-        return (49.0*r*r*r*r*r*r - 30.0*r*r*r*r)  # d(7r^7 - 6r^5)/dr = 49*(r^6) - 30*(r^4)
+        return 49.0*r*r*r*r*r*r - 30.0*r*r*r*r  # d(7r^7 - 6r^5)/dr = 49*(r^6) - 30*(r^4)
     elif ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
-        return (147.0*r*r*r*r*r*r - 150.0*r*r*r*r + 30.0*r*r)  # d(21r^7 - 30r^5 + 10r^3)/dr = 147*(r^6) - 150*(r^4) + 30*(r^2)
+        return 147.0*r*r*r*r*r*r - 150.0*r*r*r*r + 30.0*r*r  # d(21r^7 - 30r^5 + 10r^3)/dr = 147*(r^6) - 150*(r^4) + 30*(r^2)
     elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):  # d(35r^7 - 60r^5 + 30r^3 - 4r) = 245*(r^6) - 300*(r^4) + 90*(r^2) - 4
-        return (245.0*r*r*r*r*r*r - 300.0*r*r*r*r + 90.0*r*r - 4.0)
+        return 245.0*r*r*r*r*r*r - 300.0*r*r*r*r + 90.0*r*r - 4.0
     else:
         return 0.0  # default return value for the orders more than 7.
 
@@ -414,7 +414,7 @@ def radial_polynomial_derivative_dr(m: int, n: int, r: float) -> float:
     Parameters
     ----------
     m: int
-        Azimutal order.
+        Azimuthal order.
     n: int
         Radial order.
     r: float
@@ -428,7 +428,7 @@ def radial_polynomial_derivative_dr(m: int, n: int, r: float) -> float:
     """
     if (n == 0) and (m == 0):
         return 0.0
-    elif (m > n):
+    elif m > n:
         return 0.0
     else:
         # Recursion formula that should be more effective than direct calculation
@@ -444,7 +444,7 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
     Parameters
     ----------
     m : int
-        Azimutal order.
+        Azimuthal order.
     theta : float
         Angle from polar coordinates associated with the unit circle .
 
@@ -454,9 +454,9 @@ def triangular_derivative_dtheta(m: int, theta: float) -> float:
         Calculated value.
 
     """
-    if (m > 0):
+    if m > 0:
         return -m*math.sin(m*theta)
-    elif (m < 0):
+    elif m < 0:
         return -m*math.cos(m*theta)
     else:
         return 0.0
@@ -484,7 +484,6 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
 
     """
     name = ""
-    (m, n) = mode
     dictionary_names = {(-1, 1): "Vertical (Y) tilt", (1, 1): "Horizontal (X) tilt", (-2, 2): "Oblique astigmatism",
                         (0, 2): "Defocus", (2, 2): "Vertical astigmatism", (-3, 3): "Vertical trefoil",
                         (-1, 3): "Vertical coma", (1, 3): "Horizontal coma", (3, 3): "Oblique trefoil",
@@ -530,7 +529,7 @@ def get_osa_standard_index(m: int, n: int) -> int:
     Parameters
     ----------
     m : int
-        Azimutal order.
+        Azimuthal order.
     n : int
         Radial order.
 
@@ -592,5 +591,5 @@ if __name__ == '__main__':
     step_r = 0.01; step_theta = 1.0  # in grads
     orders = [(-1, 1)]  # Y tilt
     plot_zps_polar(orders, step_r, step_theta, "Y tilt")
-    zernikes_set = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
-    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", alpha_coefficients=coefficients, show_amplitudes=True)
+    zernikes_set = [(-1, 1), (1, 1)]
+    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts with equal amplitudes", show_amplitudes=True)
