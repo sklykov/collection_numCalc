@@ -112,9 +112,8 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         """
         # t1 = time.time()
         # below: update the plot
-        self.figure = get_plot_zps_polar(self.figure, orders=self.orders, step_r=0.005, step_theta=0.8,
+        self.figure = get_plot_zps_polar(self.figure, orders=self.orders, step_r=0.005, step_theta=0.9,
                                          alpha_coefficients=self.amplitudes, show_amplitudes=self.plotColorbar)
-        # t3 = time.time(); print("plot time(ms):", int(np.round((t3-t1)*1000, 0)))
         self.canvas.draw()  # redraw the figure
         # t2 = time.time(); print("redraw time(ms):", int(np.round((t2-t1)*1000, 0)))  # for debugging
 

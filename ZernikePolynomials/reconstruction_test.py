@@ -146,14 +146,14 @@ if repo_pics2:
         # set14zernikes = [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3),
         #                  (1, 3), (3, 3), (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)]
         plot_zps_polar(zernikes_set, title="reconstraction of pics from the open repository",
-                       tuned=True, alpha_coefficients=(alpha_coefficients))
+                       alpha_coefficients=(alpha_coefficients))
         # Plotting the 14 Zernikes, assuming that the graph from the calculation gives the coefficients for Zernike polynomials
         repo_coefficients = [-0.987, 0.367, 0.341, -1.434, 0.843, -0.306, 0.192, 0.375, -0.277, 0.343, -0.159, 0.171, -0.037, -0.016,
                              0.0, -0.01, 0.25, 0.0, 0.004, 0.0]
         for i in range(len(zernikes_set)):
             print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i], 3), "(SK) ",
                   repo_coefficients[i], "(Jacopo's)")
-        plot_zps_polar(zernikes_set, title="profile reconstructed by Jacopo", tuned=True, alpha_coefficients=repo_coefficients)
+        plot_zps_polar(zernikes_set, title="profile reconstructed by Jacopo", alpha_coefficients=repo_coefficients)
 
 # %% Tests on the recorded pictures from the Shack-Hartmann sensor
 if shwfs2:

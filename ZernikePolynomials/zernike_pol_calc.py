@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Calculation of Zernike polynomials.
+Calculation of Zernike polynomials, plot their surface maps on the unit apertures.
 
 @author: ssklykov
 """
@@ -112,53 +112,24 @@ def zernike_polynomial(m: int, n: int, r: float, theta: float) -> float:
     return (normalization_factor(m, n)*radial_polynomial(m, n, r)*triangular_function(m, theta))
 
 
-def zernike_polynomials_sum(orders: list, r: float, theta: float) -> float:
+def zernike_polynomials_sum_tuned(orders: list, alpha_coefficients: list, step_r: float = 0.01,
+                                  step_theta: float = 1.0) -> tuple:
     """
-    Return sum of specified Zernike polynomials (m,n) for the particular point on the unit circle.
+    Calculate sum of Zernike's polynomials using specified amplitudes (alpha coefficients).
+
+    NOTE: this sum calculation using the tabular values up to 7th order and vectorization of triangular function calculation.
+    It's speeded up, but not universal. Rewrite in the need of customizing to the arbitrary order calculation.
 
     Parameters
     ----------
     orders : list
-        List of tuples like [(m,n), ...] with all Zernike polynomials orders for summing.
-    r : float
-        Radius on the unit circle.
-    theta : float
-        Angle on the unit circle.
-
-    Raises
-    ------
-    TypeError
-        If the input list doesn't contain tuples formatted as (m,n).
-
-    Returns
-    -------
-    float
-        Sum of all specified Zernike polynomials.
-    """
-    s = 0.0  # initial sum
-    for tuple_orders in orders:
-        if not (isinstance(tuple_orders, tuple)):
-            raise TypeError
-        else:
-            (m, n) = tuple_orders
-            s += zernike_polynomial(m, n, r, theta)
-    return s
-
-
-def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_coefficients: list) -> float:
-    """
-    Return sum of muliplied by alpha coefficient Zernike polynomials (m,n) for the particular point on the unit circle.
-
-    Parameters
-    ----------
-    orders : list
-        List of tuples like [(m,n), ...] with all Zernike polynomials orders for summing.
-    r : float
-        Radius on the unit circle.
-    theta : float
-        Angle on the unit circle.
-    alpha_coefficients : list
-        Tuning coefficients for calculation of Zernike polynomials mutliplied by specified coefficient.
+        List of Zernike polynomials orders recorded in tuples (m, n) inside the list like [(m, n), ...].
+    alpha_coefficients: list
+        List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
+    step_r : float, optional
+        Step for calculation of radius for a summing map (colormap). The default is 0.01.
+    step_theta : float, optional
+        Step (in grades) for calculation of angle for a summing map (colormap). The default is 1.0.
 
     Raises
     ------
@@ -167,25 +138,38 @@ def zernike_polynomials_sum_tuned(orders: list, r: float, theta: float, alpha_co
 
     Returns
     -------
-    float
-        Sum of all specified Zernike polynomials.
+    tuple
+        In the form (R, Theta, S) there R - radial coordinates vector, Theta - angular coordinates vector,
+        S - polynomials sum.
+
     """
-    s = 0.0  # initial sum
-    for i in range(len(orders)):
-        if abs(alpha_coefficients[i]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
-            tuple_orders = orders[i]
-            if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
+    R = np.arange(0.0, 1.0+step_r, step_r)  # steps on r (polar coordinate)
+    Theta = np.arange(0.0, (2.0*np.pi + np.radians(step_theta)), np.radians(step_theta))  # steps on theta (polar coordinates)
+    (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
+    # Calculation of sum of Zernike's polynomials (on all points sequentially => slow, deleted)
+    # Speed up the calculation by using vectorization of calculation on angles theta and using tabulated function values
+    Z = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
+    S = np.zeros((i_size, j_size), dtype='float')  # initial sum
+    for k in range(len(orders)):
+        if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
+            tuple_orders = orders[k]
+            if (not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients))
+                    and len(tuple_orders != 2)):
                 raise TypeError
             else:
                 (m, n) = tuple_orders
-                s += zernike_polynomial(m, n, r, theta)*alpha_coefficients[i]
+                norm = normalization_factor(m, n)
+                for i in range(i_size):
+                    Z[i, :] = (alpha_coefficients[k]*norm*tabular_radial_polynomial(m, n, R[i])
+                               * (vectorized_triangular_function(m, Theta)[:]))
+                S += Z  # adding to the final sum of all contributed Zernike's polynomials
         else:
             continue  # goes further on the loop for the next polynomial with non-zero amplitude
-    return s
+    return (R, Theta, S)
 
 
-def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, title: str = "Sum of Zernike polynomials",
-                   tuned: bool = False, alpha_coefficients: list = [], show_amplitudes: bool = False):
+def plot_zps_polar(orders: list, step_r: float = 0.005, step_theta: float = 0.5, title: str = "Sum of Zernike polynomials",
+                   alpha_coefficients: list = [], show_amplitudes: bool = False):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle.
 
@@ -198,9 +182,7 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
     step_theta : float, optional
         Step (in grades) for calculation of angle for a summing map (colormap). The default is 1.0.
     title : str, optional
-        Title for placing on the plot, e.g. for specific single polynomial like X Tilt. The default is "Sum of Zernike polynomials".
-    tuned: bool, optional
-        Flag for the taking into account specified alpha_coefficients (amplitudes) for the specified polynomials.
+        Title for placing on the plot, e.g. for specific single polynomial. The default is "Sum of Zernike polynomials".
     alpha_coefficients: list, optional
         List with tunning coefficients (amplitudes) of each polynomial for their sum calculation.
     show_amplitudes : bool, optional
@@ -211,30 +193,21 @@ def plot_zps_polar(orders: list, step_r: float = 0.01, step_theta: float = 1.0, 
     None. The plot is shown in the separate window.
 
     """
-    R = np.arange(0.0, 1.0+step_r, step_r)
-    Theta = np.arange(0.0, 2*np.pi+np.radians(step_theta), np.radians(step_theta))
-    (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
-    Z = np.zeros((i_size, j_size), dtype='float')
-    for i in range(i_size):
-        for j in range(j_size):
-            if tuned:
-                Z[i, j] = zernike_polynomials_sum_tuned(orders, R[i], Theta[j], alpha_coefficients)
-            else:
-                Z[i, j] = zernike_polynomials_sum(orders, R[i], Theta[j])
-    # Plotting and formatting - Polar projection + plotting the colormap as filled contour using "contourf"
-    plt.figure()
-    plt.axes(projection='polar')
-    n_used_tones = 100
-    plt.contourf(Theta, R, Z, n_used_tones, cmap=cm.coolwarm)
-    plt.title(title)
-    plt.axis('off')
+    if len(alpha_coefficients) == 0:
+        alpha_coefficients = [1.0 for i in orders]
+    R, Theta, Z = zernike_polynomials_sum_tuned(orders, alpha_coefficients, step_r=step_r, step_theta=step_theta)
+    # Plotting and formatting - Polar projection + plotting the colormap
+    plt.figure(); axes = plt.axes(projection='polar'); axes.set_theta_direction(-1)  # set the clockwise counting of theta
+    # plt.grid(False); plt.pcolormesh(Theta, R, Z, cmap=cm.coolwarm)  # the windows with plots are not responsive!
+    plt.contourf(Theta, R, Z, 100, cmap=cm.coolwarm)  # produces more responsive plots!
+    plt.title(title); plt.axis('off')
     if show_amplitudes:
         plt.colorbar()  # shows the colour bar with shown on image amplitudes
     plt.tight_layout()
 
 
 def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: float = 0.01,
-                       step_theta: float = 2.0, show_amplitudes: bool = False):
+                       step_theta: float = 1.0, show_amplitudes: bool = False):
     """
     Plot Zernike's polynomials sum ("zps") in polar projection for the unit radius circle on the provided matplotlib.figure instance.
 
@@ -253,33 +226,18 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     show_amplitudes : bool, optional
         Shows the colourbar on the plot with amplitudes. The default is False.
 
+    Raises
+    ------
+    TypeError
+        If the input list doesn't contain tuples formatted as (m,n) AND if length of orders != alpha coefficients.
+
     Returns
     -------
     figure : matplotlib.figure.Figure()
         The Figure() instance with plotted colormesh graph.
 
     """
-    R = np.arange(0.0, 1.0+step_r, step_r)  # steps on r (polar coordinate)
-    Theta = np.arange(0.0, 2*np.pi, np.radians(step_theta))  # steps on theta (polar coordinates)
-    (i_size, j_size) = (np.size(R, 0), np.size(Theta, 0))
-    # Calculation of sum of Zernike's polynomials (on all points sequentially => slow, deleted, see the drawing function above)
-    # Speed up the calculation by using vectorization of calculation on angles theta and using tabulated function values
-    Z2 = np.zeros((i_size, j_size), dtype='float')  # for storing Zernike's polynomial values
-    S = np.zeros((i_size, j_size), dtype='float')  # initial sum
-    for k in range(len(orders)):
-        if abs(alpha_coefficients[k]) > 1.0E-6:  # the alpha or amplitude coeficient is actually non-zero
-            tuple_orders = orders[k]
-            if not(isinstance(tuple_orders, tuple)) and not(len(orders) == len(alpha_coefficients)):
-                raise TypeError
-            else:
-                (m, n) = tuple_orders
-                norm = normalization_factor(m, n)
-                for i in range(i_size):
-                    Z2[i, :] = (alpha_coefficients[k]*norm*tabular_radial_polynomial(m, n, R[i])
-                                * (vectorized_triangular_function(m, Theta)[:]))
-                S += Z2  # adding to the final sum of all contributed Zernike's polynomials
-        else:
-            continue  # goes further on the loop for the next polynomial with non-zero amplitude
+    R, Theta, S = zernike_polynomials_sum_tuned(orders, alpha_coefficients, step_r=step_r, step_theta=step_theta)
     # Plotting and formatting - Polar projection + plotting the colormap as colour mesh
     # Below - clearing of picture axes, for preventing adding many axes to the single figure
     figure.clear(); axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
@@ -293,7 +251,7 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
     im = axes.pcolormesh(Theta, R, S, cmap=cm.coolwarm)  # plot the colour map by using the Z map according to Theta, R polar coordinates
     axes.axis('off')  # off polar coordnate axes
-    # print(np.min(Z), np.max(Z))  # FOR DEBUG
+    axes.set_theta_direction(-1)  # the counterclockwise counting of angle switched to clockwise!
     if show_amplitudes:
         figure.colorbar(im, ax=axes)  # shows the colour bar with shown on image amplitudes
     figure.tight_layout()
@@ -449,38 +407,6 @@ def tabular_radial_derivative_dr(m: int, n: int, r: float) -> float:
         return 0.0  # default return value for the orders more than 7.
 
 
-def plot_zps_rectangular(orders: list, step_xy: float = 0.02):
-    """
-    Plot the rectangular projection of calculated Zernike polynomials sum.
-
-    Parameters
-    ----------
-    orders : list
-        List of Zernike polynomials orders recorded in tuples (m, n) inside the list like [(m, n), ...].
-    step_xy : float, optional
-        Step in X,Y axes calculated for the range [-1, 1]. The default is 0.02.
-
-    Returns
-    -------
-    None. The plot is shown in the separate window
-
-    """
-    X = np.arange(-1.0, 1.0, step_xy)
-    Y = np.arange(-1.0, 1.0, step_xy)
-    X, Y = np.meshgrid(X, Y)
-    R = np.sqrt(np.power(X, 2) + np.power(Y, 2))
-    Theta = np.arctan(Y/X)
-    (i_size, j_size) = (np.size(X, 0), np.size(X, 1))
-    Z = np.zeros((i_size, j_size), dtype='float')
-    for i in range(i_size):
-        for j in range(j_size):
-            Z[i, j] = zernike_polynomials_sum(orders, R[i, j], Theta[i, j])
-    # Plotting and formatting - Rectangular projection
-    plt.imshow(Z, cmap=cm.coolwarm)  # Plot colormap surface
-    plt.axis('off')
-    plt.tight_layout()
-
-
 def radial_polynomial_derivative_dr(m: int, n: int, r: float) -> float:
     """
     Calculate derivative on radius of radial polynomial (like dR(m,n)/dr), that is calculated by the recurrence equation.
@@ -559,146 +485,41 @@ def get_classical_polynomial_name(mode: tuple, short_names: bool = False) -> str
     """
     name = ""
     (m, n) = mode
-    if (m == -1) and (n == 1):
-        name = "Vertical (Y) tilt"
-        if short_names:
-            name = "Vert. tilt"
-    if (m == 1) and (n == 1):
-        name = "Horizontal (X) tilt"
-        if short_names:
-            name = "Hor. tilt"
-    if (m == -2) and (n == 2):
-        name = "Oblique astigmatism"
-        if short_names:
-            name = "Obliq. astigm."
-    if (m == 0) and (n == 2):
-        name = "Defocus"
-    if (m == 2) and (n == 2):
-        name = "Vertical astigmatism"
-        if short_names:
-            name = "Vert. astigm."
-    if (m == -3) and (n == 3):
-        name = "Vertical trefoil"
-        if short_names:
-            name = "Vert. 3foil"
-    if (m == -1) and (n == 3):
-        name = "Vertical coma"
-        if short_names:
-            name = "Vert. coma"
-    if (m == 1) and (n == 3):
-        name = "Horizontal coma"
-        if short_names:
-            name = "Hor. coma"
-    if (m == 3) and (n == 3):
-        name = "Oblique trefoil"
-        if short_names:
-            name = "Obliq. 3foil"
-    if (m == -4) and (n == 4):
-        name = "Oblique quadrafoil"
-        if short_names:
-            name = "Obliq. 4foil"
-    if (m == -2) and (n == 4):
-        name = "Oblique secondary astigmatism"
-        if short_names:
-            name = "Obliq. 2d ast."
-    if (m == 0) and (n == 4):
-        name = "Primary spherical"
-        if short_names:
-            name = "Spherical"
-    if (m == 2) and (n == 4):
-        name = "Vertical secondary astigmatism"
-        if short_names:
-            name = "Vert. 2d ast."
-    if (m == 4) and (n == 4):
-        name = "Vertical quadrafoil"
-        if short_names:
-            name = "Vert. 4foil"
-    if (m == -5) and (n == 5):
-        name = "Vertical pentafoil"
-        if short_names:
-            name = "Vert. 5foil"
-    if (m == -3) and (n == 5):
-        name = "Vertical secondary trefoil"
-        if short_names:
-            name = "Vert. 2d 3foil"
-    if (m == -1) and (n == 5):
-        name = "Vertical secondary coma"
-        if short_names:
-            name = "Vert. 2d coma"
-    if (m == 1) and (n == 5):
-        name = "Horizontal secondary coma"
-        if short_names:
-            name = "Hor. 2d coma"
-    if (m == 3) and (n == 5):
-        name = "Oblique secondary trefoil"
-        if short_names:
-            name = "Obliq. 2d 3foil"
-    if (m == 5) and (n == 5):
-        name = "Oblique pentafoil"
-        if short_names:
-            name = "Obliq. 5foil"
-    # My guess of naming below
-    if (m == 0) and (n == 6):
-        name = "Secondary spherical"
-        if short_names:
-            name = "2d spherical"
-    if (m == 6) and (n == 6):
-        name = "Vertical sexfoil"
-        if short_names:
-            name = "Vert. 6foil"
-    if (m == -6) and (n == 6):
-        name = "Oblique sexfoil"
-        if short_names:
-            name = "Obliq. 6foil"
-    if (m == 4) and (n == 6):
-        name = "Vertical secondary quadrafoil"
-        if short_names:
-            name = "Vert. 2d 4foil"
-    if (m == -4) and (n == 6):
-        name = "Oblique secondary quadrafoil"
-        if short_names:
-            name = "Obliq.2d 4foil"
-    if (m == -2) and (n == 6):
-        name = "Oblique thirdly astigmatism"
-        if short_names:
-            name = "Obliq. 3d ast."
-    if (m == 2) and (n == 6):
-        name = "Vertical thirdly astigmatism"
-        if short_names:
-            name = "Vert. 3d ast."
-    if (m == -7) and (n == 7):
-        name = "Vertical septfoil"
-        if short_names:
-            name = "Vert. 7foil"
-    if (m == -5) and (n == 7):
-        name = "Vertical secondary pentafoil"
-        if short_names:
-            name = "Vert. 2d 5foil"
-    if (m == -3) and (n == 7):
-        name = "Vertical thirdly trefoil"
-        if short_names:
-            name = "Vert. 3d 3foil"
-    if (m == -1) and (n == 7):
-        name = "Vertical thirdly coma"
-        if short_names:
-            name = "Vert. 3d coma"
-    if (m == 1) and (n == 7):
-        name = "Horizontal thirdly coma"
-        if short_names:
-            name = "Hor. 3d coma"
-    if (m == 3) and (n == 7):
-        name = "Oblique thirdly trefoil"
-        if short_names:
-            name = "Obliq.3d 3foil"
-    if (m == 5) and (n == 7):
-        name = "Oblique secondary pentafoil"
-        if short_names:
-            name = "Obliq.2d 5foil"
-    if (m == 7) and (n == 7):
-        name = "Oblique septfoil"
-        if short_names:
-            name = "Obliq. 7foil"
-
+    dictionary_names = {(-1, 1): "Vertical (Y) tilt", (1, 1): "Horizontal (X) tilt", (-2, 2): "Oblique astigmatism",
+                        (0, 2): "Defocus", (2, 2): "Vertical astigmatism", (-3, 3): "Vertical trefoil",
+                        (-1, 3): "Vertical coma", (1, 3): "Horizontal coma", (3, 3): "Oblique trefoil",
+                        (-4, 4): "Oblique quadrafoil", (-2, 4): "Oblique secondary astigmatism",
+                        (0, 4): "Primary spherical", (2, 4): "Vertical secondary astigmatism",
+                        (4, 4): "Vertical quadrafoil", (-5, 5): "Vertical pentafoil",
+                        (-3, 5): "Vertical secondary trefoil", (-1, 5): "Vertical secondary coma",
+                        (1, 5): "Horizontal secondary coma", (3, 5): "Oblique secondary trefoil",
+                        (5, 5): "Oblique pentafoil", (-6, 6): "Oblique sexfoil",
+                        (-4, 6): "Oblique secondary quadrafoil", (-2, 6): "Oblique thirdly astigmatism",
+                        (0, 6): "Secondary spherical", (2, 6): "Vertical thirdly astigmatism",
+                        (4, 6): "Vertical secondary quadrafoil", (6, 6): "Vertical sexfoil",
+                        (-7, 7): "Vertical septfoil", (-5, 7): "Vertical secondary pentafoil",
+                        (-3, 7): "Vertical thirdly trefoil", (-1, 7): "Vertical thirdly coma",
+                        (1, 7): "Horizontal thirdly coma", (3, 7): "Oblique thirdly trefoil",
+                        (5, 7): "Oblique secondary pentafoil", (7, 7): "Oblique septfoil"}
+    dictionary_short_names = {(-1, 1): "Vert. tilt", (1, 1): "Hor. tilt", (-2, 2): "Obliq. astigm.",
+                              (0, 2): "Defocus", (2, 2): "Vert. astigm.", (-3, 3): "Vert. 3foil",
+                              (-1, 3): "Vert. coma", (1, 3): "Hor. coma", (3, 3): "Obliq. 3foil",
+                              (-4, 4): "Obliq. 4foil", (-2, 4): "Obliq. 2d ast.",
+                              (0, 4): "Spherical", (2, 4): "Vert. 2d ast.", (4, 4): "Vert. 4foil",
+                              (-5, 5): "Vert. 5foil", (-3, 5): "Vert. 2d 3foil", (-1, 5): "Vert. 2d coma",
+                              (1, 5): "Hor. 2d coma", (3, 5): "Obliq. 2d 3foil",
+                              (5, 5): "Obliq. 5foil", (-6, 6): "Obliq. 6foil", (-4, 6): "Obliq.2d 4foil",
+                              (-2, 6): "Obliq. 3d ast.", (0, 6): "2d spherical", (2, 6): "Vert. 3d ast.",
+                              (4, 6): "Vert. 2d 4foil", (6, 6): "Vert. 6foil", (-7, 7): "Vert. 7foil",
+                              (-5, 7): "Vert. 2d 5foil", (-3, 7): "Vert. 3d 3foil", (-1, 7): "Vert. 3d coma",
+                              (1, 7): "Hor. 3d coma", (3, 7): "Obliq.3d 3foil",
+                              (5, 7): "Obliq.2d 5foil", (7, 7): "Obliq. 7foil"}
+    if short_names:
+        if mode in dictionary_short_names.keys():
+            name = dictionary_short_names[mode]
+    else:
+        if mode in dictionary_names.keys():
+            name = dictionary_names[mode]
     return name
 
 
@@ -738,9 +559,9 @@ def test():
     r = 0.841; theta = np.radians(30.0); theta = float(theta)  # some predefined values for polar coordinates
     # Tests of implemented recursive values using the equations from Wiki as tabulated
     m = 1; n = 1; zrp = zernike_polynomial(m, n, r, theta)
-    assert abs(zrp - 2*r*np.cos(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
+    assert abs(zrp - 2.0*r*np.cos(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
     m = -1; n = 1; zrp = zernike_polynomial(m, n, r, theta)
-    assert abs(zrp - 2*r*np.sin(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
+    assert abs(zrp - 2.0*r*np.sin(theta)) < 1E-4, f'Implemented Z{m, n} not equal to tabulated one'
     m = 0; n = 2; zrp = zernike_polynomial(m, n, r, theta)
     assert abs(zrp - np.sqrt(3.0)*(2.0*r*r - 1.0)) < 1E-4, f'Implemented Z{m, n} != to tabulated one'
     m = -2; n = 2; zrp = zernike_polynomial(m, n, r, theta)
@@ -765,23 +586,11 @@ def test():
 
 # %% Tests
 if __name__ == '__main__':
-    r = 2.0; m = 1; n = 3; theta = 0.0
-    # print(normalization_factor(0,0))
-    # print("radial polynomial:", radial_polynomial(m, n, r))
-    # print("derivative of the radial polynomial: ", radial_polynomial_derivative_dr(m, n, r))
-    # print("zernike polynomial:", zernike_polynomial(m, n, r, theta))
-    # print("sum of two polynomials 1, 1 and 0, 2:", zernike_polynomials_sum([(1, 1), (0, 2)], r, theta))
-    test()  # Testing implemented recurrence equations
+    test()  # Testing implemented recurrence equations and tabular values
 
     # %% Plotting results over the surface
-    # Plotting as the radial surface - Y tilt and Defocus
-    step_r = 0.005
-    step_theta = 1  # in grads
-    # orders = [(-1, 1)]  # Y tilt
-    # plot_zps_polar(orders, step_r, step_theta, "Y tilt")
-    orders = [(1, 1)]  # X tilt
-    # plot_zps_polar(orders, step_r, step_theta, "X tilt")
+    step_r = 0.01; step_theta = 1.0  # in grads
+    orders = [(-1, 1)]  # Y tilt
+    plot_zps_polar(orders, step_r, step_theta, "Y tilt")
     zernikes_set = [(-1, 1), (1, 1)]; coefficients = [1.0, 1.0]  # Tilts
-    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", tuned=True, alpha_coefficients=coefficients)
-    zernikes_set = [(-2, 2), (0, 2), (2, 2)]; coefficients = [1.0, 1.0, 1.0]  # 2nd orders
-    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum 2nd orders", tuned=True, alpha_coefficients=coefficients, show_amplitudes=True)
+    plot_zps_polar(zernikes_set, step_r, step_theta, "Sum tilts", alpha_coefficients=coefficients, show_amplitudes=True)

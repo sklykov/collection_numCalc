@@ -597,7 +597,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
         # integral_sumX /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
         # integral_sumY /= (np.pi*np.power((aperture_radius/rho_unit_calibration), 2))
         # actually, the integral values should be calibrated to each sub-aperture area - depending on the integration limits
-        integral_sumX /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
+        integral_sumX /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))  # 0.5 - due to integration from (rdr)dtheta
         integral_sumY /= 0.5*(theta_b - theta_a)*(((rho_b*rho_b)-(rho_a*rho_a)))
         # The final integral values should be also calibrated to focal and wavelengths, but it's not yet implemented
         if swapXY:  # Choosing the relation between X and Y axis calculation, meaning - see the documentation
