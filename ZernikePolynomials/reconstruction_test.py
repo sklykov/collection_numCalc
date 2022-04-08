@@ -14,7 +14,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = False; repo_pics = True; n_zernikes = 14
+shwfs = True; repo_pics = False; n_zernikes = 20
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set1 = [(-1, 1), (1, 1)]
@@ -75,12 +75,12 @@ if repo_pics:
 # %% Tests on the recorded pictures from the Shack-Hartmann sensor
 if shwfs:
     # Parameters for integration
-    plot = False; aperture_radius = 10.0; threshold = 54.0; region_size = 18; n_integration_steps = 30; min_dist_peaks = 16
+    plot = False; aperture_radius = 10.0; threshold = 54.0; region_size = 18; n_integration_steps = 80; min_dist_peaks = 16
     # Manual change the working directory to the folder with stored pictures, outside the repository
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
-    aberrated_pic_name = "AstigmatismPic0.png"  # Name of prerecorded picture with aberrations
-    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix14TabZernike_RecordedAberrations.npy")
+    aberrated_pic_name = "AstigmatismPic2.png"  # Name of prerecorded picture with aberrations
+    precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20TabZernike_RecordedAberrations.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RecordedAberrations.npy")
     os.chdir(".."); os.chdir(".."); os.chdir("sh_wfs")  # Navigation to the local storage with recorded aberrations
     if not(os.path.exists(precalculated_zernikes)):
@@ -109,8 +109,12 @@ if shwfs:
         (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix,
                                                                    pics_folder=os.getcwd(), aberrated_pic_name=aberrated_pic_name,
                                                                    plot_results=plot, threshold_abs=threshold, region_size=region_size)
-        alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts))  # get expansion of aberrations
-        # Plot the sum profile of all aberrations
-        plot_zps_polar(zernikes_set, title="reconstruction of " + "actual defocus", alpha_coefficients=alpha_coefficients)
+        alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)*np.pi)   # !!! * by pi
+        # Plot the sum profile of all
+        if aberrated_pic_name[0:7] == "Defocus":  # because naming was inverted in the recorded aberrations
+            title_name = "astigmatism"
+        else:
+            title_name = "defocus"
+        plot_zps_polar(zernikes_set, title="reconstruction of actual " + title_name, alpha_coefficients=alpha_coefficients)
         for i in range(len(zernikes_set)):
-            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i]*np.pi, 3))
+            print(get_classical_polynomial_name(zernikes_set[i]), ":", np.round(alpha_coefficients[i], 3))
