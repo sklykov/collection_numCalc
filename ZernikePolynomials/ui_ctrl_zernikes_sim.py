@@ -45,7 +45,7 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
         # Widgets creation and specification (almost all - buttons)
         self.refreshPlotButton = Button(self, text="Refresh Plot", command=self.plot_zernikes)
         self.zernikesLabel = Label(self, text=" Zernike polynoms ctrls up to:")
-        self.figure = plot_figure.Figure(figsize=(5, 5))  # Default empty figure for
+        self.figure = plot_figure.Figure(figsize=(5, 5))  # Default empty figure for phase profile
         self.canvas = FigureCanvasTkAgg(self.figure, master=self); self.plotWidget = self.canvas.get_tk_widget()
         # !!! Below - the way of how associate tkinter buttons with the variables and their states! THEY ARE DECOUPLED!
         self.varPlotColorbarButton = tk.BooleanVar(); self.varPlotColorbarButton.set(False)
@@ -445,9 +445,10 @@ class ZernikeCtrlUI(Frame):  # all widgets master class - top level window
                 except Exception:
                     print("Connection hasn't been established, check connection settings")
             else:  # the connection was established already
-                ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
+                ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status - ??? (reimplement it)
                 converted_voltages = ampcom.AmpCom.create_varr2(self.voltages, VMAX)  # made out of found voltages bits
                 ampcom.AmpCom.AmpWrite(self.deviceHandle, converted_voltages)  # send converted V to bits to a device
+                ampcom.AmpCom.AmpUpdate(self.deviceHandle)  # always update after write
                 ampcom.AmpCom.AmpStatus(self.deviceHandle)  # should print the device status
 
     def destroy(self):
