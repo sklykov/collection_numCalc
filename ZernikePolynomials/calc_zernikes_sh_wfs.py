@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Calculation of aberrations by using non- and aberrated wavefronts recorded by a Shack-Hartmann sensor.
+Specification of calculation functions for reconstruction using non- and aberrated wavefronts recorded by a Shack-Hartmann sensor.
 
+These functions are called further in the 'reconstruction_test.py' file for testing reconstructions.
 According to the doctoral thesis by Antonello, J. (2014): https://doi.org/10.4233/uuid:f98b3b8f-bdb8-41bb-8766-d0a15dae0e27
 
 @author: ssklykov
@@ -561,7 +562,7 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
     nonaberrated = (io.imread(nonaberratedPath, as_gray=True))
     if subtract_background:
         # Subtracting from the recorded pictures (non- and aberrated) the recorded background
-        background = (io.imread(backgroundPath, as_gray=True))  # reads the background image only if it's requested by input parameters
+        background = (io.imread(backgroundPath, as_gray=True))  # reads background image only if it's requested by input parameters
         diff_nonaberrated = (nonaberrated - background); diff_nonaberrated = img_as_ubyte(diff_nonaberrated)
         threshold_abs = np.round(np.mean(diff_nonaberrated), 0) + 1
     else:
@@ -578,7 +579,8 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
         plt.figure(); plt.imshow(nonaberrated); plt.tight_layout(); plt.title("Non-aberrated")
     # Plotting of results on an image for debugging (for coms_nonaberrated)
     # CoMs = center of masses, calculated in the areas around found local peaks
-    coms_nonaberrated = get_localCoM_matrix(diff_nonaberrated, min_dist_peaks=min_dist_peaks, threshold_abs=threshold_abs,
+    coms_nonaberrated = get_localCoM_matrix(diff_nonaberrated, min_dist_peaks=min_dist_peaks,
+                                            threshold_abs=threshold_abs,
                                             region_size=region_size, plot=plot_results)
     # Searching for the central sub-aperture that should be close to the center of the image
     (rows, cols) = diff_nonaberrated.shape; x_img_center = cols//2; y_img_center = rows//2
@@ -586,10 +588,12 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
     min_distance = np.sqrt(np.power(x_min_dist, 2) + np.power(y_min_dist, 2))
     # Looking for minimal distance between sub-apertures and the center of the frame and saving its index
     for i in range(np.size(coms_nonaberrated, 0)):
-        distance = np.sqrt(np.power((coms_nonaberrated[i, 1] - x_img_center), 2) + np.power((coms_nonaberrated[i, 0] - y_img_center), 2))
+        distance = np.sqrt(np.power((coms_nonaberrated[i, 1] - x_img_center), 2)
+                           + np.power((coms_nonaberrated[i, 0] - y_img_center), 2))
         if min_distance > distance:
             i_center_subaperture = i; min_distance = distance
-    x_central_subaperture = coms_nonaberrated[i_center_subaperture, 1]; y_central_subaperture = coms_nonaberrated[i_center_subaperture, 0]
+    x_central_subaperture = coms_nonaberrated[i_center_subaperture, 1]
+    y_central_subaperture = coms_nonaberrated[i_center_subaperture, 0]
     # Plotting the found center of image and central sub-aperture
     if plot_results:
         plt.figure(); plt.imshow(diff_nonaberrated)  # for plotting the found central sub-aperture
@@ -618,7 +622,7 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
             y_relative = -coms_nonaberrated[i, 0] + y_central_subaperture   # relative to the central sub-aperture
             rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
             # Calculation of integration limits for the angles theta
-            theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with selection of the right quadrant in grads!
+            theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with right quadrant selection in grads!
             # ??? Maybe redundant but seems better to make conversion to all positive values angles:
             if theta0[j] < 0.0:
                 theta0[j] += 360.0   # all negative angles become positive
@@ -746,7 +750,6 @@ def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, 
     # Below: removing belonging to central subaperture values
     coms_shifts = np.delete(coms_shifts, i_central_aperture, axis=0)
     integral_matrix_aberrated = np.delete(integral_matrix_aberrated, i_central_aperture, axis=0)
-    # print("coordinates of central sub-aperture:", int(coms_aberrated[i_central_aperture, 1]), int(coms_aberrated[i_central_aperture, 0]))
 
     return coms_shifts, integral_matrix_aberrated
 
@@ -758,8 +761,10 @@ if __name__ == '__main__':
     show_plots = False; min_dist_peaks = 18; threshold = 60.0; region_size = 20; aperture_radius = 14.0  # Parameters
     # Below - calculating CoMs of focal spots in the non-aberrated picture, get integral limits and the picture
     (coms_nonaberrated, pic_integral_limits,
-     theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(plot_results=show_plots, threshold_abs=threshold,
-                                                                                  region_size=region_size, aperture_radius=aperture_radius,
+     theta0, rho0, integration_limits) = get_integral_limits_nonaberrated_centers(plot_results=show_plots,
+                                                                                  threshold_abs=threshold,
+                                                                                  region_size=region_size,
+                                                                                  aperture_radius=aperture_radius,
                                                                                   min_dist_peaks=min_dist_peaks)
     # Below - integration of polynomials in each sub-aperture area using calculated before limits
     integral_matrix = calc_integral_matrix_zernike(zernikes_set, integration_limits, theta0, rho0,

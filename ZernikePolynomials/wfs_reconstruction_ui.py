@@ -14,6 +14,8 @@ import matplotlib.figure as plot_figure
 # import time
 import numpy as np
 import os
+from skimage import io
+from skimage.util import img_as_ubyte
 
 
 # %% Reconstructor GUI
@@ -27,6 +29,10 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.master.geometry("+80+120")  # opens the main window with some offset
         self.config(takefocus=True)   # make created window in focus
         self.calibrate_window = None  # holder for checking if the window created
+        self.calibrate_axes = None  # the class for plotting in figure loaded pictures
+        self.loaded_image = None  # holder for the loaded image for calibration / reconstruction
+        self.calibration = False  # flag for switching for a calibration window
+        self.default_threshold = 50
 
         # Buttons and labels specification
         self.load_button = tk.Button(master=self, text="Load Picture", padx=2, pady=2)
@@ -90,10 +96,12 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
 
         """
         if self.calibrate_window is None:  # create the toplevel widget for holding all ctrls for calibration
+            # Toplevel window configuration
             self.calibrate_window = tk.Toplevel(master=self); self.calibrate_window.geometry("+780+120")
             self.calibrate_window.protocol("WM_DELETE_WINDOW", self.calibration_exit)  # associate quit with the function
             self.calibrate_button.config(state="disabled")  # disable the Calibrate button
             self.calibrate_window.title("Calibration")
+
             # Buttons specification for calibration
             pad = 4  # universal additional distance between buttons on grid layout
             self.calibrate_load_button = tk.Button(master=self.calibrate_window, text="Load recorded spots",
@@ -101,16 +109,29 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.calibrate_localize_button = tk.Button(master=self.calibrate_window, text="Localize focal spots",
                                                        command=self.localize_spots)
             self.calibrate_localize_button.config(state="disabled")
+            self.threshold_frame = tk.Frame(master=self.calibrate_window)  # for holding label and spinbox
+            self.threshold_label = tk.Label(master=self.threshold_frame, text="Threshold (1...254): ")
+            self.threshold_label.pack(side='left', padx=1, pady=1)
+            self.threshold_value = tk.IntVar(); self.threshold_value.set(self.default_threshold)  # default threshold value
+            self.threshold_value.trace_add(mode="write", callback=self.validate_threshold)
+            self.threshold_ctrl_box = tk.Spinbox(master=self.threshold_frame, from_=1, to=254,
+                                                 increment=1, textvariable=self.threshold_value,
+                                                 wrap=True, width=4)   # adapt Spinbox to 4 digits in int value
+            self.threshold_ctrl_box.pack(side='left', padx=1, pady=1)
+            self.threshold_ctrl_box.config(state="disabled")
             # Construction of figure holder for its representation
-            self.calibrate_figure = plot_figure.Figure()
+            self.calibrate_figure = plot_figure.Figure(figsize=(5.8, 5.2))
             self.calibrate_canvas = FigureCanvasTkAgg(self.calibrate_figure, master=self.calibrate_window)
             self.calibrate_fig_widget = self.calibrate_canvas.get_tk_widget()
+
             # Layout of widgets on the calibration window
             self.calibrate_load_button.grid(row=0, rowspan=1, column=0, columnspan=1, padx=pad, pady=pad)
             self.calibrate_localize_button.grid(row=0, rowspan=1, column=1, columnspan=1, padx=pad, pady=pad)
+            self.threshold_frame.grid(row=0, rowspan=1, column=2, columnspan=1, padx=pad, pady=pad)
             self.calibrate_fig_widget.grid(row=1, rowspan=4, column=0, columnspan=4, padx=pad, pady=pad)
             self.calibrate_window.grid()
             self.calibrate_window.config(takefocus=True)  # put the created windows in focus
+            self.calibration = True  # flag for association of images with the calibration window
 
     def calibration_exit(self):
         """
@@ -124,11 +145,72 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.calibrate_button.config(state="normal")  # activate the Calibrate button
         self.calibrate_window.destroy(); self.calibrate_window = None
         self.config(takefocus=True)   # make main window in focus
+        self.calibration = False
+        self.loaded_image = None; self.calibrate_axes = None  # restore empty holders for recreation
 
     def load_picture(self):
+        """
+        Ask a user for selecting an image for loading and represent it in calibration / reconstruction window.
+
+        Returns
+        -------
+        None.
+
+        """
         self.calibrate_localize_button.config(state="normal")  # enable localization button after loading image
-        image_path = tk.filedialog.askopenfile(initialdir=self.calibration_path)
-        print(image_path)
+        self.pics_path = os.path.join(self.current_path, "pics")  # default folder with the pictures
+        # construct absolute path to the folder with recorded pictures
+        if os.path.exists(self.pics_path) and os.path.isdir(self.pics_path):
+            initialdir = self.pics_path
+        else:
+            initialdir = self.current_path
+        file_types = [("PNG image", "*.png"), ("JPG file", "*.jpg, *.jpeg"), ("Tiff file", "*.tiff, *.tif")]
+        open_image_dialog = tk.filedialog.askopenfile(initialdir=initialdir, filetypes=file_types)
+        if open_image_dialog is not None:
+            self.path_loaded_picture = open_image_dialog.name  # record absolute path to the opened image
+            self.loaded_image = io.imread(self.path_loaded_picture, as_gray=True)
+            self.loaded_image = img_as_ubyte(self.loaded_image)  # convert to the ubyte U8 image
+            rows, cols = self.loaded_image.shape
+            if self.calibration:  # draw the loaded image in the opened calibration window (Toplevel)
+                if self.calibrate_axes is None:
+                    self.calibrate_axes = self.calibrate_figure.add_subplot()  # add axes without dimension
+                if self.calibrate_axes is not None and self.loaded_image is not None:
+                    self.calibrate_axes.imshow(self.loaded_image, cmap='gray')
+                    self.calibrate_axes.axis('off'); self.calibrate_figure.tight_layout()
+                    self.calibrate_canvas.draw()  # redraw image in the widget (stored in canvas)
+                    self.threshold_ctrl_box.config(state="normal")
+
+    def validate_threshold(self, *args):
+        """
+        Call checking function after some time of the first changing of threshold value.
+
+        Parameters
+        ----------
+        *args : list
+            List with name of IntVar and operation (write).
+
+        Returns
+        -------
+        None.
+
+        """
+        self.after(920, self.check_threshold_value)  # call once the checking procedure
+
+    def check_threshold_value(self):
+        """
+        Check input manually value in the text variable of the threshold controlling Spinbox.
+
+        Returns
+        -------
+        None.
+
+        """
+        try:
+            input_value = self.threshold_value.get()
+            if input_value < 1 or input_value > 255:
+                self.threshold_value.set(self.default_threshold)
+        except Exception:
+            self.threshold_value.set(self.default_threshold)
 
     def localize_spots(self):
         pass
@@ -139,3 +221,4 @@ if __name__ == "__main__":
     rootTk = tk.Tk()  # toplevel widget of Tk there the class - child of tk.Frame is embedded
     reconstructor_gui = ReconstructionUI(rootTk)
     reconstructor_gui.mainloop()
+    loaded_image = reconstructor_gui.loaded_image
