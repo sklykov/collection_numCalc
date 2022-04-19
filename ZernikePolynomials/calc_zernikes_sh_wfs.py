@@ -55,7 +55,7 @@ def check_img_coordinate(max_coordinate, coordinate):
         return coordinate
 
 
-def get_localCoM_matrix(image: np.ndarray, min_dist_peaks: int = 15, threshold_abs: float = 2,
+def get_localCoM_matrix(image: np.ndarray, min_dist_peaks: int = 15, threshold_abs: float = 55.0,
                         region_size: int = 16, plot: bool = False) -> np.array:
     """
     Calculate local center of masses in the region around of found peaks (maximums).

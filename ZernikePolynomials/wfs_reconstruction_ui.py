@@ -8,14 +8,13 @@ many recorded images, stored locally.
 """
 # %% Imports
 import tkinter as tk
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # import canvas container from matplotlib for tkinter
 import matplotlib.figure as plot_figure
 # import time
-import numpy as np
 import os
 from skimage import io
 from skimage.util import img_as_ubyte
+from reconstruction_wfs_functions import get_integral_limits_nonaberrated_centers
 
 
 # %% Reconstructor GUI
@@ -32,6 +31,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.calibrate_axes = None  # the class for plotting in figure loaded pictures
         self.loaded_image = None  # holder for the loaded image for calibration / reconstruction
         self.calibration = False  # flag for switching for a calibration window
+        self.calibrate_plots = None  # flag for plots on an image - CoMs, etc.
         self.default_threshold = 50
 
         # Buttons and labels specification
@@ -145,8 +145,9 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.calibrate_button.config(state="normal")  # activate the Calibrate button
         self.calibrate_window.destroy(); self.calibrate_window = None
         self.config(takefocus=True)   # make main window in focus
-        self.calibration = False
-        self.loaded_image = None; self.calibrate_axes = None  # restore empty holders for recreation
+        # Below - restore empty holders for recreation of figure, axes, etc.
+        self.calibration = False; self.loaded_image = None
+        self.calibrate_axes = None; self.calibrate_plots = None
 
     def load_picture(self):
         """
@@ -159,6 +160,9 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         """
         self.calibrate_localize_button.config(state="normal")  # enable localization button after loading image
         self.pics_path = os.path.join(self.current_path, "pics")  # default folder with the pictures
+        if self.calibrate_axes is not None:
+            self.calibrate_figure.delaxes(self.calibrate_figure.get_axes()[0])
+            self.calibrate_axes = None
         # construct absolute path to the folder with recorded pictures
         if os.path.exists(self.pics_path) and os.path.isdir(self.pics_path):
             initialdir = self.pics_path
@@ -178,7 +182,8 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                     self.calibrate_axes.imshow(self.loaded_image, cmap='gray')
                     self.calibrate_axes.axis('off'); self.calibrate_figure.tight_layout()
                     self.calibrate_canvas.draw()  # redraw image in the widget (stored in canvas)
-                    self.threshold_ctrl_box.config(state="normal")
+                    self.threshold_ctrl_box.config(state="normal")  # enable the threshold button
+                    self.calibrate_plots = None
 
     def validate_threshold(self, *args):
         """
@@ -194,7 +199,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         None.
 
         """
-        self.after(920, self.check_threshold_value)  # call once the checking procedure
+        self.after(920, self.check_threshold_value)  # call once the checking procedure of input value
 
     def check_threshold_value(self):
         """
@@ -212,8 +217,37 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         except Exception:
             self.threshold_value.set(self.default_threshold)
 
+    def redraw_loaded_image(self):
+        """
+        Recreate the Axes instance and redraw originally loaded picture (without any additional plots on it).
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.calibrate_plots is None:  # upon the creatuin
+            self.calibrate_plots = True
+        else:
+            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
+            self.calibrate_figure.delaxes(self.calibrate_figure.get_axes()[0])
+            self.calibrate_axes = self.calibrate_figure.add_subplot()
+            self.calibrate_axes.imshow(self.loaded_image, cmap='gray')
+            self.calibrate_axes.axis('off'); self.calibrate_figure.tight_layout()
+            self.calibrate_canvas.draw()  # redraw image in the widget (stored in canvas)
+
     def localize_spots(self):
-        pass
+        """
+        Call the function for localization of center of masses of focal spots on the loaded image.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.redraw_loaded_image()
+        get_integral_limits_nonaberrated_centers(self.calibrate_axes, self.loaded_image, self.threshold_value.get())
+        self.calibrate_canvas.draw()
 
 
 # %% Main launch

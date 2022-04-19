@@ -249,7 +249,7 @@ def get_plot_zps_polar(figure, orders: list, alpha_coefficients: list, step_r: f
     #     axes = figure.add_subplot(projection='polar')  # axes - the handle for drawing functions
     # !!!: using contourf function is too slow for providing refreshing upon calling by the button
     axes.grid(False)  # demanded by pcolormesh function, if not called - deprecation warning
-    im = axes.pcolormesh(Theta, R, S, cmap=cm.coolwarm)  # plot the colour map by using the Z map according to Theta, R polar coordinates
+    im = axes.pcolormesh(Theta, R, S, cmap=cm.coolwarm)  # plot the colour map by using the Z map according to Theta, R coord-s
     axes.axis('off')  # off polar coordinate axes
     axes.set_theta_direction(-1)  # the counterclockwise counting of angle switched to clockwise!
     if show_amplitudes:
@@ -401,7 +401,7 @@ def tabular_radial_derivative_dr(m: int, n: int, r: float) -> float:
         return 49.0*r*r*r*r*r*r - 30.0*r*r*r*r  # d(7r^7 - 6r^5)/dr = 49*(r^6) - 30*(r^4)
     elif ((m == -3) and (n == 7)) or ((m == 3) and (n == 7)):
         return 147.0*r*r*r*r*r*r - 150.0*r*r*r*r + 30.0*r*r  # d(21r^7 - 30r^5 + 10r^3)/dr = 147*(r^6) - 150*(r^4) + 30*(r^2)
-    elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):  # d(35r^7 - 60r^5 + 30r^3 - 4r) = 245*(r^6) - 300*(r^4) + 90*(r^2) - 4
+    elif ((m == -1) and (n == 7)) or ((m == 1) and (n == 7)):  # d(35r^7 - 60r^5 + 30r^3 - 4r) = 245*(r^6) - 300*(r^4) + 90*(r^2)-4
         return 245.0*r*r*r*r*r*r - 300.0*r*r*r*r + 90.0*r*r - 4.0
     else:
         return 0.0  # default return value for the orders more than 7.
