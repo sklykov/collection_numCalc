@@ -12,7 +12,7 @@ According to the doctoral thesis by Antonello, J. (2014): https://doi.org/10.423
 import numpy as np
 from skimage.feature import peak_local_max
 import time
-from matplotlib.patches import Rectangle, Circle
+from matplotlib.patches import Circle  # Rectangle  - uncomment if need for visualization
 from scipy import ndimage
 from zernike_pol_calc import radial_polynomial, radial_polynomial_derivative_dr, triangular_function
 from zernike_pol_calc import triangular_derivative_dtheta, normalization_factor
@@ -79,65 +79,71 @@ def get_integral_limits_nonaberrated_centers(axes_fig, picture_as_array: np.ndar
     Returns
     -------
     tuple
-        (Centers of masses for non-aberrated image without the central sub-aperture, non-aberrated image,
-         Theta (polar) coordinates of sub-apertures, Rho (polar) coordinates of sub-apertures, Integration limits for sub-apertures).
+        (Centers of masses for non-aberrated image without the central sub-aperture, Theta (polar) coordinates of sub-apertures,
+         Rho (polar) coordinates of sub-apertures, Integration limits for sub-apertures).
 
     """
     # Use the specified radius of sub-apertures for calculation of parameters for CoMs defining
-    min_dist_peaks = int(np.round(2*aperture_radius, 0)); region_size = min_dist_peaks
+    min_dist_peaks = int(np.round(1.5*aperture_radius, 0))
+    region_size = int(np.round(1.5*aperture_radius, 0))
     # CoMs = center of masses, calculated in the areas around found local peaks
     coms_nonaberrated = get_localCoM_matrix(picture_as_array, axes_fig, min_dist_peaks=min_dist_peaks,
                                             threshold_abs=threshold_abs, region_size=region_size)
-    # Searching for the central sub-aperture that should be close to the center of the image
-    (rows, cols) = picture_as_array.shape; x_img_center = cols//2; y_img_center = rows//2
-    x_min_dist = cols; y_min_dist = rows; i_center_subaperture = -1
-    min_distance = np.sqrt(np.power(x_min_dist, 2) + np.power(y_min_dist, 2))
-    # Looking for minimal distance between sub-apertures and the center of the frame and saving its index
-    for i in range(np.size(coms_nonaberrated, 0)):
-        distance = np.sqrt(np.power((coms_nonaberrated[i, 1] - x_img_center), 2)
-                           + np.power((coms_nonaberrated[i, 0] - y_img_center), 2))
-        if min_distance > distance:
-            i_center_subaperture = i; min_distance = distance
-    x_central_subaperture = coms_nonaberrated[i_center_subaperture, 1]
-    y_central_subaperture = coms_nonaberrated[i_center_subaperture, 0]
-    # Plotting the found center of image and central sub-aperture
-    axes_fig.plot(x_central_subaperture, y_central_subaperture, '+', color="red")
-    # axes_fig.plot(x_img_center, y_img_center, '+', color="blue")
-    # Detected centers below are searched for on the aberrated image, so the shifts in CoMs should be calculated relatively to it
-    rho0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate r of a sub-aperture (lens)
-    theta0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate theta of a sub-aperture (lens)
-    theta_a = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (lower) on theta (1)
-    theta_b = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (higher) on theta (2)
-    subapertures_wt_central = np.zeros((np.size(coms_nonaberrated, 0)-1, 2), dtype='float')
-    integration_limits = [(0.0, 0.0) for i in range(np.size(coms_nonaberrated, 0)-1)]
-    # Calculation of integration limits - below
-    j = 0
-    for i in range(np.size(coms_nonaberrated, 0)):
-        # Plot found regions for CoM calculations
-        if not(i == i_center_subaperture):
-            axes_fig.add_patch(Circle((coms_nonaberrated[i, 1], coms_nonaberrated[i, 0]), aperture_radius,
-                                      edgecolor='green', facecolor='none'))
-        if i == i_center_subaperture:  # Deleting the central subaperture from the calculations
-            continue
-        else:
-            # Calculation of the boundaries of the integration intervals for equations from the thesis
-            x_relative = coms_nonaberrated[i, 1] - x_central_subaperture  # relative to the central sub-aperture
-            y_relative = -coms_nonaberrated[i, 0] + y_central_subaperture   # relative to the central sub-aperture
-            rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
-            # Calculation of integration limits for the angles theta
-            theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with right quadrant selection in grads!
-            # ??? Maybe redundant but seems better to make conversion to all positive values angles:
-            if theta0[j] < 0.0:
-                theta0[j] += 360.0   # all negative angles become positive
-            theta_a[j] = np.round(theta0[j] - np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
-            theta_b[j] = np.round(theta0[j] + np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
-            integration_limits[j] = (theta_a[j], theta_b[j])
-            subapertures_wt_central[j, 0] = coms_nonaberrated[i, 0]; subapertures_wt_central[j, 1] = coms_nonaberrated[i, 1]
-            j += 1
-    # Plot the found and used CoMs for calculations
-    axes_fig.plot(subapertures_wt_central[:, 1], subapertures_wt_central[:, 0], '.', color="red")
-    # Before the calculation for angles made in grads, below the transfer to radians for passing it further to trigonometric functions
-    theta0 = np.radians(theta0); integration_limits = np.radians(integration_limits)
+    # If the specified parameters provide no result for searching for focal spots, then skip all calculations
+    if len(coms_nonaberrated) == 0:
+        print("No detected focal spots")
+        subapertures_wt_central = theta0 = rho0 = integration_limits = -1
+    else:
+        # Searching for the central sub-aperture that should be close to the center of the image
+        (rows, cols) = picture_as_array.shape; x_img_center = cols//2; y_img_center = rows//2
+        x_min_dist = cols; y_min_dist = rows; i_center_subaperture = -1
+        min_distance = np.sqrt(np.power(x_min_dist, 2) + np.power(y_min_dist, 2))
+        # Looking for minimal distance between sub-apertures and the center of the frame and saving its index
+        for i in range(np.size(coms_nonaberrated, 0)):
+            distance = np.sqrt(np.power((coms_nonaberrated[i, 1] - x_img_center), 2)
+                               + np.power((coms_nonaberrated[i, 0] - y_img_center), 2))
+            if min_distance > distance:
+                i_center_subaperture = i; min_distance = distance
+        x_central_subaperture = coms_nonaberrated[i_center_subaperture, 1]
+        y_central_subaperture = coms_nonaberrated[i_center_subaperture, 0]
+        # Plotting the found center of image and central sub-aperture
+        axes_fig.plot(x_central_subaperture, y_central_subaperture, '+', color="red")
+        # axes_fig.plot(x_img_center, y_img_center, '+', color="blue")
+        # Detected centers below are searched for on the aberrated image, so the shifts in CoMs should be calculated relatively to it
+        rho0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate r of a sub-aperture (lens)
+        theta0 = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # polar coordinate theta of a sub-aperture (lens)
+        theta_a = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (lower) on theta (1)
+        theta_b = np.zeros(np.size(coms_nonaberrated, 0)-1, dtype='float')  # integration limits (higher) on theta (2)
+        subapertures_wt_central = np.zeros((np.size(coms_nonaberrated, 0)-1, 2), dtype='float')
+        integration_limits = [(0.0, 0.0) for i in range(np.size(coms_nonaberrated, 0)-1)]
+        # Calculation of integration limits - below
+        j = 0
+        for i in range(np.size(coms_nonaberrated, 0)):
+            # Plot found regions for CoM calculations
+            if not(i == i_center_subaperture):
+                axes_fig.add_patch(Circle((coms_nonaberrated[i, 1], coms_nonaberrated[i, 0]), aperture_radius,
+                                          edgecolor='green', facecolor='none'))
+            if i == i_center_subaperture:  # Deleting the central subaperture from the calculations
+                continue
+            else:
+                # Calculation of the boundaries of the integration intervals for equations from the thesis
+                x_relative = coms_nonaberrated[i, 1] - x_central_subaperture  # relative to the central sub-aperture
+                y_relative = -coms_nonaberrated[i, 0] + y_central_subaperture   # relative to the central sub-aperture
+                rho0[j] = np.sqrt(np.power(x_relative, 2) + np.power(y_relative, 2))  # radial coordinate of lens pupil
+                # Calculation of integration limits for the angles theta
+                theta0[j] = np.arctan2(y_relative, x_relative)*(180/np.pi)  # Calculation arctan with right quadrant selection in grads!
+                # ??? Maybe redundant but seems better to make conversion to all positive values angles:
+                if theta0[j] < 0.0:
+                    theta0[j] += 360.0   # all negative angles become positive
+                theta_a[j] = np.round(theta0[j] - np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
+                theta_b[j] = np.round(theta0[j] + np.arctan(aperture_radius/rho0[j])*(180/np.pi), 3)  # calculation in grads!
+                integration_limits[j] = (theta_a[j], theta_b[j])
+                subapertures_wt_central[j, 0] = coms_nonaberrated[i, 0]; subapertures_wt_central[j, 1] = coms_nonaberrated[i, 1]
+                j += 1
+        # Plot the found and used CoMs for calculations
+        axes_fig.plot(subapertures_wt_central[:, 1], subapertures_wt_central[:, 0], '.', color="red")
+        # Before the calculation for angles made in grads, below the transfer to radians for passing it further to trigonometric functions
+        theta0 = np.radians(theta0); integration_limits = np.radians(integration_limits)
     return subapertures_wt_central, theta0, rho0, integration_limits
 
 
