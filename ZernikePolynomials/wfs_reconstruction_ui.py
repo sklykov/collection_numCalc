@@ -8,15 +8,17 @@ many recorded images, stored locally.
 """
 # %% Imports
 import tkinter as tk
+from tkinter.ttk import Progressbar
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # import canvas container from matplotlib for tkinter
 import matplotlib.figure as plot_figure
-# import time
+import time
 import numpy as np
 import os
 from skimage import io
 from skimage.util import img_as_ubyte
-from reconstruction_wfs_functions import get_integral_limits_nonaberrated_centers
+from reconstruction_wfs_functions import get_integral_limits_nonaberrated_centers, IntegralMatrixThreaded
 import re
+from queue import Queue, Empty
 
 
 # %% Reconstructor GUI
@@ -34,10 +36,12 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.loaded_image = None  # holder for the loaded image for calibration / reconstruction
         self.calibration = False  # flag for switching for a calibration window
         self.calibrate_plots = None  # flag for plots on an image - CoMs, etc.
-        self.default_threshold = 55
-        self.default_radius = 14.0
-        self.coms_spots = None
+        self.default_threshold = 55; self.default_radius = 14.0; self.coms_spots = None
         self.order = 4  # default selected Zernike order
+        self.messages_queue = Queue(maxsize=10)
+        self.integral_matrix = []
+        self.calculation_thread = None  # holder for calculation thread of integral matrix
+        self.integration_running = False  # flag for tracing the running integration
 
         # Buttons and labels specification
         self.load_button = tk.Button(master=self, text="Load Picture", padx=2, pady=2)
@@ -125,6 +129,16 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.abort_integral_matrix_button = tk.Button(master=self.calibrate_window, text="Abort integrals",
                                                           command=self.abort_integration, fg="red")
             self.abort_integral_matrix_button.config(state="disabled")
+            self.save_integral_matrix_button = tk.Button(master=self.calibrate_window, text="Save int. matrix",
+                                                         command=self.save_integral_matrix)
+            self.save_integral_matrix_button.config(state="disabled")
+
+            # Packing progress bar
+            self.progress_frame = tk.Frame(master=self.calibrate_window)
+            self.progress_bar_label = tk.Label(master=self.progress_frame, text="Integration progress: ")
+            self.integration_progress_bar = Progressbar(master=self.progress_frame, length=150)
+            self.progress_bar_label.pack(side='left', padx=1, pady=1)
+            self.integration_progress_bar.pack(side='left', padx=1, pady=1)
 
             # Threshold value ctrls and packing
             self.threshold_frame = tk.Frame(master=self.calibrate_window)  # for holding label and spinbox
@@ -154,8 +168,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.zernike_orders = ["1st", "2nd", "3rd", "4th", "5th"]; self.selected_order = tk.StringVar()
             self.order_list = ["Use up to " + item + " order" for item in self.zernike_orders]
             self.selected_order.set(self.order_list[3])
-            self.zernike_order_selector = tk.OptionMenu(self.calibrate_window, self.selected_order,
-                                                        self.order_list[3], *self.order_list,
+            self.zernike_order_selector = tk.OptionMenu(self.calibrate_window, self.selected_order, *self.order_list,
                                                         command=self.order_selected)
             self.zernike_order_selector.config(state="disabled")
 
@@ -173,7 +186,9 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.calibrate_fig_widget.grid(row=1, rowspan=4, column=0, columnspan=5, padx=pad, pady=pad)
             self.calc_integral_matrix_button.grid(row=5, rowspan=1, column=0, columnspan=1, padx=pad, pady=pad)
             self.zernike_order_selector.grid(row=5, rowspan=1, column=1, columnspan=1, padx=pad, pady=pad)
+            self.progress_frame.grid(row=5, rowspan=1, column=2, columnspan=1, padx=pad, pady=pad)
             self.abort_integral_matrix_button.grid(row=5, rowspan=1, column=3, columnspan=1, padx=pad, pady=pad)
+            self.save_integral_matrix_button.grid(row=5, rowspan=1, column=4, columnspan=1, padx=pad, pady=pad)
             self.calibrate_window.grid()
             self.calibrate_window.config(takefocus=True)  # put the created windows in focus
             self.calibration = True  # flag for association of images with the calibration window
@@ -372,13 +387,97 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
 
         """
         reg_digit = re.compile('\d')  # match any digit in a string
-        self.order = int(re.search(reg_digit, self.selected_order.get()).group(0))
+        self.order = int(re.search(reg_digit, self.selected_order.get()).group(0))  # scan for number of Zernike order
 
     def calculate_integral_matrix(self):
-        pass
+        """
+        Call the calculation of integral matrix.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.calculation_thread = IntegralMatrixThreaded(self.messages_queue, self.order, self.theta0, self.rho0,
+                                                         self.integration_limits, self.radius_value.get(),
+                                                         self.integration_progress_bar, self.integral_matrix)
+        self.calculation_thread.start()
+        self.integration_running = True
+        self.save_integral_matrix_button.config(state="disabled")
+        self.after(500, self.check_finish_integration)
 
     def abort_integration(self):
-        pass
+        """
+        Send the command for stopping integration.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.integration_running:
+            self.messages_queue.put_nowait("Stop integration")  # send the command for stopping calculation thread
+            self.save_integral_matrix_button.config(state="disabled")
+
+    def check_finish_integration(self):
+        """
+        Check periodically whatever the calculation of integral matrix is finished or not.
+
+        Returns
+        -------
+        None.
+
+        """
+        if not self.messages_queue.empty():
+            try:
+                message = self.messages_queue.get_nowait()
+                if message == "Integration finished":
+                    self.integration_running = False
+                    print("Integration matrix acquired and can be saved")
+                    self.integral_matrix = self.calculation_thread.integral_matrix
+                    if not isinstance(self.integral_matrix, list):
+                        rows, cols = self.integral_matrix.shape
+                        if rows > 0 and cols > 0:
+                            self.save_integral_matrix_button.config(state="normal")
+                elif message == "Stop integration":
+                    self.messages_queue.put_nowait(message); time.sleep(0.15)  # resend abort calculation
+            except Empty:
+                self.after(400, self.check_finish_integration)
+        else:
+            self.after(400, self.check_finish_integration)
+
+    def save_integral_matrix(self):
+        """
+        Save the calculated integral matrix on the specified path.
+
+        Returns
+        -------
+        None.
+
+        """
+        integralM_file = tk.filedialog.asksaveasfile(title="Save integral matrix",
+                                                     initialdir=self.calibration_path,
+                                                     filetypes=[("numpy binary file", "*.npy")],
+                                                     defaultextension=".npy",
+                                                     initialfile="integral_calibration_matrix.npy")
+        if integralM_file is not None:
+            self.integral_matrix_path = integralM_file.name
+            np.save(self.integral_matrix_path, self.integral_matrix)
+            self.set_default_path()   # update the indicator of default detected spots path
+
+    def destroy(self):
+        """
+        Rewrite the behaviour of the main window then it's closed.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.messages_queue.put_nowait("Stop integration")  # send the command for stopping calculation thread
+        if self.calculation_thread is not None:
+            if self.calculation_thread.is_alive():
+                self.calculation_thread.join(1)  # wait 1 sec for active thread stops
 
 
 # %% Main launch
@@ -386,4 +485,3 @@ if __name__ == "__main__":
     rootTk = tk.Tk()  # toplevel widget of Tk there the class - child of tk.Frame is embedded
     reconstructor_gui = ReconstructionUI(rootTk)
     reconstructor_gui.mainloop()
-    loaded_image = reconstructor_gui.loaded_image

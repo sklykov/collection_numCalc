@@ -11,16 +11,15 @@ According to the doctoral thesis by Antonello, J. (2014): https://doi.org/10.423
 # %% Imports and globals
 import numpy as np
 from skimage.feature import peak_local_max
-import time
+# import time
 from matplotlib.patches import Circle  # Rectangle  - uncomment if need for visualization
 from scipy import ndimage
-from zernike_pol_calc import radial_polynomial, radial_polynomial_derivative_dr, triangular_function
-from zernike_pol_calc import triangular_derivative_dtheta, normalization_factor
-from zernike_pol_calc import tabular_radial_polynomial, tabular_radial_derivative_dr  # for speeding up calculations
-from numpy.linalg import lstsq
 from calc_zernikes_sh_wfs import check_img_coordinate
 from threading import Thread
 from queue import Empty, Queue
+from zernike_pol_calc import normalization_factor
+from calc_zernikes_sh_wfs import (rho_ab, rho_integral_funcX, rho_integral_funcY,
+                                  r_integral_tabular_funcX, r_integral_tabular_funcY)
 
 
 # %% Function definitions
@@ -186,18 +185,242 @@ def get_zernike_coefficients_list(selected_order: int) -> list:
         return []
 
 
+def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
+                                            messages_queue: Queue, n_polynomial: int = 1, aperture_radius: float = 15.0,
+                                            n_steps: int = 50, swapXY: bool = True) -> np.ndarray:
+    """
+    Calculate integrals using trapezodial rule inside the sub-apertures, which lies inside the unit circle.
+
+    Parameters
+    ----------
+    integration_limits : np.ndarray
+        Calculated previously on theta polar coordinate.
+    theta0 : np.ndarray
+        Polar coordinate theta of sub-aperture centers.
+    rho0 : np.ndarray
+        Polar coordinates r of sub-aperture centers.
+    m : int
+        Azimuthal order of the Zernike polynomial.
+    n : int
+        Radial order of the Zernike polynomial.
+    messages_queue : Queue
+        Queue pipe for checking of Stop event and sending back the messages about the calculation progress.
+    n_polynomial : int, optional
+        Number of polynomial for which the integration calculated. The default is 1.
+    aperture_radius : float, optional
+        Radius of sub-aperture in pixels on the image. The default is 15.0.
+    n_steps : int, optional
+        Number of integration steps for both integrals. The default is 50.
+    swapXY : bool, optional
+        For swapping the direction of Y axis pointing up on the picture, instead down as for pixel coordinates (y, x),
+        for conforming with the thesis calculations. The default is True.
+
+    Returns
+    -------
+    integral_values : ndarray with sizes (Number of sub-apertures, 2)
+        Resulting integration values for each sub-aperture, they are listed for Y and X axes (relatively to image coordinate system).
+
+    """
+    integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
+    calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
+    # Introduction of Zernike's polynomials normalization coefficients => tune of each polynomial contribution
+    calibration = normalization_factor(m, n)  # use it for recalculate integral values for testing
+    rho_unit_calibration = np.max(rho0) + aperture_radius  # For making integration on rho on unit circle
+    # For each sub-aperture below integration on (r, theta) of the Zernike polynomials
+    calculation_flag = True  # for stopping the calculation if appropriate messages received
+    for i_subaperture in range(len(integration_limits)):
+        if not messages_queue.empty():
+            try:
+                message = messages_queue.get_nowait()
+                if message == "Stop integration":
+                    calculation_flag = False
+                    messages_queue.put_nowait(message)
+            except Empty:
+                pass
+        if calculation_flag:
+            # print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
+            # Integration limits and steps on theta
+            (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta (radians)
+            delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
+            theta = theta_a  # initial value of theta
+            # Getting limits for integration on rho
+            (rho_a, rho_b) = rho_ab(rho0[i_subaperture], theta, theta0[i_subaperture], aperture_radius)
+            # All rho values should be normalized to the maximum rho0 coordinate + radius_subaperture
+            rho_a /= rho_unit_calibration; rho_b /= rho_unit_calibration
+            # Integration over theta (trapezoidal rule)
+            integral_sumX = 0.0; integral_sumY = 0.0
+            for j_theta in range(n_steps+1):
+                # Integration on rho for X and Y axis (trapezoidal formula)
+                rho = rho_a  # Lower integration boundary
+                delta_rho = (rho_b - rho_a)/n_steps
+                integral_sum_rhoX1 = 0.0; integral_sum_rhoX2 = 0.0; integral_sum_rhoY1 = 0.0; integral_sum_rhoY2 = 0.0
+                for j_rho in range(n_steps+1):
+                    # get 2 parts of functions according the thesis
+                    if n <= 7:  # tabular functions specified up to this order
+                        (X1, X2) = r_integral_tabular_funcX(rho, theta, m, n)
+                        (Y1, Y2) = r_integral_tabular_funcY(rho, theta, m, n)
+                    else:
+                        (X1, X2) = rho_integral_funcX(rho, theta, m, n)
+                        (Y1, Y2) = rho_integral_funcY(rho, theta, m, n)
+                    # multiplication depends on starting / finishing point according to the formula
+                    if (j_rho == 0) or (j_rho == n_steps):
+                        integral_sum_rhoX1 += 0.5*X1; integral_sum_rhoX2 += 0.5*X2  # on X axis
+                        integral_sum_rhoY1 += 0.5*Y1; integral_sum_rhoY2 += 0.5*Y2  # on Y axis
+                    else:
+                        integral_sum_rhoX1 += X1; integral_sum_rhoX2 += X2
+                        integral_sum_rhoY1 += Y1; integral_sum_rhoY2 += Y2
+                    rho += delta_rho
+                integral_sum_rhoX = (integral_sum_rhoX1 - integral_sum_rhoX2)  # Equations from thesis
+                integral_sum_rhoY = (integral_sum_rhoY1 + integral_sum_rhoY2)  # Equations from thesis
+                # End of integration on rho (i.e. r from polar coordinates)
+                integral_sum_rhoX *= delta_rho; integral_sum_rhoY *= delta_rho
+                if (j_theta == 0) and (j_theta == n_steps):
+                    integral_sumX += 0.5*integral_sum_rhoX; integral_sumY += 0.5*integral_sum_rhoY
+                else:
+                    integral_sumX += integral_sum_rhoX; integral_sumY += integral_sum_rhoY
+                theta += delta_theta
+            integral_sumX *= delta_theta; integral_sumY *= delta_theta  # End of integration on theta
+            # actually, the integral values should be calibrated to each sub-aperture area - depending on the integration limits
+            integral_sumX /= 0.5*(theta_b - theta_a)*((rho_b*rho_b)-(rho_a*rho_a))  # 0.5 - due to integration from (rdr)dtheta
+            integral_sumY /= 0.5*(theta_b - theta_a)*((rho_b*rho_b)-(rho_a*rho_a))
+            # The final integral values should be also calibrated to focal and wavelengths, but it's not yet implemented
+            if swapXY:  # Choosing the relation between X and Y axis calculation (swap them on demand)
+                integral_values[i_subaperture, 1] = calibration*integral_sumX  # Not yet implemented calibration, not necessary now
+                integral_values[i_subaperture, 0] = calibration*integral_sumY
+            else:
+                integral_values[i_subaperture, 0] = calibration*integral_sumX
+                integral_values[i_subaperture, 1] = calibration*integral_sumY
+            integral_values = np.round(integral_values, 9)  # rounding up to ... digits after coma
+        else:
+            break  # stop the integration on each sub-aperture
+    return integral_values
+
+
+def calc_integral_matrix_zernike(progress_bar, zernike_polynomials_list: list, integration_limits: np.ndarray, theta0: np.ndarray,
+                                 rho0: np.ndarray, messages_queue: Queue, aperture_radius: float = 15.0,
+                                 n_steps: int = 80, swapXY: bool = True) -> np.ndarray:
+    """
+    Wrap calculation of integral values on sub-apertures performing on several Zernike polynomials.
+
+    For shortening time of calculation, use the increasing order of listing of polynomials coefficients (like [(-1, 1), (1, 1)])
+
+    Parameters
+    ----------
+    zernike_polynomials_list: list
+        All polynomial specification as 2 orders (m, n) in list.
+    integration_limits : np.ndarray
+        Calculated previously on theta polar coordinate.
+    theta0 : np.ndarray
+        Polar coordinate theta of sub-aperture centers.
+    rho0 : np.ndarray
+        Polar coordinates r of sub-aperture centers.
+    messages_queue : Queue
+        Queue pipe for checking of Stop event and sending back the messages about the calculation progress.
+    aperture_radius : float, optional
+        Radius of sub-aperture in pixels on the image. The default is 15.0.
+    n_steps : int, optional
+        Number of integration steps for both integrals. The default is 100.
+    swapXY: bool, optional
+        For swapping the direction of Y axis pointing up on the picture, instead down as for pixel coordinates (y, x),
+        for conforming with the thesis calculations. The default is True.
+
+    Returns
+    -------
+    integral_matrix : ndarray with sizes (Number of sub-apertures, Number of Zernikes)
+        Resulting integration values for each sub-aperture and for both X and Y axes and specified Zernike values.
+
+    """
+    progress_bar['value'] = 0  # refresh progress bar
+    n_rows = np.size(rho0, 0)
+    n_cols = 2*len(zernike_polynomials_list)  # Because calculation needed for both X and Y axes
+    integral_matrix = np.zeros((n_rows, n_cols), dtype='float')
+    # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
+    # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
+    symmetrical_substitution = False; i_symmetry = -1
+    calculation_flag = True  # flag for stopping calculation
+    length_add = (100 // len(zernike_polynomials_list)) + 1  # portion for progress bar
+    s = 0  # for calculation of increasing progress bar value
+    progress_bar['value'] = 5  # some visually initial progress bar value
+    # Integration for each polynomial:
+    for i in range(len(zernike_polynomials_list)):
+        # Check the messages for stopping integration
+        if not messages_queue.empty():
+            try:
+                message = messages_queue.get_nowait()
+                if message == "Stop integration":
+                    calculation_flag = False
+            except Empty:
+                pass
+        if calculation_flag:
+            (m, n) = zernike_polynomials_list[i]
+            if (((m == -1) and (n == 1)) or ((m == -2) and (n == 2)) or ((m == -3) and (n == 3)) or ((m == -4) and (n == 4))
+                    or ((m == -5) and (n == 5))):
+                i_symmetry = i; symmetrical_substitution = True  # Regulates if shortening of calculation happen below
+            if symmetrical_substitution:
+                if (((m == 1) and (n == 1)) or ((m == 2) and (n == 2)) or ((m == 3) and (n == 3)) or ((m == 4) and (n == 4))
+                        or ((m == 5) and (n == 5))):
+                    # Shortening the time of calculation because of symmetrical integrals over sub-apertures for (-1, 1) and (1, 1),
+                    # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
+                    integral_matrix[:, 2*i] = -integral_matrix[:, 2*i_symmetry+1]
+                    integral_matrix[:, 2*i+1] = integral_matrix[:, 2*i_symmetry]
+                else:
+                    # Normal integrals calculation
+                    integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n,
+                                                                              messages_queue=messages_queue, n_polynomial=i+1,
+                                                                              aperture_radius=aperture_radius, n_steps=n_steps,
+                                                                              swapXY=swapXY)
+                    integral_matrix[:, 2*i] = integral_values[:, 0]; integral_matrix[:, 2*i+1] = integral_values[:, 1]
+            else:
+                # Normal integrals calculation
+                integral_values = calc_integrals_on_apertures_unit_circle(integration_limits, theta0, rho0, m, n,
+                                                                          messages_queue=messages_queue, n_polynomial=i+1,
+                                                                          aperture_radius=aperture_radius, n_steps=n_steps,
+                                                                          swapXY=swapXY)
+                integral_matrix[:, 2*i] = integral_values[:, 0]; integral_matrix[:, 2*i+1] = integral_values[:, 1]
+            print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
+            s += length_add
+            progress_bar['value'] = s
+        else:
+            # Integration was aborted
+            progress_bar['value'] = 0; integral_matrix = []; break  # stop for loop above
+    messages_queue.put_nowait("Integration finished")
+    return integral_matrix
+
+
 # %% Threaded class for integral matrix calculation
 class IntegralMatrixThreaded(Thread):
     """Calculate integral matrix in the threaded manner."""
 
     messages_queue: Queue
+    order: int
+    theta0: np.ndarray
+    rho0: np.ndarray
+    integration_limits: np.ndarray
+    radius_subaperture: float
+    integral_matrix: np.ndarray
 
-    def __init__(self, messages_queue: Queue):
-        self.messages_queue = messages_queue
-        super.__init__(self)
+    def __init__(self, messages_queue: Queue, order: int, theta0: np.ndarray, rho0: np.ndarray,
+                 integration_limits: np.ndarray, radius_subaperture: float, progress_bar,
+                 integral_matrix: np.ndarray):
+        self.messages_queue = messages_queue; self.order = order; self.theta0 = theta0
+        self.rho0 = rho0; self.integration_limits = integration_limits; self.radius_subaperture = radius_subaperture
+        self.progress_bar = progress_bar; self.integral_matrix = integral_matrix
+        super().__init__()  # initialization of a new thread
 
     def run(self):
-        pass
+        """
+        Calculate integral matrix calling specified functions above (look also for defaul values).
+
+        Returns
+        -------
+        None.
+
+        """
+        print("Integral matrix calculation started")
+        self.integral_matrix = calc_integral_matrix_zernike(self.progress_bar, get_zernike_coefficients_list(self.order),
+                                                            self.integration_limits, self.theta0, self.rho0,
+                                                            self.messages_queue, self.radius_subaperture)
+        print("Integral matrix calculation finished")
 
 
 # %% Tests
