@@ -19,6 +19,8 @@ from zernike_pol_calc import triangular_derivative_dtheta, normalization_factor
 from zernike_pol_calc import tabular_radial_polynomial, tabular_radial_derivative_dr  # for speeding up calculations
 from numpy.linalg import lstsq
 from calc_zernikes_sh_wfs import check_img_coordinate
+from threading import Thread
+from queue import Empty, Queue
 
 
 # %% Function definitions
@@ -30,18 +32,20 @@ def get_localCoM_matrix(image: np.ndarray, axes_fig, min_dist_peaks: int = 15, t
     Parameters
     ----------
     image : np.ndarray
-        Shack-Hartmann image with recorded wavefront.
+        Shack-Hartmann image with focal spots of focused wavefront.
+    axes_fig : matplotlib.Axes
+        Axes class of the figure shown in the GUI widget (window).
     min_dist_peaks : int, optional
         Minimal distance between two local peaks. The default is 15.
     threshold_abs : float, optional
-        Absolute minimal intensity value of the local peak. The default is 2.
+        Absolute minimal intensity value for start searching of a local peak. The default is 55.0.
     region_size : int, optional
         Size of local rectangle, there the center of mass is calculated. The default is 16.
 
     Returns
     -------
     coms : np.array
-        Calculated center of masses coordinates.
+        Calculated center of masses (CoMs) coordinates.
 
     """
     detected_centers = peak_local_max(image, min_distance=min_dist_peaks, threshold_abs=threshold_abs)
@@ -74,7 +78,14 @@ def get_integral_limits_nonaberrated_centers(axes_fig, picture_as_array: np.ndar
 
     Parameters
     ----------
-
+    axes_fig : matplotlib.Axes
+        Axes class of the figure shown in the GUI widget (window).
+    picture_as_array : np.ndarray
+        Shack-Hartmann image with focal spots of focused wavefront.
+    threshold_abs : float
+        Absolute minimal intensity value for start searching of a local peak. The default is 55.0.
+    aperture_radius : float
+        Radius of sub-aperture radius in pixels. The default is 15.0.
 
     Returns
     -------
@@ -147,6 +158,48 @@ def get_integral_limits_nonaberrated_centers(axes_fig, picture_as_array: np.ndar
     return subapertures_wt_central, theta0, rho0, integration_limits
 
 
+def get_zernike_coefficients_list(selected_order: int) -> list:
+    """
+    Return list with tuples containing azimuthal and radial orders (m, n).
+
+    Parameters
+    ----------
+    selected_order : int
+        Selected Zernike order, now in range from 1 to 5.
+
+    Returns
+    -------
+    list
+        List with sequential azimuthal and radial orders stored in tuples as (m, n).
+
+    """
+    zernike_coefficients_dict = {1: [(-1, 1), (1, 1)], 2: [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2)],
+                                 3: [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3)],
+                                 4: [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3),
+                                     (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4)],
+                                 5: [(-1, 1), (1, 1), (-2, 2), (0, 2), (2, 2), (-3, 3), (-1, 3), (1, 3), (3, 3),
+                                     (-4, 4), (-2, 4), (0, 4), (2, 4), (4, 4), (-5, 5), (-3, 5), (-1, 5), (1, 5),
+                                     (3, 5), (5, 5)]}
+    if selected_order >= 1 and selected_order <= 5:
+        return zernike_coefficients_dict[selected_order]
+    else:
+        return []
+
+
+# %% Threaded class for integral matrix calculation
+class IntegralMatrixThreaded(Thread):
+    """Calculate integral matrix in the threaded manner."""
+
+    messages_queue: Queue
+
+    def __init__(self, messages_queue: Queue):
+        self.messages_queue = messages_queue
+        super.__init__(self)
+
+    def run(self):
+        pass
+
+
 # %% Tests
 if __name__ == "__main__":
-    pass
+    print(get_zernike_coefficients_list(1))

@@ -16,6 +16,7 @@ import os
 from skimage import io
 from skimage.util import img_as_ubyte
 from reconstruction_wfs_functions import get_integral_limits_nonaberrated_centers
+import re
 
 
 # %% Reconstructor GUI
@@ -26,16 +27,17 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         # Basic initialization of class variables
         super().__init__(master)  # initialize the toplevel widget
         self.master.title("UI for reconstruction of recorded wavefronts")
-        self.master.geometry("+80+120")  # opens the main window with some offset
+        self.master.geometry("+50+70")  # opens the main window with some offset
         self.config(takefocus=True)   # make created window in focus
         self.calibrate_window = None  # holder for checking if the window created
         self.calibrate_axes = None  # the class for plotting in figure loaded pictures
         self.loaded_image = None  # holder for the loaded image for calibration / reconstruction
         self.calibration = False  # flag for switching for a calibration window
         self.calibrate_plots = None  # flag for plots on an image - CoMs, etc.
-        self.default_threshold = 50
-        self.default_radius = 15.0
+        self.default_threshold = 55
+        self.default_radius = 14.0
         self.coms_spots = None
+        self.order = 4  # default selected Zernike order
 
         # Buttons and labels specification
         self.load_button = tk.Button(master=self, text="Load Picture", padx=2, pady=2)
@@ -102,7 +104,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         """
         if self.calibrate_window is None:  # create the toplevel widget for holding all ctrls for calibration
             # Toplevel window configuration
-            self.calibrate_window = tk.Toplevel(master=self); self.calibrate_window.geometry("+780+120")
+            self.calibrate_window = tk.Toplevel(master=self); self.calibrate_window.geometry("+720+70")
             self.calibrate_window.protocol("WM_DELETE_WINDOW", self.calibration_exit)  # associate quit with the function
             self.calibrate_button.config(state="disabled")  # disable the Calibrate button
             self.calibrate_window.title("Calibration")
@@ -117,6 +119,12 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.save_coms_button = tk.Button(master=self.calibrate_window, text="Save found spots",
                                               command=self.save_localized_coms)
             self.save_coms_button.config(state="disabled")
+            self.calc_integral_matrix_button = tk.Button(master=self.calibrate_window, text="Calculate integrals",
+                                                         command=self.calculate_integral_matrix)
+            self.calc_integral_matrix_button.config(state="disabled")
+            self.abort_integral_matrix_button = tk.Button(master=self.calibrate_window, text="Abort integrals",
+                                                          command=self.abort_integration, fg="red")
+            self.abort_integral_matrix_button.config(state="disabled")
 
             # Threshold value ctrls and packing
             self.threshold_frame = tk.Frame(master=self.calibrate_window)  # for holding label and spinbox
@@ -142,8 +150,17 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.radius_ctrl_box.pack(side='left', padx=1, pady=1)
             self.radius_ctrl_box.config(state="disabled")
 
+            # Number of orders control
+            self.zernike_orders = ["1st", "2nd", "3rd", "4th", "5th"]; self.selected_order = tk.StringVar()
+            self.order_list = ["Use up to " + item + " order" for item in self.zernike_orders]
+            self.selected_order.set(self.order_list[3])
+            self.zernike_order_selector = tk.OptionMenu(self.calibrate_window, self.selected_order,
+                                                        self.order_list[3], *self.order_list,
+                                                        command=self.order_selected)
+            self.zernike_order_selector.config(state="disabled")
+
             # Construction of figure holder for its representation
-            self.calibrate_figure = plot_figure.Figure(figsize=(6.8, 5.6))
+            self.calibrate_figure = plot_figure.Figure(figsize=(6.8, 5.7))
             self.calibrate_canvas = FigureCanvasTkAgg(self.calibrate_figure, master=self.calibrate_window)
             self.calibrate_fig_widget = self.calibrate_canvas.get_tk_widget()
 
@@ -154,6 +171,9 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.radius_frame.grid(row=0, rowspan=1, column=3, columnspan=1, padx=pad, pady=pad)
             self.save_coms_button.grid(row=0, rowspan=1, column=4, columnspan=1, padx=pad, pady=pad)
             self.calibrate_fig_widget.grid(row=1, rowspan=4, column=0, columnspan=5, padx=pad, pady=pad)
+            self.calc_integral_matrix_button.grid(row=5, rowspan=1, column=0, columnspan=1, padx=pad, pady=pad)
+            self.zernike_order_selector.grid(row=5, rowspan=1, column=1, columnspan=1, padx=pad, pady=pad)
+            self.abort_integral_matrix_button.grid(row=5, rowspan=1, column=3, columnspan=1, padx=pad, pady=pad)
             self.calibrate_window.grid()
             self.calibrate_window.config(takefocus=True)  # put the created windows in focus
             self.calibration = True  # flag for association of images with the calibration window
@@ -313,9 +333,11 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         if not isinstance(self.coms_spots, int):
             rows, cols = self.coms_spots.shape  # getting the size of found coordinates (X, Y) of CoMs
             if rows > 0 and cols > 0:
-                self.save_coms_button.config(state="normal")
+                self.save_coms_button.config(state="normal"); self.calc_integral_matrix_button.config(state="normal")
+                self.zernike_order_selector.config(state="normal"); self.abort_integral_matrix_button.config(state="normal")
         else:
-            self.save_coms_button.config(state="disabled")
+            self.save_coms_button.config(state="disabled"); self.calc_integral_matrix_button.config(state="disabled")
+            self.zernike_order_selector.config(state="disabled"); self.abort_integral_matrix_button.config(state="disabled")
 
     def save_localized_coms(self):
         """
@@ -334,6 +356,29 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                 self.calibrated_spots_path = coms_file.name
                 np.save(self.calibrated_spots_path, self.coms_spots)
                 self.set_default_path()   # update the indicator of default detected spots path
+
+    def order_selected(self, *args):
+        """
+        Extract the order number from StringVar list of controls.
+
+        Parameters
+        ----------
+        *args : list
+            Provided by tkinter as the StringVar change.
+
+        Returns
+        -------
+        None.
+
+        """
+        reg_digit = re.compile('\d')  # match any digit in a string
+        self.order = int(re.search(reg_digit, self.selected_order.get()).group(0))
+
+    def calculate_integral_matrix(self):
+        pass
+
+    def abort_integration(self):
+        pass
 
 
 # %% Main launch
