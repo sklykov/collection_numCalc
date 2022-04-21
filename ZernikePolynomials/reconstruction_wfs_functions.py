@@ -186,6 +186,28 @@ def get_zernike_coefficients_list(selected_order: int) -> list:
         return []
 
 
+def get_zernike_order_from_coefficients_number(coefficients_number: int) -> int:
+    """
+    Return maximum Zernike polynomial order.
+
+    Parameters
+    ----------
+    coefficients_number : int
+        Number of coeffficients with orders (m ,n).
+
+    Returns
+    -------
+    int
+        Order of maximum Zernike polynomial.
+
+    """
+    coefficients_number_dict = {2: 1, 5: 2, 9: 3, 14: 4, 20: 5, 27: 6, 35: 7}
+    if coefficients_number >= 2 and coefficients_number <= 35:
+        return coefficients_number_dict[coefficients_number]
+    else:
+        return -1
+
+
 def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, theta0: np.ndarray, rho0: np.ndarray, m: int, n: int,
                                             messages_queue: Queue, n_polynomial: int = 1, aperture_radius: float = 15.0,
                                             n_steps: int = 50, swapXY: bool = True) -> np.ndarray:
@@ -390,6 +412,58 @@ def calc_integral_matrix_zernike(progress_bar, zernike_polynomials_list: list, i
     else:
         messages_queue.put_nowait("Integration aborted")
     return integral_matrix
+
+
+def get_coms_shifts(coms_nonaberrated: np.ndarray, integral_matrix: np.ndarray, coms_aberrated: np.ndarray,
+                    aperture_radius: float = 15.0) -> tuple:
+    """
+    Calculate shifts between center of masses around local focal spots for aberrated and non-aberrated images.
+
+    Parameters
+    ----------
+    coms_nonaberrated : np.ndarray
+        Calculated center of masses around local focal spots on the non-aberrated image.
+    coms_aberrated : np.ndarray
+        Calculated center of masses around local focal spots on the aberrated image.
+    integral_matrix : np.ndarray
+        Calculated the integral matrix for Zernike polynomials.
+    aperture_radius : float
+        Radius of sub-aperture radius in pixels. The default is 15.0.
+
+    Returns
+    -------
+    tuple
+        (shifts of CoMs, integral matrix according to the detected CoMs on the aberrated image).
+
+    """
+    min_dist_peaks = int(np.round(1.5*aperture_radius, 0))  # estimation based on specified aperture radius
+    # Calculate the shifts between CoMs in aberrated and non-aberrated images
+    coms_shifts = np.zeros((np.size(coms_aberrated, 0), 2), dtype='float')  # Shifts between CoMs
+    # Recalculate the integration values that will be used further for calculation of alpha coefficient
+    integral_matrix_aberrated = np.zeros((np.size(coms_aberrated, 0), np.size(integral_matrix, 1)), dtype='float')
+    i_central_aperture = -1  # for defining the central aperture in the aberrated list of CoMs
+    # Below - calculation of shifts between CoMs
+    for i in range(np.size(coms_aberrated, 0)):
+        central_aperture_found = True  # flag for defining the index of central sub-aperture in the aberrated list
+        for j in range(0, np.size(coms_nonaberrated, 0)):
+            diffY = abs(coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX = abs(coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            diffY_sign = (coms_aberrated[i, 0] - coms_nonaberrated[j, 0]); diffX_sign = (coms_aberrated[i, 1] - coms_nonaberrated[j, 1])
+            if (diffX < float((min_dist_peaks/2))) and (diffY < float((min_dist_peaks/2))):
+                central_aperture_found = False  # the matching is defined, shift found => it's not the central sub-aperture
+                coms_shifts[i, 0] = -diffY_sign  # Direction of Y axis swapped (not as on the picture, from top to bottom)
+                coms_shifts[i, 1] = diffX_sign  # Direction of X axis is the same as on the picture (from left to right)
+                for k in range(np.size(integral_matrix, 1)):
+                    integral_matrix_aberrated[i, k] = integral_matrix[j, k]
+                break  # Stop searching the candidates within CoMs from nonaberrated image if the actual shift found
+        if central_aperture_found:
+            # print("Central subaperture found:", i)
+            i_central_aperture = i  # record the found index for further removing of the central aperture integral values and coms
+    # Below: removing belonging to central subaperture values
+    coms_shifts = np.delete(coms_shifts, i_central_aperture, axis=0)
+    coms_aberrated = np.delete(coms_aberrated, i_central_aperture, axis=0)
+    integral_matrix_aberrated = np.delete(integral_matrix_aberrated, i_central_aperture, axis=0)
+
+    return coms_shifts, integral_matrix_aberrated, coms_aberrated
 
 
 # %% Threaded class for integral matrix calculation

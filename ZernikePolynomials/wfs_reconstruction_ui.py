@@ -17,9 +17,12 @@ import os
 from skimage import io
 from skimage.util import img_as_ubyte
 from reconstruction_wfs_functions import (get_integral_limits_nonaberrated_centers, IntegralMatrixThreaded,
-                                          get_localCoM_matrix)
+                                          get_localCoM_matrix, get_coms_shifts, get_zernike_coefficients_list,
+                                          get_zernike_order_from_coefficients_number)
 import re
 from queue import Queue, Empty
+from calc_zernikes_sh_wfs import get_polynomials_coefficients
+from zernike_pol_calc import get_plot_zps_polar
 
 
 # %% Reconstructor GUI
@@ -601,6 +604,10 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                                                                  command=self.localize_aberrated_spots)
                     self.reconstruct_get_shifts_button = tk.Button(master=self.reconstruction_window, text="Get shifts",
                                                                    command=self.calculate_coms_shifts)
+                    self.reconstruct_get_shifts_button.config(state="disabled")
+                    self.reconstruct_get_zernikes_button = tk.Button(master=self.reconstruction_window, text="Get Aberrations",
+                                                                     command=self.calculate_zernikes_coefficients)
+                    self.reconstruct_get_zernikes_button.config(state="disabled")
 
                     # Construction of figure holder for its representation
                     self.reconstruction_figure = plot_figure.Figure(figsize=(6.8, 5.7))
@@ -634,6 +641,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                     self.threshold_frame.grid(row=0, rowspan=1, column=1, columnspan=1, padx=pad, pady=pad)
                     self.radius_frame.grid(row=0, rowspan=1, column=2, columnspan=1, padx=pad, pady=pad)
                     self.reconstruct_get_shifts_button.grid(row=0, rowspan=1, column=3, columnspan=1, padx=pad, pady=pad)
+                    self.reconstruct_get_zernikes_button.grid(row=0, rowspan=1, column=4, columnspan=1, padx=pad, pady=pad)
                     self.reconstruction_fig_widget.grid(row=1, rowspan=4, column=0, columnspan=5, padx=pad, pady=pad)
 
                     # Draw the loaded image
@@ -658,6 +666,29 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                         # self.threshold_ctrl_box.config(state="normal")  # enable the threshold button
                         # self.radius_ctrl_box.config(state="normal")  # enable the radius button
                         self.reconstruction_plots = None
+        else:  # the new image not loaded, but the window remains with the previous image not active actually
+            if self.reconstruction_window is not None:
+                self.reconstruction_exit()  # close previously opened toplevel window
+
+    def redraw_aberrated_image(self):
+        """
+        Redraw loaded image without any plots on it.
+
+        Returns
+        -------
+        None.
+
+        """
+        # Redraw the image on the reconstruction window without any additional plots on it
+        if self.reconstruction_plots is None:
+            self.reconstruction_plots = True
+        else:
+            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
+            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
+            self.reconstruction_axes = self.reconstruction_figure.add_subplot()
+            self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
+            self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+            self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
 
     def localize_aberrated_spots(self):
         """
@@ -668,24 +699,18 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         None.
 
         """
-        # self.redraw_loaded_image()  # call for refreshing image without plotted CoMs and subapertures
-        min_dist_peaks = int(np.round(1.5*self.radius_value.get(), 0))
-        region_size = int(np.round(1.4*self.radius_value.get(), 0))
+        min_dist_peaks = int(np.round(1.5*self.radius_value.get(), 0))  # also used in imported reconstruction_wfs_functions
+        region_size = int(np.round(1.4*self.radius_value.get(), 0))  # also used in imported reconstruction_wfs_functions
         self.coms_aberrated = get_localCoM_matrix(image=self.loaded_image, axes_fig=self.reconstruction_axes,
                                                   threshold_abs=self.threshold_value.get(),
                                                   min_dist_peaks=min_dist_peaks, region_size=region_size)
-        # Below - firstly - clean the previous drawing on the figure, secondly - draw
-        if self.reconstruction_plots is None:
-            self.reconstruction_plots = True
-        else:
-            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
-            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
-            self.reconstruction_axes = self.reconstruction_figure.add_subplot()
-            self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
-            self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+        self.redraw_aberrated_image()  # redraw the originally loaded image without any plots
+        # Below - plotting found spots
+        rows, cols = self.coms_aberrated.shape
+        if rows > 0 and cols > 0:
+            self.reconstruction_axes.plot(self.coms_aberrated[:, 1], self.coms_aberrated[:, 0], '.', color="red")
             self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
-        self.reconstruction_axes.plot(self.coms_aberrated[:, 1], self.coms_aberrated[:, 0], '.', color="red")
-        self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+            self.reconstruct_get_shifts_button.config(state="normal")
 
     def calculate_coms_shifts(self):
         """
@@ -696,16 +721,43 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         None.
 
         """
-        # Below - clean previous drawing and plot loaded picture without any additional drawing
-        if self.reconstruction_plots is None:
-            self.reconstruction_plots = True
-        else:
-            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
-            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
-            self.reconstruction_axes = self.reconstruction_figure.add_subplot()
-            self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
-            self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+        self.redraw_aberrated_image()  # redraw the originally loaded image without any plots
+        (self.coms_shifts, self.integral_matrix_aberrated,
+         self.coms_aberrated) = get_coms_shifts(self.coms_spots, self.integral_matrix,
+                                                self.coms_aberrated, self.radius_value.get())
+        # Plot shifts
+        rows, cols = self.coms_aberrated.shape
+        if rows > 0 and cols > 0:
+            for i in range(rows):
+                # Plotting the arrows for visual representation of shifts direction. Changed signs - because of swapped Y axis
+                self.reconstruction_axes.arrow(self.coms_aberrated[i, 1] - self.coms_shifts[i, 1],
+                                               self.coms_aberrated[i, 0] + self.coms_shifts[i, 0],
+                                               self.coms_shifts[i, 1], -self.coms_shifts[i, 0],
+                                               color='red', linewidth=4)
             self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+            self.reconstruct_get_zernikes_button.config(state="normal")
+
+    def calculate_zernikes_coefficients(self):
+        """
+        Calculate amplitudes (alpha coefficients) of Zernike polynomials, used for integral matrix calculation.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.alpha_coefficients = get_polynomials_coefficients(self.integral_matrix_aberrated, self.coms_shifts)
+        self.alpha_coefficients *= np.pi  # for adjusting to radians ???
+        self.alpha_coefficients = list(self.alpha_coefficients)
+        if len(self.alpha_coefficients) > 0:
+            # Define below used orders of Zernikes and providing them for amplitudes calculation
+            self.order = get_zernike_order_from_coefficients_number(len(self.alpha_coefficients))
+            self.zernike_list_orders = get_zernike_coefficients_list(self.order)
+            # Draw the profile with Zernike polynomials multiplied by coefficients (amplitudes)
+            self.reconstruction_figure = get_plot_zps_polar(self.reconstruction_figure, orders=self.zernike_list_orders,
+                                                            step_r=0.005, step_theta=0.9,
+                                                            alpha_coefficients=self.alpha_coefficients, show_amplitudes=False)
+            self.reconstruction_canvas.draw()  # redraw the figure
 
     def reconstruction_exit(self):
         """
