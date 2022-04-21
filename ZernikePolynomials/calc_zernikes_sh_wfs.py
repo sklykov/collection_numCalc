@@ -501,8 +501,8 @@ def get_integral_limits_nonaberrated_centers(pics_folder: str = "pics", backgrou
     """
     Calculate the center of masses of localized focal spots and also the integration limits for further modal wavefront reconstruction.
 
-    Focal spots are recorded within the non-aberrated image (flat wavefront) from Shack-Hartmann sensor. Integrations limits are calculated
-    according to the mentioned above in this file thesis.
+    Focal spots are recorded within the non-aberrated image (flat wavefront) from Shack-Hartmann sensor.
+    Integrations limits are calculated according to the mentioned above in this file thesis.
 
     Parameters
     ----------

@@ -16,7 +16,8 @@ import numpy as np
 import os
 from skimage import io
 from skimage.util import img_as_ubyte
-from reconstruction_wfs_functions import get_integral_limits_nonaberrated_centers, IntegralMatrixThreaded
+from reconstruction_wfs_functions import (get_integral_limits_nonaberrated_centers, IntegralMatrixThreaded,
+                                          get_localCoM_matrix)
 import re
 from queue import Queue, Empty
 
@@ -42,16 +43,22 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         self.integral_matrix = []
         self.calculation_thread = None  # holder for calculation thread of integral matrix
         self.integration_running = False  # flag for tracing the running integration
+        self.activate_load_aber_pic_count = 0  # if it is equal to 2, then both files for reconstruction can be loaded
+        self.loaded_axes = None; self.loaded_figure = None  # holders for opening and loading figures
+        self.reconstruction_window = None  # holder for top-level window represent the loaded picture
+        self.reconstruction_axes = None; self.reconstruction_plots = None
 
         # Buttons and labels specification
-        self.load_button = tk.Button(master=self, text="Load Picture", padx=2, pady=2)
+        self.load_button = tk.Button(master=self, text="Load Aber.Picture", padx=2, pady=2, command=self.load_aberrated_picture)
+        self.load_button.config(state="disabled")
         self.calibrate_button = tk.Button(master=self, text="Calibrate", padx=2, pady=2, command=self.calibrate)
         self.path_int_matrix = tk.StringVar()
         self.label_integral_matrix = tk.Label(master=self, textvariable=self.path_int_matrix, anchor=tk.CENTER)
         self.default_path_label = tk.Label(master=self, text="Default path to calibration files:", anchor=tk.CENTER)
         self.current_path = os.path.dirname(__file__); self.calibration_path = os.path.join(self.current_path, "calibrations")
-        self.load_spots_button = tk.Button(master=self, text="Load Focal Spots", padx=1, pady=1)
-        self.load_integral_matrix_button = tk.Button(master=self, text="Load Integral Matrix", padx=1, pady=1)
+        self.load_spots_button = tk.Button(master=self, text="Load Focal Spots", padx=1, pady=1, command=self.load_found_spots)
+        self.load_integral_matrix_button = tk.Button(master=self, text="Load Integral Matrix", padx=1,
+                                                     pady=1, command=self.load_integral_matrix)
         self.spots_text = tk.StringVar(); self.integralM_text = tk.StringVar()  # text variables
         self.spots_label = tk.Label(master=self, textvariable=self.spots_text, anchor=tk.CENTER)
         self.integralM_label = tk.Label(master=self, textvariable=self.integralM_text, anchor=tk.CENTER)
@@ -86,17 +93,28 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.integralM_path = os.path.join(self.calibration_path, "integral_calibration_matrix.npy")
             if os.path.exists(self.spots_path):
                 self.spots_text.set("Calibration file with focal spots found")
+                self.coms_spots = np.load(self.spots_path)
+                rows, cols = self.coms_spots.shape
+                if rows > 0 and cols > 0:
+                    self.activate_load_aber_pic_count += 1
             else:
                 self.spots_text.set("No default calibration file with spots found")
             if os.path.isfile(self.integralM_path):
                 self.integralM_text.set("Calibration file with integral matrix found")
+                self.integral_matrix = np.load(self.integralM_path)
+                rows, cols = self.integral_matrix.shape
+                if rows > 0 and cols > 0:
+                    self.activate_load_aber_pic_count += 1
             else:
                 self.integralM_text.set("No default calibration file with integral matrix found")
+            if self.activate_load_aber_pic_count == 2:
+                self.load_button.config(state="normal")
         else:
             self.path_int_matrix.set(self.current_path)
             self.spots_text.set("No default calibration file with spots found")
             self.integralM_text.set("No default calibration file with integral matrix found")
 
+    # %% Calibration
     def calibrate(self):
         """
         Perform calibration on the recorded non-aberrated image, stored on the local drive.
@@ -112,6 +130,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             self.calibrate_window.protocol("WM_DELETE_WINDOW", self.calibration_exit)  # associate quit with the function
             self.calibrate_button.config(state="disabled")  # disable the Calibrate button
             self.calibrate_window.title("Calibration")
+            self.load_button.config(state="disabled")
 
             # Buttons specification for calibration
             pad = 4  # universal additional distance between buttons on grid layout
@@ -202,12 +221,19 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         None.
 
         """
-        self.calibrate_button.config(state="normal")  # activate the Calibrate button
-        self.calibrate_window.destroy(); self.calibrate_window = None
-        self.config(takefocus=True)   # make main window in focus
-        # Below - restore empty holders for recreation of figure, axes, etc.
-        self.calibration = False; self.loaded_image = None
-        self.calibrate_axes = None; self.calibrate_plots = None
+        if self.integration_running:  # if the integration running, then abort integration first
+            self.abort_integration()
+            self.after(520, self.calibration_exit)  # call this function again after some ms for closing window
+        else:
+            self.calibrate_button.config(state="normal")  # activate the Calibrate button
+            self.config(takefocus=True)   # make main window in focus
+            # Below - restore empty holders for recreation of figure, axes, etc.
+            self.calibration = False; self.loaded_image = None
+            self.calibrate_axes = None; self.calibrate_plots = None
+            if not self.messages_queue.empty():
+                self.messages_queue.queue.clear()  # clear all messages from the messages queue
+            self.calibrate_window.destroy(); self.calibrate_window = None
+        self.load_button.config(state="normal")  # activate the load picture button
 
     def load_picture(self):
         """
@@ -319,7 +345,7 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         None.
 
         """
-        if self.calibrate_plots is None:  # upon the creatuin
+        if self.calibrate_plots is None:  # upon the creation
             self.calibrate_plots = True
         else:
             # Below - code for refreshing Axes class for again re-draw found CoMs and etc
@@ -339,6 +365,8 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
 
         """
         self.redraw_loaded_image()  # call for refreshing image without plotted CoMs and subapertures
+        self.activate_load_aber_pic_count = 0  # disactivate the possibility to load aberrated picture before calibration complete
+        self.load_button.config(state="disabled")
         (self.coms_spots, self.theta0, self.rho0,
          self.integration_limits) = get_integral_limits_nonaberrated_centers(self.calibrate_axes,
                                                                              self.loaded_image,
@@ -418,6 +446,10 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         if self.integration_running:
             self.messages_queue.put_nowait("Stop integration")  # send the command for stopping calculation thread
             self.save_integral_matrix_button.config(state="disabled")
+            if self.calculation_thread is not None:  # checks that thread object still exists
+                if self.calculation_thread.is_alive():
+                    self.calculation_thread.join(1)  # wait 1 sec for active thread stops
+            self.integration_running = False
 
     def check_finish_integration(self):
         """
@@ -439,6 +471,9 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
                         rows, cols = self.integral_matrix.shape
                         if rows > 0 and cols > 0:
                             self.save_integral_matrix_button.config(state="normal")
+                if message == "Integration aborted":
+                    self.integration_running = False
+                    print(message); self.integral_matrix = []
                 elif message == "Stop integration":
                     self.messages_queue.put_nowait(message); time.sleep(0.15)  # resend abort calculation
             except Empty:
@@ -465,6 +500,225 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
             np.save(self.integral_matrix_path, self.integral_matrix)
             self.set_default_path()   # update the indicator of default detected spots path
 
+    # %% Reconstruction
+    def load_found_spots(self):
+        """
+        Load saved in the *npy file detected coordinates of focal spots.
+
+        Returns
+        -------
+        None.
+
+        """
+        if os.path.exists(self.calibration_path) and os.path.isdir(self.calibration_path):
+            initialdir = self.calibration_path
+        else:
+            initialdir = self.current_path
+        coms_file = tk.filedialog.askopenfile(title="Load coordinates of localized spots",
+                                              initialdir=initialdir, filetypes=[("numpy binary file", "*.npy")],
+                                              defaultextension=".npy", initialfile="detected_focal_spots.npy")
+        if coms_file is not None:
+            self.calibrated_spots_path = coms_file.name
+            self.coms_spots = np.load(self.spots_path)
+            rows, cols = self.coms_spots.shape
+            if rows > 0 and cols > 0:
+                # below - force the user to load the integral matrix again, if the file with spots reloaded
+                self.load_button.config(state="disabled")
+                if self.activate_load_aber_pic_count == 0 or self.activate_load_aber_pic_count == 1:
+                    self.activate_load_aber_pic_count += 1
+                elif self.activate_load_aber_pic_count == 2:
+                    self.activate_load_aber_pic_count -= 1
+            if self.activate_load_aber_pic_count == 2:
+                self.load_button.config(state="normal")
+
+    def load_integral_matrix(self):
+        """
+        Load the precalculated integral matrix.
+
+        Returns
+        -------
+        None.
+
+        """
+        if os.path.exists(self.calibration_path) and os.path.isdir(self.calibration_path):
+            initialdir = self.calibration_path
+        else:
+            initialdir = self.current_path
+        integralM_file = tk.filedialog.askopenfile(title="Load calculated integral matrix",
+                                                   initialdir=initialdir, filetypes=[("numpy binary file", "*.npy")],
+                                                   defaultextension=".npy", initialfile="integral_calibration_matrix.npy")
+        if integralM_file is not None:
+            self.integralM_path = integralM_file.name
+            self.integral_matrix = np.load(self.integralM_path)
+            rows, cols = self.integral_matrix.shape
+            if rows > 0 and cols > 0:
+                # below - force the user to load the integral matrix again, if the file with spots reloaded
+                self.load_button.config(state="disabled")
+                if self.activate_load_aber_pic_count == 0 or self.activate_load_aber_pic_count == 1:
+                    self.activate_load_aber_pic_count += 1
+                elif self.activate_load_aber_pic_count == 2:
+                    self.activate_load_aber_pic_count -= 1
+            if self.activate_load_aber_pic_count == 2:
+                self.load_button.config(state="normal")
+
+    def load_aberrated_picture(self):
+        """
+        Load the aberrated picture for calculation of aberrations profile.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.pics_path = os.path.join(self.current_path, "pics")  # default folder with the pictures
+        # Below - delete the plots (e.g., the localized focal spots)
+        if self.reconstruction_axes is not None:
+            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
+            self.reconstruction_axes = None
+        # construct absolute path to the folder with recorded pictures
+        if os.path.exists(self.pics_path) and os.path.isdir(self.pics_path):
+            initialdir = self.pics_path
+        else:
+            initialdir = self.current_path
+        file_types = [("PNG image", "*.png"), ("JPG file", "*.jpg, *.jpeg"), ("Tiff file", "*.tiff, *.tif")]
+        open_image_dialog = tk.filedialog.askopenfile(initialdir=initialdir, filetypes=file_types)
+        if open_image_dialog is not None:
+            self.path_loaded_picture = open_image_dialog.name  # record absolute path to the opened image
+            self.loaded_image = io.imread(self.path_loaded_picture, as_gray=True)
+            self.loaded_image = img_as_ubyte(self.loaded_image)  # convert to the ubyte U8 image
+            rows, cols = self.loaded_image.shape
+            if rows > 0 and cols > 0:
+                # construct the toplevel window
+                if self.reconstruction_window is None:  # create the toplevel widget for holding all ctrls for calibration
+                    # Toplevel window configuration
+                    self.reconstruction_window = tk.Toplevel(master=self); self.reconstruction_window.geometry("+720+70")
+                    self.reconstruction_window.protocol("WM_DELETE_WINDOW", self.reconstruction_exit)
+                    self.calibrate_button.config(state="disabled")  # disable the Calibrate button
+                    self.reconstruction_window.title("Reconstruction"); pad = 4
+
+                    # Buttons specification
+                    self.reconstruct_localize_button = tk.Button(master=self.reconstruction_window, text="Localize focal spots",
+                                                                 command=self.localize_aberrated_spots)
+                    self.reconstruct_get_shifts_button = tk.Button(master=self.reconstruction_window, text="Get shifts",
+                                                                   command=self.calculate_coms_shifts)
+
+                    # Construction of figure holder for its representation
+                    self.reconstruction_figure = plot_figure.Figure(figsize=(6.8, 5.7))
+                    self.reconstruction_canvas = FigureCanvasTkAgg(self.reconstruction_figure, master=self.reconstruction_window)
+                    self.reconstruction_fig_widget = self.reconstruction_canvas.get_tk_widget()
+
+                    # Threshold value ctrls and packing
+                    self.threshold_frame = tk.Frame(master=self.reconstruction_window)  # for holding label and spinbox
+                    self.threshold_label = tk.Label(master=self.threshold_frame, text="Threshold (1...254): ")
+                    self.threshold_label.pack(side='left', padx=1, pady=1)
+                    self.threshold_value = tk.IntVar(); self.threshold_value.set(self.default_threshold)  # default threshold value
+                    self.threshold_value.trace_add(mode="write", callback=self.validate_threshold)
+                    self.threshold_ctrl_box = tk.Spinbox(master=self.threshold_frame, from_=1, to=254,
+                                                         increment=1, textvariable=self.threshold_value,
+                                                         wrap=True, width=4)   # adapt Spinbox to 4 digits in int value
+                    self.threshold_ctrl_box.pack(side='left', padx=1, pady=1)
+
+                    # Radius of sub-apertures ctrls and packing
+                    self.radius_frame = tk.Frame(master=self.reconstruction_window)  # for holding label and spinbox
+                    self.radius_label = tk.Label(master=self.radius_frame, text="Sub-aperture radius: ")
+                    self.radius_label.pack(side='left', padx=1, pady=1)
+                    self.radius_value = tk.DoubleVar(); self.radius_value.set(self.default_radius)  # default threshold value
+                    self.radius_value.trace_add(mode="write", callback=self.validate_radius)
+                    self.radius_ctrl_box = tk.Spinbox(master=self.radius_frame, from_=1.0, to=100.0,
+                                                      increment=0.2, textvariable=self.radius_value,
+                                                      wrap=True, width=4)   # adapt Spinbox to 4 digits in double value
+                    self.radius_ctrl_box.pack(side='left', padx=1, pady=1)
+
+                    # Place widgets on the Toplevel window
+                    self.reconstruct_localize_button.grid(row=0, rowspan=1, column=0, columnspan=1, padx=pad, pady=pad)
+                    self.threshold_frame.grid(row=0, rowspan=1, column=1, columnspan=1, padx=pad, pady=pad)
+                    self.radius_frame.grid(row=0, rowspan=1, column=2, columnspan=1, padx=pad, pady=pad)
+                    self.reconstruct_get_shifts_button.grid(row=0, rowspan=1, column=3, columnspan=1, padx=pad, pady=pad)
+                    self.reconstruction_fig_widget.grid(row=1, rowspan=4, column=0, columnspan=5, padx=pad, pady=pad)
+
+                    # Draw the loaded image
+                    if self.reconstruction_axes is None:
+                        self.reconstruction_axes = self.reconstruction_figure.add_subplot()  # add axes without dimension
+                    if self.reconstruction_axes is not None and self.loaded_image is not None:
+                        self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
+                        self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+                        self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+                        # self.threshold_ctrl_box.config(state="normal")  # enable the threshold button
+                        # self.radius_ctrl_box.config(state="normal")  # enable the radius button
+                        self.reconstruction_plots = None
+
+                # Redraw reloaded image on the reconstruction window
+                else:  # the reconstruction window has been already opened
+                    if self.reconstruction_axes is None:
+                        self.reconstruction_axes = self.reconstruction_figure.add_subplot()  # add axes without dimension
+                    if self.reconstruction_axes is not None and self.loaded_image is not None:
+                        self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
+                        self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+                        self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+                        # self.threshold_ctrl_box.config(state="normal")  # enable the threshold button
+                        # self.radius_ctrl_box.config(state="normal")  # enable the radius button
+                        self.reconstruction_plots = None
+
+    def localize_aberrated_spots(self):
+        """
+        Localize the focal spots on aberrated images.
+
+        Returns
+        -------
+        None.
+
+        """
+        # self.redraw_loaded_image()  # call for refreshing image without plotted CoMs and subapertures
+        min_dist_peaks = int(np.round(1.5*self.radius_value.get(), 0))
+        region_size = int(np.round(1.4*self.radius_value.get(), 0))
+        self.coms_aberrated = get_localCoM_matrix(image=self.loaded_image, axes_fig=self.reconstruction_axes,
+                                                  threshold_abs=self.threshold_value.get(),
+                                                  min_dist_peaks=min_dist_peaks, region_size=region_size)
+        # Below - firstly - clean the previous drawing on the figure, secondly - draw
+        if self.reconstruction_plots is None:
+            self.reconstruction_plots = True
+        else:
+            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
+            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
+            self.reconstruction_axes = self.reconstruction_figure.add_subplot()
+            self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
+            self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+            self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+        self.reconstruction_axes.plot(self.coms_aberrated[:, 1], self.coms_aberrated[:, 0], '.', color="red")
+        self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+
+    def calculate_coms_shifts(self):
+        """
+        Calculate and visualize shifts in center of masses between non-aberrated and aberrated pictures.
+
+        Returns
+        -------
+        None.
+
+        """
+        # Below - clean previous drawing and plot loaded picture without any additional drawing
+        if self.reconstruction_plots is None:
+            self.reconstruction_plots = True
+        else:
+            # Below - code for refreshing Axes class for again re-draw found CoMs and etc
+            self.reconstruction_figure.delaxes(self.reconstruction_figure.get_axes()[0])
+            self.reconstruction_axes = self.reconstruction_figure.add_subplot()
+            self.reconstruction_axes.imshow(self.loaded_image, cmap='gray')
+            self.reconstruction_axes.axis('off'); self.reconstruction_figure.tight_layout()
+            self.reconstruction_canvas.draw()  # redraw image in the widget (stored in canvas)
+
+    def reconstruction_exit(self):
+        """
+        Handle close of the toplevel window for reconstruction controls.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.calibrate_button.config(state="normal")
+        self.reconstruction_window.destroy(); self.reconstruction_window = None
+
     def destroy(self):
         """
         Rewrite the behaviour of the main window then it's closed.
@@ -478,6 +732,8 @@ class ReconstructionUI(tk.Frame):  # The way of making the ui as the child of Fr
         if self.calculation_thread is not None:
             if self.calculation_thread.is_alive():
                 self.calculation_thread.join(1)  # wait 1 sec for active thread stops
+        if not self.messages_queue.empty():
+            self.messages_queue.queue.clear()  # clear all messages from the messages queue
 
 
 # %% Main launch

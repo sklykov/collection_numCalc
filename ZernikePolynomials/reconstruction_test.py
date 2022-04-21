@@ -14,7 +14,7 @@ import time
 import numpy as np
 
 # %% Type of calibration
-shwfs = True; repo_pics = False; n_zernikes = 20
+shwfs = False; repo_pics = True; n_zernikes = 14
 
 # %% Making calibration (integration of Zernike polynomials over sub-apertures) once and reading the integral matrix later
 # zernikes_set1 = [(-1, 1), (1, 1)]
@@ -33,12 +33,14 @@ else:
 # %% Testing the another calibration mechanism - calculate only once the integral matrix for the non-aberrated image
 if repo_pics:
     # Parameters for integration
-    plot = False; aperture_radius = 15.0; threshold = 60.0; region_size = 20; n_integration_steps = 80; min_dist_peaks = 20
+    plot = True; aperture_radius = 14.0; threshold = 58.0; region_size = 16; n_integration_steps = 80; min_dist_peaks = 18
     # Manual specification of relative paths to the files
     current_path = os.path.dirname(__file__)  # get path to the folder containing the script
     calibrations = os.path.join(current_path, "calibrations")  # the "calibrations" folder with all saved calculations data
     precalculated_zernikes = os.path.join(calibrations, "IntegralMatrix20TabularZernike_RepoPics.npy")
+    # precalculated_zernikes2 = os.path.join(calibrations, "integral_calibration_matrix.npy")
     precalculated_nonaberration = os.path.join(calibrations, "CoMsNonaberrated_RepoPics.npy")
+    # precalculated_nonaberration2 = os.path.join(calibrations, "detected_focal_spots.npy")
     if not(os.path.exists(precalculated_zernikes)):
         t1 = time.time()  # get the current time measurement
         (coms_nonaberrated, pic_integral_limits,
@@ -58,6 +60,8 @@ if repo_pics:
             print(f"Integration of the Zernike polynomials ({zernikes_set}) takes:", np.round(t2-t1, 3), "s")
     else:
         integral_matrix = np.load(precalculated_zernikes); coms_nonaberrated = np.load(precalculated_nonaberration)
+        # coms_nonaberrated2 = np.load(precalculated_nonaberration2); diff_coms = coms_nonaberrated2 - coms_nonaberrated
+        # integral_matrix2 = np.load(precalculated_zernikes2); diff_int_matricies = integral_matrix2 - integral_matrix
         (coms_shifts, integral_matrix_aberrated) = get_coms_shifts(coms_nonaberrated, integral_matrix, plot_results=plot,
                                                                    threshold_abs=threshold, region_size=region_size)
         alpha_coefficients = list(get_polynomials_coefficients(integral_matrix_aberrated, coms_shifts)*np.pi)  # !!! * by pi

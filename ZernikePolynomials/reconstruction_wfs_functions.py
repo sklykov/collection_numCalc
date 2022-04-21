@@ -12,7 +12,8 @@ According to the doctoral thesis by Antonello, J. (2014): https://doi.org/10.423
 import numpy as np
 from skimage.feature import peak_local_max
 # import time
-from matplotlib.patches import Circle  # Rectangle  - uncomment if need for visualization
+from matplotlib.patches import Circle
+# from matplotlib.patches import Rectangle  # uncomment if need for visualization
 from scipy import ndimage
 from calc_zernikes_sh_wfs import check_img_coordinate
 from threading import Thread
@@ -95,7 +96,7 @@ def get_integral_limits_nonaberrated_centers(axes_fig, picture_as_array: np.ndar
     """
     # Use the specified radius of sub-apertures for calculation of parameters for CoMs defining
     min_dist_peaks = int(np.round(1.5*aperture_radius, 0))
-    region_size = int(np.round(1.5*aperture_radius, 0))
+    region_size = int(np.round(1.4*aperture_radius, 0))
     # CoMs = center of masses, calculated in the areas around found local peaks
     coms_nonaberrated = get_localCoM_matrix(picture_as_array, axes_fig, min_dist_peaks=min_dist_peaks,
                                             threshold_abs=threshold_abs, region_size=region_size)
@@ -222,7 +223,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
 
     """
     integral_values = np.zeros((len(integration_limits), 2), dtype='float')  # Doubled values - for X,Y axes
-    calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
+    # calibration = 1.0  # TODO: Calibration taking into account the wavelength, focal length should be implemented later
     # Introduction of Zernike's polynomials normalization coefficients => tune of each polynomial contribution
     calibration = normalization_factor(m, n)  # use it for recalculate integral values for testing
     rho_unit_calibration = np.max(rho0) + aperture_radius  # For making integration on rho on unit circle
@@ -238,7 +239,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
             except Empty:
                 pass
         if calculation_flag:
-            # print(f"Integration for #{n_polynomial} polynomial started on {i_subaperture} subaperture out of {len(integration_limits)}")
+            # print(f"Integration for #{n_polynomial} pol. started on {i_subaperture} subaperture out of {len(integration_limits)}")
             # Integration limits and steps on theta
             (theta_a, theta_b) = integration_limits[i_subaperture]  # Calculated previously integration steps on theta (radians)
             delta_theta = (theta_b - theta_a)/n_steps  # Step for integration on theta
@@ -290,7 +291,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
             else:
                 integral_values[i_subaperture, 0] = calibration*integral_sumX
                 integral_values[i_subaperture, 1] = calibration*integral_sumY
-            integral_values = np.round(integral_values, 9)  # rounding up to ... digits after coma
+            integral_values = np.round(integral_values, 8)  # rounding up to ... digits after coma
         else:
             break  # stop the integration on each sub-aperture
     return integral_values
@@ -298,7 +299,7 @@ def calc_integrals_on_apertures_unit_circle(integration_limits: np.ndarray, thet
 
 def calc_integral_matrix_zernike(progress_bar, zernike_polynomials_list: list, integration_limits: np.ndarray, theta0: np.ndarray,
                                  rho0: np.ndarray, messages_queue: Queue, aperture_radius: float = 15.0,
-                                 n_steps: int = 80, swapXY: bool = True) -> np.ndarray:
+                                 n_steps: int = 10, swapXY: bool = True) -> np.ndarray:
     """
     Wrap calculation of integral values on sub-apertures performing on several Zernike polynomials.
 
@@ -338,7 +339,7 @@ def calc_integral_matrix_zernike(progress_bar, zernike_polynomials_list: list, i
     # (-2, 2) and (2, 2), (-3, 3) and (-4, 4) - applying below reassignment
     symmetrical_substitution = False; i_symmetry = -1
     calculation_flag = True  # flag for stopping calculation
-    length_add = (100 // len(zernike_polynomials_list)) + 1  # portion for progress bar
+    length_add = (100 // len(zernike_polynomials_list))  # portion for progress bar
     s = 0  # for calculation of increasing progress bar value
     progress_bar['value'] = 5  # some visually initial progress bar value
     # Integration for each polynomial:
@@ -378,12 +379,16 @@ def calc_integral_matrix_zernike(progress_bar, zernike_polynomials_list: list, i
                                                                           swapXY=swapXY)
                 integral_matrix[:, 2*i] = integral_values[:, 0]; integral_matrix[:, 2*i+1] = integral_values[:, 1]
             print(f"Calculated {i+1} polynomial out of {len(zernike_polynomials_list)}")
-            s += length_add
-            progress_bar['value'] = s
+            s += length_add; progress_bar['value'] = s
         else:
             # Integration was aborted
             progress_bar['value'] = 0; integral_matrix = []; break  # stop for loop above
-    messages_queue.put_nowait("Integration finished")
+    if calculation_flag:
+        messages_queue.put_nowait("Integration finished")
+        if s < 100:
+            progress_bar['value'] = 100
+    else:
+        messages_queue.put_nowait("Integration aborted")
     return integral_matrix
 
 
