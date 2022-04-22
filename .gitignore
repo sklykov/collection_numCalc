@@ -1,3 +1,12 @@
+# My additions
+docs/
+documentation/
+Docs/ 
+DIP/fluo_beads_sim/ 
+
+# Specifics from PyCharm
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -103,15 +112,3 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# My additions
-docs/
-documentation/
-Docs/ 
-DIP/fluo_beads_sim/ 
-SimUscope/*.tiff
-# Driver library for the device - not public yet
-ZernikePolynomials/ampcom/*
-ZernikePolynomials/AmpCom.py
-
-# Specifics from PyCharm
-.idea/

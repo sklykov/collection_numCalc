@@ -1,2 +1,0 @@
-The images borrowed from the repository: https://github.com/jacopoantonello/mshwfs
-They are licenced under the GNU General Public License v3 or later.
