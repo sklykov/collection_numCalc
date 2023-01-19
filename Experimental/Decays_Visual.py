@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Visualization of decays laws
-@author: ssklykov
+Visualization of decays laws.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import numpy as np

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Plotting the input values with error bars (an array) nad regressed values
-x - values of x from initial measurements, yMean - measurements, yStD - standard deviations (errors)
-@author: ssklykov
+Plotting the input values with error bars (an array) and regressed values.
+
+x - values of x from initial measurements, yMean - measurements, yStD - standard deviations (errors).
+@author: sklykov
+@license: The Unlicense
 """
 import matplotlib.pyplot as plt
 

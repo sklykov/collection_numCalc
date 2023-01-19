@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Calculation of dynamics of a hypothetic particle guided by a generated force field.
+
 Implementation - in a dedicated class below.
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import numpy as np

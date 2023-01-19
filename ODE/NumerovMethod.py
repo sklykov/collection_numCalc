@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Non-comprehensive implementation of Numerov's method for solving ODEs like y'' = f(x)*y + g(x)
+Non-comprehensive implementation of Numerov's method for solving ODEs like y'' = f(x)*y + g(x).
+
 Applicability -? and Testing results -?
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -28,7 +31,7 @@ def numerovMethod(y0: float, y1: float, f, g, h: float, xStart: float, xFinish: 
     if checkInputs(f, h, xStart, xFinish) and checkInputs(g, h, xStart, xFinish):
         return None
     n = numberOfSteps(xStart, xFinish, h)
-    yValues = np.zeros(n,dtype='float'); xMesh = np.zeros(n,dtype='float')  # init mesh values
+    yValues = np.zeros(n, dtype='float'); xMesh = np.zeros(n, dtype='float')  # init mesh values
     xMesh[0] = xStart; xMesh[1] = xStart + h
     yValues[0] = y0; yValues[1] = y1
     for i in range(2, n):

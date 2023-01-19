@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Another modified sort (not sure that actual "bubble" but looks similiar)
+Another modified sort (not sure that actual "bubble" but looks similiar).
+
 Sorting "swap it!"
 Main idea - to swap values in founded pairs (e.g. [54]) or subarrays of unsorted values (e.g [864])
 This is slow algorithm right now because the ineffective pairs swapping step comes after first effective step of sorting all
 unsorted subarrays. Now, the sorting of unsorted array takes longer time than even the bubble sort algorithm
 TODO: increase speed of sorting after first effective and fast step! Avoid pairs swapping!
-Developed in the Spyder IDE using Kite
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -40,46 +42,46 @@ def MySort(xIn, t0) -> tuple:
         flag = True; isSortingPerformedCorrect = False  # Interim values
 
         # while below on each iteration trying to find unsorted chunks and if found performing swapping
-        while(flag):
+        while flag:
             # The algorithm looks for unsorted chuncks of original array
             k = 0  # indexing of elements in an array
             swaps = 0  # number of performed swaps during each sorting iteration on overall input array
             while (k < (len(x)-1)):
-                l = 0  # counting pairs of unsorted values
+                m = 0   # counting pairs of unsorted values
 
                 # Checking if there is unsorted subarrays presented
                 if ((x[k]-x[k+1]) > 0):
-                    l += 1  # for counting how many further elements in unsorted sequence
+                    m += 1  # for counting how many further elements in unsorted sequence
                     # Calculation of length of unsorted subsequence (like 8765..)
-                    while ((k+l+1) < len(x)) and ((x[k+l]-x[k+l+1]) > 0):  # (!): first condition should be tested firstly!
-                        l += 1
+                    while ((k+m+1) < len(x)) and ((x[k+m]-x[k+m+1]) > 0):  # (!): first condition should be tested firstly!
+                        m += 1
 
                 # Swapping value in unsorted parts of input array
-                if (l > 0):
+                if m > 0:
                     xk = 0  # for swapping - interim value for exchanging two swapped values
                     # Swapping unsorted pairs
-                    if (l == 1):
+                    if (m == 1):
                         # print(x,"before pair swapping") # Debugging purposes
-                        xk = x[k]; x[k] = x[k+1]; x[k+1] = xk; k += l-1
+                        xk = x[k]; x[k] = x[k+1]; x[k+1] = xk; k += m-1
                         # print(x,"after pair swapping") # Debugging purposes
                     # Swapping even numbers of unsorted pairs from a whole unsorted subarray (like [876])
-                    elif (l % 2 == 0):
+                    elif m % 2 == 0:
                         # print(l % 2,"- l % 2 |",l, "l")
                         # print(x,"before even swapping") # Debugging purposes
                         n = 0  # for making right swapping
-                        while (n < (l / 2)):
-                            xk = x[k+n]; x[k+n] = x[k+l-n]; x[k+l-n] = xk; n += 1
+                        while n < m / 2:
+                            xk = x[k+n]; x[k+n] = x[k+m-n]; x[k+m-n] = xk; n += 1
                         # print(x,"after even swapping") # Debugging purposes
-                        k += l
+                        k += m
                     # Swapping odd numbers of unsorted pairs from a whole unsorted subarray (like [8765])
                     else:
                         # Here is found number of pairs in unsorted sequence is odd
                         # print(x,"before odd swapping") # Debugging purposes
                         n = 0  # for making right swapping
-                        while (n < ((l // 2) + 1)):  # l//2 - integer division, 5//2 = 2
-                            xk = x[k+n]; x[k+n] = x[k+l-n]; x[k+l-n] = xk; n += 1
+                        while n < m // 2 + 1:  # l//2 - integer division, 5//2 = 2
+                            xk = x[k+n]; x[k+n] = x[k+m-n]; x[k+m-n] = xk; n += 1
                         # print(x,"after odd swapping") # Debugging purposes
-                        k += l
+                        k += m
                     swaps += 1
 
                 # print(k,"current index")
@@ -114,5 +116,5 @@ t0 = time.process_time()  # get the starting point from the CPU time [s]
 (arSorted3, t, res) = MySort(ar3, t0)
 print("Sorting of a presorted array takes s = ", t)
 t0 = time.process_time()  # get the starting point from the CPU time [s]
-(arSorted4,t,res) = MySort(ar4,t0)
+(arSorted4, t, res) = MySort(ar4, t0)
 print("Sorting of a presorted in descending order array takes s = ", t)

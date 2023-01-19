@@ -1,7 +1,8 @@
 """
 Matricies editing - reshaping 1D matrix to the 2D with special columns.
 
-author: @ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 
 # %% Imports

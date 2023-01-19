@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Insertion Sort Demo
-Developed in the Spyder IDE
-@author: ssklykov
+Insertion Sort Demo.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -33,7 +34,7 @@ def InsertSort(xIn, t0):
         # Actual insertion sort
         for j in range(1, len(x)):
             xj = x[j]  # holding "pivot"
-            while((j-1) >= 0):
+            while ((j-1) >= 0):
                 if (x[j-1] > x[j]):
                     x[j] = x[j-1]  # shift the bigger value on one step forward
                     x[j-1] = xj  # assign the pivot on the place of bigger value

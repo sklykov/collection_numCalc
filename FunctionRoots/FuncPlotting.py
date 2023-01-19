@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Making the plotting a bit more automated by using two function containing all needed function calls
-@author: ssklykov
+Make the plotting a bit more automated by using two function containing all needed function calls.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from matplotlib import pyplot as plt

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Plotting of input arrays - call different functions to plot different sets of input arrays
-@author: ssklykov
+Plotting of input arrays - call different functions to plot different sets of input arrays.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from matplotlib import pyplot as plt
@@ -9,8 +11,8 @@ from matplotlib import pyplot as plt
 
 # %% Plotting similiar arrays
 def plotTwoArrSameX(x, y1, y2, title: str = "Samples", label1: str = "y1", label2: str = "y2"):
-    """ Plotting of two input arrays (y1(x),y2(x)) sharing same borders for X axis """
-    plt.rc('font', family='serif') # Trying to use open-source font
+    """Plot of two input arrays (y1(x),y2(x)) sharing same borders for X axis."""
+    plt.rc('font', family='serif')  # Trying to use open-source font
     plt.figure(); axes = plt.axes(); plt.title(title)
     if (min(y1) > min(y2)):
         minY = min(y2)
@@ -29,8 +31,8 @@ def plotTwoArrSameX(x, y1, y2, title: str = "Samples", label1: str = "y1", label
 
 # %% Plotting of single array
 def plotSingleArrSameX(x, y, title: str = "Sample"):
-    """Plotting of single array function y(x) = x """
-    plt.rc('font', family='serif') # Trying to use open-source font
+    """Plot of single array function y(x) = x."""
+    plt.rc('font', family='serif')  # Trying to use open-source font
     plt.figure(); axes = plt.axes(); plt.title(title)
     axes.set(xlim=(min(x), max(x)), ylim=(min(y), max(y)*1.05))  # set limits for axes
     axes.plot(x, y, 'ro-', linewidth=1)
@@ -40,7 +42,7 @@ def plotSingleArrSameX(x, y, title: str = "Sample"):
 
 # %% Plotting two arrays with different max and min values
 def plotTwoArrDiffX(x1, x2, y1, y2, title: str = "Samples", label1: str = "y1", label2: str = "y2"):
-    """Plotting of two input arrays (y1(x),y2(x)) sharing same borders for X axis but with different x values"""
+    """Plot of two input arrays (y1(x),y2(x)) sharing same borders for X axis but with different x values."""
     plt.rc('font', family='serif')  # Trying to use open-source font
     plt.figure(); axes = plt.axes(); plt.title(title)
     if (min(y1) > min(y2)):

@@ -3,7 +3,8 @@
 """
 Basic histogram values manipulations.
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import LoaderFile

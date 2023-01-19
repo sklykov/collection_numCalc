@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Experiments with simulation of images of fluorescent beads for evaluation of precision of their localization.
-In other words, for generationg ground truth data for tracking / segmentation evaluations.
+Generate ground truth data for tracking / segmentation evaluations.
 
-@author: ssklykov
+Experiments with simulation of images of fluorescent beads for evaluation of precision of their localization.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% General imports
 import numpy as np
@@ -19,6 +21,7 @@ import math
 # %% class definition
 class image_beads():
     """Collection of all methods related to generation of fluorescent beads in the microscope images."""
+
     # default values
     width = 11
     height = 11
@@ -159,6 +162,7 @@ class image_beads():
                                   debug: bool = False):
         """
         Generate shifted for less than 1 pixel centared before image of a bead with specified type.
+
         Such splitting on even pixel shift and less than 1 pixel is performed because of even offset
         could be applied only for integration the bead image on the larger scene there even shifts are
         simply drawn by shifting entire bead image.
@@ -256,7 +260,7 @@ class image_beads():
     @staticmethod
     def calculate_PSF(max_intensity, NA: float, wavelength: float, pixel_distance: float, calibration: float) -> float:
         """
-        Gaussian approximation of PSF according to the paper of Zhang, et al. (2007)
+        Gaussian approximation of PSF according to the paper of Zhang, et al. (2007).
 
         Parameters
         ----------
@@ -288,7 +292,7 @@ class image_beads():
     @staticmethod
     def show_PSF(max_intensity, size: int, NA: float, wavelength: float, calibration: float, save: bool = False):
         """
-        Plotting calculated with the function 'calculate_PSF' above profile of the approximated PSF.
+        Plot calculated with the function 'calculate_PSF' above profile of the approximated PSF.
 
         Parameters
         ----------
@@ -339,7 +343,8 @@ class image_beads():
     # %% Calculate PSF as the kernel for further convolution
     def calculate_img_PSF(self, NA: float, wavelength: float, calibration: float):
         """
-        Calculation PSF as kernel for convolution with automatically calculated size N (NxN convolution kernel).
+        Calculate PSF as kernel for convolution with automatically calculated size N (NxN convolution kernel).
+
         PSF kernel is used for calculation of edges blurring due to diffraction.
 
         Parameters
@@ -389,7 +394,7 @@ class image_beads():
     # %% Checking separately how the border experiences the blurring by the calculated PSF application
     def calc_border_extended_PSF(self):
         """
-        Calculation of blurred bead's border due to the diffraction blurring of sharp edges.
+        Calculate of blurred bead's border due to the diffraction blurring of sharp edges.
 
         Raises
         ------
@@ -422,7 +427,7 @@ class image_beads():
     # %% Get the centralized blurred bead's profile by adding blurred border
     def get_centralized_blurred_bead(self, max_pixel_val, NA: float, wavelength: float, calibration: float):
         """
-        Calculation of the intensity profile of the specified bead type with blurred edge due to the diffraction.
+        Calculate of the intensity profile of the specified bead type with blurred edge due to the diffraction.
 
         Parameters
         ----------
@@ -468,7 +473,7 @@ class image_beads():
     def get_shifted_blurred_bead(self, i_offset: float, j_offset: float, max_pixel_val,
                                  NA: float, wavelength: float, calibration: float):
         """
-        Composing the blurring of sub-centrilized image.
+        Compose the blurring of sub-centrilized image.
 
         Parameters
         ----------
@@ -619,7 +624,7 @@ class image_beads():
     # %% Plotting the bead's image or profile
     def plot_bead(self, plot_border: bool = False):
         """
-        Plotting various class' matrix attributes (specified in the code) as images opened as matplotlib windows.
+        Plot various class' matrix attributes (specified in the code) as images opened as matplotlib windows.
 
         Parameters
         ----------
@@ -681,7 +686,8 @@ class image_beads():
     # %% Calculate of origin coordinates
     def get_origin_coordinates(self) -> list:
         """
-        Calculates the coordinates of origin (zero pixel) of bead image for further drawing (placing) it on a scene.
+        Calculate the coordinates of origin (zero pixel) of bead image for further drawing (placing) it on a scene.
+
         It implies that the image generated and the coordinates of its center already calculated before.
 
         Returns
@@ -698,7 +704,7 @@ class image_beads():
     # %% Saving of generated bead's image (profile)
     def save_bead_image(self, base_name: str = "001.jpg"):
         """
-        Saving the generated image of the bead.
+        Save the generated image of the bead.
 
         Parameters
         ----------
@@ -730,8 +736,9 @@ class image_beads():
     # %% Saving the used parameters in the default folder
     def save_used_parameters(self, default_folder: str = "tests"):
         """
-        Saving some of the used for generation of the bead sample parameters in some specified folder that
-        is placed in the same folder where script is.
+        Save some of the used for generation of the bead sample parameters in the specified folder.
+
+        The folder will be placed in the same folder where script is.
 
         Parameters
         ----------
@@ -759,6 +766,28 @@ class image_beads():
     # %% Maybe redundant in common sense but useful function for calculations
     @staticmethod
     def distance(i_dest: int, i_center: int, j_dest: int, j_center: int, round_precision: int) -> float:
+        """
+        Calculate Eucledian distance between pixels on a image and a center (origin) of an image.
+
+        Parameters
+        ----------
+        i_dest : int
+            i pixel (coordinate).
+        i_center : int
+            i pixel (coordinate) of a center of an image.
+        j_dest : int
+            j pixel (coordinate).
+        j_center : int
+            j pixel (coordinate) of a center of an image.
+        round_precision : int
+            Rounding precision (number of digits in the returning values).
+
+        Returns
+        -------
+        float
+            Eucledian distance.
+
+        """
         distance_calc = 0.0
         distance_calc = np.round((np.sqrt(np.power((i_dest - i_center), 2) + np.power((j_dest - j_center), 2))),
                                  round_precision)

@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Simpson's Rule with automative (adaptive) selection of integration step by adjusting integral sum calculation for each
-halving step (h[i] = h[i-1]/2). A user should only specify potentially the desired precision of integral sum calculation
-Small modifications in comparison to TraperzoidalAutoAdaptive
-@author: ssklykov
+Implement Simpson's Rule with automative (adaptive) selection of integration step.
+
+Adaptive selection of integration step - by comparing integral sum calculation for each halving step (h[i] = h[i-1]/2).
+A user should only specify potentially the desired precision of integral sum calculation.
+Small modifications in comparison to TraperzoidalAutoAdaptive.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import Section
 from sampleFunctions import SampleFuncIntegr as sfint
@@ -11,16 +15,36 @@ import inspect
 
 
 # %% Algorithm implementation
-def SimpsonAutoAdaptive(a: float, b: float, y, epsilon: float = 0.01):
+def SimpsonAutoAdaptive(a: float, b: float, y, epsilon: float = 0.01) -> float:
     """
-    Simpson Integration implementation. It demands [a,b] of interval for integration; y - function or
-    method returning single float number and accepting single float number; epsilon - difference of two sub-
-    sequently calculated integrals (condition for stopping) - absolute error"""
+    Simpson Integration implementation.
+
+    It demands [a,b] of interval for integration; y - function or method returning single float number
+    and accepting single float number; epsilon - difference of two subsequently calculated
+    integrals (condition for stopping adaptive reducing of integration step) - absolute error.
+
+    Parameters
+    ----------
+    a : float
+        Lower bond of integration interval.
+    b : float
+        Higher bond of integration interval.
+    y : callable function / method
+        Function for which integration is performed.
+    epsilon : float, optional
+        Difference between integration sum that is considered to be small enough. The default is 0.01.
+
+    Returns
+    -------
+    float
+        Integral sum.
+
+    """
     if (a >= b):
         print("Incosistent interval assigning [a,b]")
         # return None
         holder = b; b = a; a = holder
-    if not((inspect.isfunction(y)) or (inspect.ismethod(y))):
+    if not ((inspect.isfunction(y)) or (inspect.ismethod(y))):
         print("Passed function y(x) isn't the defined (callable) method or function")
         return None  # returning null object instead of any result, even equal to zero
     else:
@@ -34,7 +58,7 @@ def SimpsonAutoAdaptive(a: float, b: float, y, epsilon: float = 0.01):
         j = 1  # number of iterations
         S0 = T0; S1 = (4*T1 - T0)/3
         while ((abs(S1 - S0) > epsilon*S1) and (j < nMaxIterations)):  # using relative error for exit this loop
-            T0 = T1; h0 = h1; S0 = S1 # stepping further
+            T0 = T1; h0 = h1; S0 = S1  # stepping further
             h1 = h0/2
             sumInt = 0.0; i = 0
             while ((a+h1*(2*i+1)) < b):

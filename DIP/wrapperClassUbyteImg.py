@@ -3,7 +3,8 @@
 """
 Wrapper class with some repeatable functionality for U8 (...) images.
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 
 
@@ -39,11 +40,11 @@ class WrapUbyteImg():
                     if (rows > 0) and (cols > 0):
                         self.image = np.uint8(np.array(uByte_image))
                     else:
-                        raise("ZeroInputList")
+                        raise ValueError("ZeroInputList")
                 else:
-                    raise("NotProperInputImage")
+                    raise ValueError("NotProperInputImage")
             except AttributeError:
-                raise("NotProperInputImage")
+                raise ValueError("NotProperInputImage")
         (self.y_size, self.x_size) = self.image.shape
         self.maxPixelValue = np.max(self.image)
         self.minPixelValue = np.min(self.image)

@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Implementation of Gauss-Seidel iterative method of solving linear system like Ax = b
+Implementation of Gauss-Seidel iterative method of solving linear system like Ax = b.
+
 Convergence (stability) of this method - ?
-Developed in the Spyder IDE using Kite
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 
 # %% Import section
@@ -89,8 +91,8 @@ def GaussSeidel(testM: TestingMatricies, epsilon: float = 0.01, nDigits: int = 3
     for i in range(n):  # starting value for performing iterative process (0th iteration)
         x[i] = t.item(i)
     # print(x) # Debugging
-    delta = x.copy(); l = 1  # number of iterations + delta - corrections between two iterations
-    while (l < nMaxIterations) and (StopIterations(delta, n, epsilon)):
+    delta = x.copy(); k = 1  # number of iterations + delta - corrections between two iterations
+    while (k < nMaxIterations) and (StopIterations(delta, n, epsilon)):
         for i in range(0, n):
             sumCurrIter = 0.0  # sum using roots from the current iteration (k)
             if (i > 0):  # Condition for using already calculated iterations (k)
@@ -104,7 +106,7 @@ def GaussSeidel(testM: TestingMatricies, epsilon: float = 0.01, nDigits: int = 3
             delta[i] = sumCurrIter + sumPrevIter + t.item(i)  # correction of current roots calculation
             x[i] += delta.item(i)  # correction of roots (x1,x2...) - an actual iteration step
             # x[i] = round(x.item(i),nDigits) # introducing truncation error but allowing to control each iteration
-        l += 1  # accounting a number of iterations for calculation of all roots (k)
+        k += 1  # accounting a number of iterations for calculation of all roots (k)
         # print(delta)
         # print(x) # Debugging
 

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Quick Sort Demo (picking a final element in an array as a pivot, thus it's not optimal implementation!)
-Developed in the Spyder IDE
-@author: ssklykov
+Quick Sort Demo (picking a final element in an array as a pivot, thus it's not optimal implementation!).
+
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -32,7 +34,7 @@ def QuickSort(xIn, t0) -> tuple:
     if (isinstance(xIn, np.ndarray)) and (len(xIn) > 1):
         x = xIn.copy()  # Ok, again copy of the input array
 
-        SortPivot(x, 0, len(x)-1) # Actual sorting step - see below
+        SortPivot(x, 0, len(x)-1)  # Actual sorting step - see below
 
         isSortCorrect = CheckSortArray(x)
         t1 = time.process_time()  # Tick time

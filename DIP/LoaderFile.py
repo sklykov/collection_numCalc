@@ -3,7 +3,8 @@
 """
 Load / handle sample images for DIP samples.
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 from skimage import io

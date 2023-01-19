@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-A few examples of algebraic function specification
-It's a function returning value of function (f(x)), where x - an input value
+A few examples of algebraic function specification.
+
+It's a function returning value of function (f(x)), where x - an input value.
 """
 import math
 

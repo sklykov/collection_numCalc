@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Bisection method of finding real roots (f(x)=0) of a function f(x)
+Bisection method of finding real roots (f(x)=0) of a function f(x).
+
 Two main restrictions:
     1) Somehow the interval for searching of roots should be specified ([a,b])4
     2) The function of interest should be somehow specified
-TODO for future: GUI specification of input parameters for algebraic function or even function itself
-Developed in the Spyder IDE
-@author: ssklykov
+TODO for future: GUI specification of input parameters for algebraic function or even function itself.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from AlgebraicFunctionEx import fVal as f

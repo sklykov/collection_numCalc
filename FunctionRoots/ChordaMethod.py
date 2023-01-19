@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Chorda or "false position" method for finding real roots of equation f(x) = 0
-Developed in the Spyder IDE
-@author: ssklykov
+Chorda or "false position" method for finding real roots of equation f(x) = 0.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import AlgF  # Module contained a class with static methods - as examples of functions

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Class for modelling samples values (measurments with some deviations)
-Developed in Spyder IDE
-@author: ssklykov
+Class for modelling samples values (measurments with some deviations).
+
+@author: sklykov
+@license: The Unlicense
 """
 # %%  "Dependecies" - imports
 import numpy as np
@@ -11,7 +12,8 @@ import math
 
 # %% Class itself
 class GenerateSample():
-    """Class for generating sample values"""
+    """Class for generating sample values."""
+
     xMin = 0; xMax = 1; nSamples = 5; percentError = 10; a = 1; b = 0; nDigits = 3
 
     def __init__(self, a: float, b: float, xMin: float, xMax: float, nSamples: int, percentError: int, nDigits: int):
@@ -19,7 +21,7 @@ class GenerateSample():
         self.nSamples = nSamples; self.percentError = percentError
 
     def generateSamplePoint(self, x: float) -> tuple:
-        """ Mimicring the measurements with errors """
+        """Mimic the measurements with errors."""
         n = 10  # modelling how many points "have been measured" for calcution mean values and standard deviations
         y = np.zeros(n, dtype=float); sum = 0.0
         for i in range(n):
@@ -37,7 +39,7 @@ class GenerateSample():
         return (yMean, yStD)
 
     def generateSampleValues(self) -> tuple:
-        """ Making the samples """
+        """Make the samples."""
         x = np.linspace(self.xMin, self.xMax, self.nSamples)
         for i in range(self.nSamples):
             x[i] = round(x[i], self.nDigits)

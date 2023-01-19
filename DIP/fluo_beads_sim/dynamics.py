@@ -2,7 +2,8 @@
 """
 Simulation of diffusion / motion of microbeads in medium. Calculates only 2D coordinates (center of a microbead).
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import numpy as np
@@ -12,22 +13,24 @@ import os
 
 # %% Class definition
 class diffusion():
-    D = 1.0  # Diffusion coefficient
-    coordinates = []
-    time_interval = 1.0  # could be in different physical values
-    calibration = 1.0  # for compensate diffusion coefficient and time_interval units
+    """Implements methods for simulation of diffusion / motion of microbeads in medium."""
+
+    D: float = 1.0  # Diffusion coefficient
+    coordinates: list = []
+    time_interval: float = 1.0  # could be in different physical values
+    calibration: float = 1.0  # for compensate diffusion coefficient and time_interval units
     x_steps = np.zeros(1000, dtype=float)
     y_steps = np.zeros(1000, dtype=float)
     r = np.zeros(1000, dtype=float)
-    x_generated_steps = []
-    y_generated_steps = []
-    r_generated = []
-    origin = []
+    x_generated_steps: list = []
+    y_generated_steps: list = []
+    r_generated: list = []
+    origin: list = []
 
     # %% Initialization
     def __init__(self, initial_point: list, D: float = 1.0, time_interval: float = 1.0, calibration: float = 1.0):
         """
-        Initialization of the class for generation of 2D diffusion movement.
+        Initialize of the class for generation of 2D diffusion movement.
 
         Parameters
         ----------
@@ -63,8 +66,10 @@ class diffusion():
     # %% Calculate coordinates for the next position
     def get_next_point(self, round_precision: int = 3, debug: bool = False) -> list:
         """
-        Calculates the next point in the generated sequence of the diffused bead according to the fundamental
-        equation provided in the paper Chandrasekhar (1943) "Stochastic Problems in Physics and Astronomy"
+        Calculate the next point in the generated sequence of the diffused bead.
+
+        It's performed according to the fundamental equation from the paper Chandrasekhar (1943)
+        "Stochastic Problems in Physics and Astronomy".
 
         Parameters
         ----------
@@ -111,7 +116,7 @@ class diffusion():
     # %% Visualize and check the histograms of x, y, r
     def get_statistics(self, size: int = 1000):
         """
-        Plotting the example of generated x,y steps and displacements r as the example of calculations.
+        Plot the example of generated x,y steps and displacements r as the example of calculations.
 
         Parameters
         ----------
@@ -153,8 +158,7 @@ class diffusion():
     # %% Saving the origin of bead image
     def save_bead_origin(self, origin_coordinates: list):
         """
-        Created for saving statistics on the calculated origin coordinates for addressing the issue with wrong
-        drawing.
+        Save statistics on the calculated origin coordinates for addressing the issue with wrong drawing.
 
         Parameters
         ----------
@@ -173,8 +177,7 @@ class diffusion():
     # %% Saving of all generated parameters
     def save_generated_stat(self, save_figures: bool = False, save_stats: bool = True, default_folder: str = "tests"):
         """
-        Saving the statistics of generated movies: x, y, r displacements and parameters used
-        for generation of diffusion.
+        Save the statistics of generated movies: x, y, r displacements and parameters used for generation of diffusion.
 
         Parameters
         ----------

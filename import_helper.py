@@ -6,7 +6,8 @@ Attempt to create the unified class for importing dependecies by compiling previ
 Reason behind - to make something functional to search / import modules if the containing it directory tree isn't
 included in any project (or to import modules from different places in a project)
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import os

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Interpolation methods implementation
-The Lagrangian polynom construction and testing
-Developed in the Spyder IDE
-@author: ssklykov
+The Lagrangian polynom construction and testing.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from InterpolSamples import InterpolSamples
@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 # %% Testing values
-nPoints = 12; nPoints += 1 # Adding 1 to the number points for making equal steps in the interval [a,b]
+nPoints = 12; nPoints += 1  # Adding 1 to the number points for making equal steps in the interval [a,b]
 percentageError = 10  # For making disturbed values
 startInterval = 0  # a from [a,b]
 finishInterval = 10  # b from [a,b]
@@ -40,7 +40,7 @@ axes.legend()  # Necessary for displaying the legend
 plt.grid()
 
 # %% Evaluation of y values for making interpolation
-def LagrangianPol(xIn:float,xArray,yArray,nRoundDigit):
+def LagrangianPol(xIn: float, xArray, yArray, nRoundDigit):
     # xIn - x value for that the returning value y should be calculated
     # xArray - x values for which y values from yArray are known
     yReturn = 0
@@ -79,19 +79,19 @@ for i in range(len(yTheoretical)):
 # %% Again plotting for making comparisons (visual)
 plt.rc('font', family='serif')  # Trying to use open-source font
 plt.figure(); axes = plt.axes(); plt.title("pure y + interpolated values")
-axes.set(xlim=(min(x),max(x)),ylim=(min(y),max(y)*1.1))  # set limits for axes
-axes.plot(x,y,'ro',label="y w/t errors")
-axes.plot(xInterpol,yInterpol,'g-',linewidth=3,label="y interpolated")
-axes.plot(xInterpol,yTheoretical,'m-',linewidth=1,label="y theoretical")
-axes.legend() # Necessary for displaying the legend
+axes.set(xlim=(min(x), max(x)), ylim=(min(y), max(y)*1.1))  # set limits for axes
+axes.plot(x, y, 'ro', label="y w/t errors")
+axes.plot(xInterpol, yInterpol, 'g-', linewidth=3, label="y interpolated")
+axes.plot(xInterpol, yTheoretical, 'm-', linewidth=1, label="y theoretical")
+axes.legend()  # Necessary for displaying the legend
 plt.grid()
 
 # Figure 2
 plt.rc('font', family='serif')  # Trying to use open-source font
 plt.figure(); axes = plt.axes(); plt.title("error y + interpolated values")
-axes.set(xlim=(min(x),max(x)),ylim=(min(yTheoretical),max(yTheoretical)*1.1))  # set limits for axes
-axes.plot(x,yEr,'bo',label="y with errors")
-axes.plot(xInterpol,yInterpolEr,'g-',linewidth=2,label="y interpolated")
-axes.plot(xInterpol,yTheoretical,'m-',linewidth=1,label="y theoretical")
+axes.set(xlim=(min(x), max(x)), ylim=(min(yTheoretical), max(yTheoretical)*1.1))  # set limits for axes
+axes.plot(x, yEr, 'bo', label="y with errors")
+axes.plot(xInterpol, yInterpolEr, 'g-', linewidth=2, label="y interpolated")
+axes.plot(xInterpol, yTheoretical, 'm-', linewidth=1, label="y theoretical")
 axes.legend()  # Necessary for displaying the legend
 plt.grid()

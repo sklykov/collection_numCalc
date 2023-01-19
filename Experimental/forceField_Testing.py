@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Testing of forceField class capabilities.
+Testof forceField class capabilities.
+
 The 'main' file for testing forceField.py, particlesDynamics.py
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 from forceField import dipole
@@ -28,7 +31,7 @@ maxDisplacementInPixels = 10
 # %% Demo
 dip = dipole(charge, [xPlusCharge, yPlusCharge], [xMinusCharge, yMinusCharge])
 # (Ex, Ey) = dip1.createFieldMap(size, nPoints)
-(ExT, EyT) = dip.createFieldMap(size, nPoints, "thermo", decayPower, widthOfFlow)
+(ExT, EyT) = dip.createFieldMap(size, nPoints, "dipole", decayPower, widthOfFlow)
 particles = pDynamics(size, nParticles)
 x = particles.coordinatesX
 y = particles.coordinatesY

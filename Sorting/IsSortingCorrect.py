@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Checking the correctness of sorting. \n
-Return True if input array is sorted correctly (in ascending order)
+Checking the correctness of sorting.
+
+Return True if input array is sorted correctly (in ascending order).
 """
 # %% Import section
 import numpy as np

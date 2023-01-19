@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Modelling of function values for testing of interpolation
-Developed in the Spyder IDE
-@author: ssklykov
+Modelling of function values for testing of interpolation.
+
+@author: sklykov
+@license: The Unlicense
 """
 import numpy as np
 import math
@@ -37,8 +38,8 @@ class InterpolSamples():
         x = np.linspace(self.lowestVal, self.highestVal, self.n)  # Number of points + 1 because of including starting point
         for i in range(self.n):
             yPure[i] = InterpolSamples.sampleFunction(x[i])
-            yError[i] = round(InterpolSamples.sampleFunction(x[i])*(1 + 0.01 *
-                  (np.random.randint(-self.percentError, self.percentError+1))), 3)
+            yError[i] = round(InterpolSamples.sampleFunction(x[i])
+                              *(1 + 0.01*(np.random.randint(-self.percentError, self.percentError + 1))), 3)
         return (x, yPure, yError)
 
     @staticmethod

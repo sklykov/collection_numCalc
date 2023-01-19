@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Linear regression using the deviated randomly linear dependency (y(x) = a*x + b)
-Developed in the Spyder IDE using Kite
+Linear regression using the deviated randomly linear dependency (y(x) = a*x + b).
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from SampleValues import GenerateSample
 import numpy as np
 from ComparisonLinPlots import PlotWErrTwo
 # %% Controlling / modelling values
-a = 2; b = 1 # From dependency y(x) = a*x + b
+a = 2; b = 1  # From dependency y(x) = a*x + b
 n = 10  # number of sampling points (modelling measures from some awesome experiment)
 nDigits = 2  # Precision of calculation / rounding
 percentError = 30  # An error controlling deviations in generated values [%]
@@ -25,7 +25,7 @@ values = GenerateSample(a, b, xMin, xMax, nSamples, percentError, nDigits)
 # %% Linear Regression
 def LinearRegression(x, yMean, yStD, nDigits):
     # Interim values calculation from the book (Sx, Sxx, etc)
-    S = 0.0; Sx = 0.0; Sxx = 0.0; Sy = 0.0; Sxy = 0.0; sigma2 = 0.0;
+    S = 0.0; Sx = 0.0; Sxx = 0.0; Sy = 0.0; Sxy = 0.0; sigma2 = 0.0
     aRegressed = 0; bRegressed = 0
     for i in range(len(x)):
         sigma2 = 1 / pow(yStD[i], 2)
@@ -34,7 +34,7 @@ def LinearRegression(x, yMean, yStD, nDigits):
     delta = (S*Sxx) - pow(Sx, 2)
     if (delta != 0):
         aRegressed = (S*Sxy - Sx*Sy)/delta; bRegressed = (Sy*Sxx - Sx*Sxy)/delta
-        aRegressed = round(aRegressed, nDigits); bRegressed = round(bRegressed,nDigits)
+        aRegressed = round(aRegressed, nDigits); bRegressed = round(bRegressed, nDigits)
     return (aRegressed, bRegressed)
 
 

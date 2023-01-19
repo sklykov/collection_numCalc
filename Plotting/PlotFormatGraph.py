@@ -7,7 +7,9 @@ The main purpose is to collect commands for fast and fancy formatting of a produ
 NOTE (historical): the autocompletion doesn't work in Spyder IDE (ver. 4.0) that has been used for its creation.
 Generally, the most useful information about the used below methods has been collected
 on the StackOverflow website, instead of using simple way of autocompletion / DocStrings reading.
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 import matplotlib.pyplot as plt
 import numpy as np

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Secant Method for finding real roots of equation f(x) = 0
-This method is really sensitive to the initial value, seems. E.g., the a from [a,b] interval doesn't work
+Secant Method for finding real roots of equation f(x) = 0.
+
+This method is really sensitive to the initial value, seems. E.g., the a from [a,b] interval doesn't work.
 So, for the making this method more stable, the middle point of an interval [a,b] is chosen as the initial one
-Developed in the Spyder IDE
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import AlgF  # Module contained a class with static methods - as examples of functions

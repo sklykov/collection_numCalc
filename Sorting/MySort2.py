@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Sorting "swap it and merge!"
+Implementation of sorting strategy "swap it and merge!".
+
 Main steps:
     (1) swap values in founded pairs (e.g. [54]) or subarrays of unsorted values (e.g [864])
     (2) merge two presorted subarrays in sorted ones with bigger size - growing them until sorting done
 (!): Still bad performance for randomly distributed values
-Developed in the Spyder IDE using Kite
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np

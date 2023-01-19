@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Midpoints Rule with adaptive integration step size selection (h)
+Midpoints Rule with adaptive integration step size selection (h).
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import Section
 from sampleFunctions import SampleFuncIntegr as sfint
@@ -10,14 +11,35 @@ import inspect
 
 
 # %% Algorithm implementation
-def midpointRuleAdaptive(a: float, b: float, y, epsilon: float = 0.01):
-    """Midpoint Rule implementation. It demands [a,b] of interval for integration; y - function or method returning \
-        single float number and accepting single float number; epsilon - difference of two subsequent calculated \
-        integrals (condition for stopping) - absolute error"""
+def midpointRuleAdaptive(a: float, b: float, y, epsilon: float = 0.01) -> float:
+    """
+    Midpoint Rule implementation.
+
+    It demands [a,b] of interval for integration; y - function or method returning single float number
+    and accepting single float number; epsilon - difference of two subsequently calculated
+    integrals (condition for stopping adaptive reducing of integration step) - absolute error.
+
+    Parameters
+    ----------
+    a : float
+        Lower bond of integration interval.
+    b : float
+        Higher bond of integration interval .
+    y : callable function / method
+        Function for which integration is performed.
+    epsilon : float, optional
+        Difference between integration sum that is considered to be small enough. The default is 0.01.
+
+    Returns
+    -------
+    float
+        Integration sum.
+
+    """
     if (a >= b):
         print("Incosistent interval assigning [a,b]")
         return None  # returning null object instead of any result, even equal to zero
-    elif not((inspect.isfunction(y)) or (inspect.ismethod(y))):
+    elif not ((inspect.isfunction(y)) or (inspect.ismethod(y))):
         print("Passed function y(x) isn't the defined (callable) method or function")
         return None
     else:
@@ -44,6 +66,7 @@ def midpointRuleAdaptive(a: float, b: float, y, epsilon: float = 0.01):
             h1 /= 3  # decreasing step size
             # print("at iteration",k,"integral value is",S1)
         return S1
+
 
 # %% Testing values
 nDigits = 4; a = 0; b = 2; nSample = 1; epsilon = 1e-3  # sensitive much more for epsilon!

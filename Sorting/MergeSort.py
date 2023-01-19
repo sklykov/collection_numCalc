@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Merge Sort Demo (the top-bottom approach as far as I understand)
-Developed in the Spyder IDE
-@author: ssklykov
+Merge Sort Demo (the top-bottom approach as far as I understand).
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -67,7 +68,8 @@ def MergeSort(xIn, t0):
 # %% Recursive function for merging pairs formed at the first step
 def PairsMerging(xIn: list):
     """
-    Recursive function for merging pairs formed at the first step
+    Recursive function for merging pairs formed at the first step.
+
     Parameters
     ----------
     xIn : list
@@ -81,7 +83,7 @@ def PairsMerging(xIn: list):
 #    print(xIn,"input array for Pairs Merging")  # Debugging
 
     # while loop below - instead of recursive call of this function -
-    while(len(xIn) > 1):
+    while (len(xIn) > 1):
         xOut = [None]*((len(xIn)//2) + (len(xIn) % 2))  # a temporary array for forming output
         sortingStep = 1  # Stepping and while() loop below going on pairs of subarrays for composing them in a sorted subarr
 

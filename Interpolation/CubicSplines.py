@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Cubic Splines implementation for finding interpolation points
+Cubic Splines implementation for finding interpolation points.
 
-Developed in the Spyder IDE
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 from InterpolSamples import InterpolSamples
@@ -31,14 +31,19 @@ plotSingle(x, y, "Sample value w/t errors")
 
 
 # %% Implementation in a function
-def cubicSplineCoeffCalc(x, y):
+def cubicSplineCoeffCalc(x, y) -> tuple:
     """
-    Calculation of cubic spline coefficients (A,B,C,D) with free or natural boundaries condition
+    Calculate of cubic spline coefficients (A,B,C,D) with free or natural boundaries condition.
+
     (y''(a) = y''(b) = 0). Cubic spline coefficients calculation for equation A*x^3 + B*x^2 + C*x + D.
-    Input
-    ---------
-    x, y:
-        arrays of sample values for which performned interpolation
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Coordinates on x.
+    y : numpy.ndarray
+        Coordinates on y.
+
     """
     # Coefficients for calculations
     A = np.zeros(len(x), dtype='float'); B = np.zeros(len(x), dtype='float')
@@ -79,6 +84,7 @@ def cubicSplineCoeffCalc(x, y):
 def cubicInterpolation(cubicCoefficients: tuple, xCustom: float, nRoundingDigits: int):
     """
     Function for calculation of interpolated values using cubic coefficients calculated before.
+
     Input
     cubicCoefficients:
         (A, B, C, D) - tuple
@@ -93,9 +99,9 @@ def cubicInterpolation(cubicCoefficients: tuple, xCustom: float, nRoundingDigits
         else:
             i += 1
     yVal = None
-    if(intervalFound):
+    if intervalFound:
         yVal = A[i]*(pow(xCustom, 3)) + B[i]*(pow(xCustom, 2)) + C[i]*xCustom + D[i]
-        yVal = round(yVal,nRoundingDigits)
+        yVal = round(yVal, nRoundingDigits)
     else:
         print("the requested x doesn't lay in the interval [startInterval,finishInterval]")
     return yVal
@@ -118,7 +124,7 @@ for i in range(len(yInterpol)):
     yInterpol[i] = cubicInterpolation(coeff, xInterpol[i], nDigits)
 # Get interpolated values for yError
 for i in range(len(yInterpolErr)):
-    yInterpolErr[i] = cubicInterpolation(coeffErr,  xInterpol[i], nDigits)
+    yInterpolErr[i] = cubicInterpolation(coeffErr, xInterpol[i], nDigits)
 
 # %% Plotting results of interpolation
 plotTwo(x, xInterpol, y, yInterpol, "Interpolation results", "original", "interpolated")

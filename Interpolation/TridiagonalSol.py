@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Solution of a system of linear equations with tridiagonal matrix
-Developed in the Spyder IDE
-@author: ssklykov
-"""
+Solution of a system of linear equations with tridiagonal matrix.
 
+@author: sklykov
+@license: The Unlicense
+"""
 
 def Solution(a, b, c, d):
     for i in range(1, len(d)):  # Range always not included the last value

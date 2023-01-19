@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Euler - Cromer algorithm for solving 2nd order ODEs like y''(x) = f(x,t,y(x))
-And 1D oscillator modelling as the demo
-@author: ssklykov
+Euler - Cromer algorithm for solving 2nd order ODEs like y''(x) = f(x,t,y(x)).
+
+And 1D oscillator modelling as the demo.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -12,7 +15,7 @@ from DynamicSystem import dynamicSys
 
 # %% Algorithm implementation (in general form - using 1st, 2nd order derivatives)
 def eulerCromer(f: float, y1stDerivPrevious: float, yPrevious: float, h: float) -> tuple:
-    """Implementation is kept general - it consumes only the values calculated outside of it"""
+    """Implement is kept general - it consumes only the values calculated outside of it."""
     y2ndDeriv = f  # y''(x..) = f(*args); a  = f/m - this is the 2nd derivative!!! (acceleration)
     y1stDeriv = y1stDerivPrevious + h*y2ndDeriv  # y'(n) = y'(n-1) + h*y''; this is speed or velocity!
     y = yPrevious + h*y1stDeriv
@@ -34,7 +37,7 @@ for i in range(nX):
     gammaPureExternalForce = 0.0
     f[i] = sysForce1(amplitude, x[i], radius, mass, gammaPureExternalForce, initSpeed)
 
-plt.figure(); plt.plot(x,f,linewidth=2); plt.xlabel("x coordinates"); plt.title("External force profile f(x)")
+plt.figure(); plt.plot(x, f, linewidth=2); plt.xlabel("x coordinates"); plt.title("External force profile f(x)")
 
 # %% Testing algorithm for solving 1D oscillatory form
 xCoord = np.zeros(nTimePoints+1, dtype='float'); speeds = np.zeros(nTimePoints+1, dtype='float')
@@ -46,7 +49,7 @@ for i in range(1, nTimePoints+1):
     (speeds[i], xCoord[i]) = eulerCromer(forceCalibrated, speeds[i-1], xCoord[i-1], hTime)
     timePoints[i] = timePoints[i-1] + hTime
 # Plotting dynamic pictures for x and v
-plt.figure(); plt.plot(timePoints,xCoord,'r',linewidth=2); plt.xlabel("time"); plt.ylabel("x"); plt.title("x(t)")
-plt.figure(); plt.plot(timePoints,speeds,'g',linewidth=2); plt.xlabel("time"); plt.ylabel("v"); plt.title("v(t)")
-plt.figure(); plt.plot(xCoord,speeds,'m',linewidth=1); plt.xlabel("x"); plt.ylabel("v")
+plt.figure(); plt.plot(timePoints, xCoord, 'r', linewidth=2); plt.xlabel("time"); plt.ylabel("x"); plt.title("x(t)")
+plt.figure(); plt.plot(timePoints, speeds, 'g', linewidth=2); plt.xlabel("time"); plt.ylabel("v"); plt.title("v(t)")
+plt.figure(); plt.plot(xCoord, speeds, 'm', linewidth=1); plt.xlabel("x"); plt.ylabel("v")
 plt.title("speed versus x coordinate")

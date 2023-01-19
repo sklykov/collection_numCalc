@@ -2,7 +2,8 @@
 """
 Container for building a scene with fluorescent objects (i.e., scene plays a role of background or frame).
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import numpy as np
@@ -15,8 +16,11 @@ from scipy.ndimage import measurements
 
 # %% class definition
 class u_scene():
-    """Class composing all capabilities of building image (numpy 2D array) with some objects drawn on the scene.
-    The image commonly is designated as width x height (e.g., 800x600)"""
+    """
+    Class composing all capabilities of building image (numpy 2D array) with some objects drawn on the scene.
+
+    The image commonly is designated as width x height (e.g., 800x600).
+    """
 
     # default values
     width = 100
@@ -31,7 +35,7 @@ class u_scene():
     # %% Constructor
     def __init__(self, width: int, height: int, image_type: str = 'uint8'):
         """
-        Initialize the blank (dark) scene image with the specified type (800x600 8bit image as an example)
+        Initialize the blank (dark) scene image with the specified type (800x600 8bit image as an example).
 
         Parameters
         ----------
@@ -99,7 +103,7 @@ class u_scene():
 
     def get_j_finish(self, j_start: int, nCols: int) -> int:
         """
-        Calculation of maximum j index for adding mask, preventing it to be for out of bounds.
+        Calculate of maximum j index for adding mask, preventing it to be for out of bounds.
 
         Parameters
         ----------
@@ -122,7 +126,7 @@ class u_scene():
 
     def get_i_finish(self, i_start: int, nRows: int) -> int:
         """
-        Calculation of maximum i index for adding mask, preventing it to be for out of bounds
+        Calculate of maximum i index for adding mask, preventing it to be for out of bounds.
 
         Parameters
         ----------
@@ -146,7 +150,8 @@ class u_scene():
     # %% Drawing of an object with some intensity mask (profile)
     def add_mask(self, i_start: int, j_start: int, mask, debug: bool = False):
         """
-        Adding the "mask" - representation of the object (basically, less than the scene (background) image).
+        Add the "mask" - representation of the object (basically, less than the scene (background) image).
+
         Contradictory, i_start represents "y" coordinate, j_start - "x", due to array representation of column and row.
         This function accepts coordinates of image origin - starting pixel for drawing (like zero pixel).
         The coordinates (j_start, i_start) as (x, y) could be negative or exceeding the scene sizes - in such case
@@ -174,17 +179,17 @@ class u_scene():
 
         # Below is checking that the mask is not empty, it should be 1x1 matrix at least
         if (nRows == 0) or (nCols == 0):
-            raise(IndexError('Provided mask is empty along some of its axis'))
+            raise IndexError('Provided mask is empty along some of its axis')
 
         # Below is checking that the i_start and j_start makes sense to apply to the scene image:
         # i_start and j_start could be negative, but at least 1 point should be added to a scene
         # also, j associates with WIDTH, so with # of columns! i - with rows!
         if ((i_start + nRows) < 1) or ((j_start + nCols) < 1):
-            raise(IndexError('Provided i_start or j_start is not conformed with the mask sizes'))
+            raise IndexError('Provided i_start or j_start is not conformed with the mask sizes')
 
         # Below is checking filling parameters (i_start, j_start) is laying on an scene image
         if (i_start >= self.height) or (j_start >= self.width):
-            raise(IndexError("Starting indices for adding mask is out of scene image bounds"))
+            raise IndexError("Starting indices for adding mask is out of scene image bounds")
 
         # i_start, j_start > 0 both, filling some mask into a scene image - basic check for conformity
         if (i_start >= 0) and (j_start >= 0) and (nRows > 0) and (nCols > 0):
@@ -256,7 +261,7 @@ class u_scene():
     # %% Plotting the summurized image (scene) with all objects
     def plot_image(self):
         """
-        Plotting the self.scene composed with added masks (objects) / noise.
+        Plot the self.scene composed with added masks (objects) / noise.
 
         Returns
         -------
@@ -275,7 +280,7 @@ class u_scene():
     # %% Clearing the scene
     def clear_scene(self):
         """
-        Clearing the scene (background) image by re-initialize it to zero values (completely dark).
+        Clear the scene (background) image by re-initialize it to zero values (completely dark).
 
         Returns
         -------
@@ -287,7 +292,7 @@ class u_scene():
     # %% Saving generated scene image
     def save_scene(self, base_extension: str = "jpg"):
         """
-        Saving the scene (image) with all collected masks (objects) on it.
+        Save the scene (image) with all collected masks (objects) on it.
 
         Parameters
         ----------

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Bubble Simple Sort Demo
-Developed in the Spyder IDE
-@author: ssklykov
+Bubble Simple Sort Demo.
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import section
 import numpy as np
@@ -38,7 +39,7 @@ def BubbleSort(xIn, t0):
             flag = False  # flag for checking if any swapping occured
             for j in range(0, len(x)-1-i):  # Sorting in pairs, thus len(x)-1 - not included in a range
                 if (x[j] > x[j+1]):  # Swapping two values in a pair
-                    xj = x[j]; x[j]=x[j+1]; x[j+1]=xj; flag = True;  # The flag = at least 1 swap occured, continue sorting
+                    xj = x[j]; x[j] = x[j+1]; x[j+1] = xj; flag = True  # The flag = at least 1 swap occured, continue sorting
             i += 1  # Next step in sorting
 
         # Checking correctness and timing

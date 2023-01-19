@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-'Getting started' with scikit-image library
+Provide 'Getting started' with scikit-image library.
+
 scikit-image demo: open RGB image / translate it to uint8 gray image / get its normalized histogram
-@author: ssklykov
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Maybe for future (TODO): Specifying dependecies outside the file
 from skimage.color import rgb2gray

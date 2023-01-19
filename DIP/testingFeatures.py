@@ -2,7 +2,8 @@
 """
 Testing script of implemented classes / functions.
 
-@author: ssklykov
+@author: sklykov
+@license: The Unlicense
 """
 # %% Imports
 import LoaderFile

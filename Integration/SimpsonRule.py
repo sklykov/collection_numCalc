@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Numerical integration - Simpson's Rule (3 points quadrature equation)
-Roughly the error of integration can be estimated as ~ h**4  (the global error)
-@author: ssklykov
+Numerical integration - Simpson's Rule (3 points quadrature equation).
+
+Roughly the error of integration can be estimated as ~ h**4  (the global error).
+
+@author: sklykov
+@license: The Unlicense
 """
 # %% Import Section
 import numpy as np
@@ -12,24 +15,33 @@ import matplotlib.pyplot as plt
 
 
 # %% Algorithm implementation
-def SimpsonIntegr(a: float, b: float, h: float, y, nDigits: int = 3):
+def SimpsonIntegr(a: float, b: float, h: float, y, nDigits: int = 3) -> float:
     """
-    Simpson's Rule Integration implementation
-    Input
-    -----
-    a, b:
-        float [a,b] interval for integration
-    h:
-        float, step size
-    y:
-        float, function or method returning single float number and accepting single float number
-    """
+    Implement Simpson's Rule Integration.
 
+    Parameters
+    ----------
+    a : float
+        Lower bond of integration interval.
+    b : float
+        Higher bond of integration interval.
+    h : float
+        Integration step, should be less than (b-a).
+    y : callable function / method
+        Function for which integration undergoes.
+    nDigits : int, optional
+        Number of returning digits after float point. The default is 3.
+
+    Returns
+    -------
+    float
+        Integral sum.
+    """
     if (a >= b) and (int((b-a)/h) <= 1):
         print("Incosistent interval assigning [a,b] or step size h - a and b exchanged, h - decreased")
         holder = b; b = a; a = holder
         h /= 2
-    if not((inspect.isfunction(y)) or (inspect.ismethod(y))):
+    if not ((inspect.isfunction(y)) or (inspect.ismethod(y))):
         print("Passed function y(x) isn't the defined method or function")
         return None  # returning null object instead of any result, even equal to zero
     else:
@@ -44,11 +56,33 @@ def SimpsonIntegr(a: float, b: float, h: float, y, nDigits: int = 3):
 
 
 # %% Adaptive calling of the Simpson's rule(above)
-def AdaptiveSimpsonInt(a: float, b: float, h: float, y, nDigits: int = 3, epsilon: float = 0.01, nMaxIterations: int = 3):
+def AdaptiveSimpsonInt(a: float, b: float, h: float, y, nDigits: int = 3,
+                       epsilon: float = 0.01, nMaxIterations: int = 10) -> float:
     """
-    Adaptive calling of Simpson's Rule for numerical integration. Epsilon - difference of two sub
-    sequent calculated integrals (condition for stopping) - absolute error; nMaxIterations - maximum number of iterations
-    of lowering step size h (no more than 30)
+    Adaptive calling of Simpson's Rule for numerical integration.
+
+    Parameters
+    ----------
+    a : float
+        Lower bond of integration interval.
+    b : float
+        Higher bond of integration interval.
+    h : float
+        Integration step, should be less than (b-a).
+    y : callable function / method
+        Function for which integration is performed.
+    nDigits : int, optional
+        Number of returning digits after float point. The default is 3.
+    epsilon : float, optional
+        Difference between integration sum that is considered to be small enough. The default is 0.01.
+    nMaxIterations : int, optional
+        Number of maximum iterations for finding the optimal integral step. The default is 10. The maximum is 30.
+
+    Returns
+    -------
+    float
+        Integral sum.
+
     """
     intSum1 = SimpsonIntegr(a, b, h, y, nDigits*4); h = h/2
     intSum2 = SimpsonIntegr(a, b, h, y, nDigits*4)  # nDigits should be more  than digits in epsilon!
@@ -57,13 +91,15 @@ def AdaptiveSimpsonInt(a: float, b: float, h: float, y, nDigits: int = 3, epsilo
         print("impossible to make so many halving iterations")
         nMaxIterations = 30
     j = 1  # number of iterations
-    while((j < nMaxIterations) and (abs(intSum2-intSum1) > epsilon*intSum2)):  # |I2-I1| <= epsilon*I2 - relative error check
+    # |I2-I1| <= epsilon*I2 - relative error check
+    while ((j < nMaxIterations) and (abs(intSum2-intSum1) > epsilon*intSum2)):
         intSum1 = intSum2
         h = h/2
         intSum2 = SimpsonIntegr(a, b, h, y, nDigits*4)  # nDigits should be more  than digits in epsilon!
         j += 1
     print(j, "number of iterations")
     return round(intSum2, nDigits)
+
 
 # %% Parameters for testing
 nDigits = 2; a = 0; b = 2; nSample = 1; h = 0.05
@@ -76,7 +112,7 @@ x = np.zeros(nPoints2); y = np.zeros(nPoints2)
 for i in range(nPoints2):
     x[i] = a + i*(h2/50); y[i] = fClass2.sampleF(x[i])
 # plot sample function from interval [a,b]
-fig = plt.figure(); plt.plot(x,y); plt.grid()
+fig = plt.figure(); plt.plot(x, y); plt.grid()
 
 # %% Testing
 integral = SimpsonIntegr(a, b, h, fClass.sampleF, nDigits)
