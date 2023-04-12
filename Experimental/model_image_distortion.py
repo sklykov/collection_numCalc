@@ -15,46 +15,49 @@ from skimage.filters import gaussian
 
 # %% Parameters
 k1 = 0.085; k2 = 0.0; k3 = 0.0
-w = 250; h = 250; grid_step = 5
+w = 400; h = 400; grid_step = 5
 plt.close("all")
+# Flags for showing / calculation of variables
 show_grid = False  # for showing using Matplotlib grid of points
 show_fringes = True  # for showing using Matplotlib modelled interferometric fringes
-fringe_step_vert = 16
+calculate_filled_distorted_img = False
+fringe_step_vert = 14
 
 # %% Grid generation
-img = np.zeros((w, h), dtype='uint8')
-for i in range(grid_step, w, grid_step):
-    for j in range(grid_step, h, grid_step):
-        img[i, j] = 255
-# plt.figure(); plt.imshow(img)
+if show_grid:
+    img = np.zeros((w, h), dtype='uint8')
+    for i in range(grid_step, w, grid_step):
+        for j in range(grid_step, h, grid_step):
+            img[i, j] = 255
+    # plt.figure(); plt.imshow(img)
 
 # %% Distortion modelling
 i_center = w // 2; j_center = h // 2
 radius = np.min([i_center, j_center])
-distorted_img = np.zeros((w, h), dtype='uint8')
-reconstructed_img = np.zeros((w, h), dtype='uint8')
-for i in range(grid_step, w, grid_step):
-    for j in range(grid_step, h, grid_step):
-        r = euclidean([i, j], [i_center, j_center])/radius  # normalized distance
-
-        # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
-        i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
-        j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
-        # Reconstruction similar to the above one
-
-        i_rec = i_distorted + int(np.round((i_distorted - i_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
-        j_rec = j_distorted + int(np.round((j_distorted - j_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
-        # Round mistake correction - ??? (reconstructed image violates grid pattern for one step)
-
-        # Make images as grid of points
-        if i_distorted > 0 and i_distorted < w and j_distorted > 0 and j_distorted < h:
-            distorted_img[i_distorted, j_distorted] = 255
-        if i_rec > 0 and i_rec < w and j_rec > 0 and j_rec < h:
-            reconstructed_img[i_rec, j_rec] = 255
-        # distorted_img[i, j] = 128
-
-# Show images
 if show_grid:
+    distorted_img = np.zeros((w, h), dtype='uint8')
+    reconstructed_img = np.zeros((w, h), dtype='uint8')
+    for i in range(grid_step, w, grid_step):
+        for j in range(grid_step, h, grid_step):
+            r = euclidean([i, j], [i_center, j_center])/radius  # normalized distance
+
+            # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
+            i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
+            j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
+            # Reconstruction similar to the above one
+
+            i_rec = i_distorted + int(np.round((i_distorted - i_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
+            j_rec = j_distorted + int(np.round((j_distorted - j_center)*(1 + k1*r*r + k2*r*r*r*r + k3*np.power(r, 6)), 0))
+            # Round mistake correction - ??? (reconstructed image violates grid pattern for one step)
+
+            # Make images as grid of points
+            if i_distorted > 0 and i_distorted < w and j_distorted > 0 and j_distorted < h:
+                distorted_img[i_distorted, j_distorted] = 255
+            if i_rec > 0 and i_rec < w and j_rec > 0 and j_rec < h:
+                reconstructed_img[i_rec, j_rec] = 255
+            # distorted_img[i, j] = 128
+
+    # Show images
     plt.figure(); plt.imshow(distorted_img)
     plt.figure(); plt.imshow(reconstructed_img)
 
@@ -80,7 +83,6 @@ for i_fringe_center in range(fringe_step_vert//4, w, fringe_step_vert):
 # Distortion of fringes
 distorted_fringes_raw = np.zeros((w, h), dtype='float')
 distorted_fringes_fill_hor = np.zeros((w, h), dtype='float')
-distorted_coordinates_pairs = []
 for i in range(w):
     for j in range(h):
         r = euclidean([i, j], [i_center, j_center])/radius  # normalized distance
@@ -94,20 +96,21 @@ for i in range(w):
 
 # Restore artifacts introduced by the distortion - horizontally filling the gaps.
 # Seems that symmetry of application - because of distorted horizontally aligned fringes
-distorted_fringes_fill_hor += distorted_fringes_raw
-for i in range(w):
-    for j in range(0, h-1, 1):
-        if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
-            distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
-    for j in range(1, h, 1):
-        if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j-1] > 0.0:
-            distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j-1]
-    for j in range(h-2, 0, -1):
-        if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
-            distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
-    for j in range(0, h-1, 1):
-        if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
-            distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
+if calculate_filled_distorted_img:
+    distorted_fringes_fill_hor += distorted_fringes_raw
+    for i in range(w):
+        for j in range(0, h-1, 1):
+            if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
+                distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
+        for j in range(1, h, 1):
+            if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j-1] > 0.0:
+                distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j-1]
+        for j in range(h-2, 0, -1):
+            if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
+                distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
+        for j in range(0, h-1, 1):
+            if (distorted_fringes_fill_hor[i, j] == 0.0 or distorted_fringes_fill_hor[i, j] < 1E-6) and distorted_fringes_fill_hor[i, j+1] > 0.0:
+                distorted_fringes_fill_hor[i, j] = distorted_fringes_fill_hor[i, j+1]
 
 # Interpolation of not assigned pixels using some interpolation
 distorted_fringes_interpol = np.zeros((w, h), dtype='float')
@@ -126,17 +129,15 @@ for i in range(w):
 
 # Additional smooth of interpolated values
 distorted_fringes_interpol_sm = np.copy(distorted_fringes_interpol)
-distorted_fringes_interpol_sm = gaussian(distorted_fringes_interpol_sm, sigma=1.2)
+distorted_fringes_interpol_sm = gaussian(distorted_fringes_interpol_sm, sigma=1.0)
 
 
 # Show images with fringes
 if show_fringes:
     # plt.figure(); plt.imshow(distorted_fringes_raw)
-    # plt.figure(); plt.imshow(distorted_fringes_fill_hor - distorted_fringes_raw)
     # plt.figure(); plt.imshow(distorted_fringes_interpol - distorted_fringes_raw)
     plt.figure(); plt.imshow(distorted_fringes_interpol)
     plt.figure(); plt.imshow(distorted_fringes_interpol_sm)
-
 
 # %% Testing
 if __name__ == "__main__":
