@@ -13,16 +13,22 @@ import matplotlib.pyplot as plt
 from skimage.filters import gaussian
 from scipy.fft import fft2, fftshift
 from matplotlib.colors import LogNorm
+import time
 
 # %% Parameters
-k1 = 0.085; k2 = 0.0; k3 = 0.0  # for modelling distortion of an image
-w = 400; h = 500; i_center = w // 2; j_center = h // 2  # generated image size properties
-radius = np.min([i_center, j_center])  # define the radius of an image as the smallest geometrical size
+k1 = 0.125; k2 = 0.0; k3 = 0.0  # for modelling distortion of an image
+w = 240; h = 280  # default image sizes
 grid_step = 5  # for generation of grid with points (one pixel)
 plt.close("all")
 # Flags for showing / calculation of variables
 show_grid = False  # for showing using Matplotlib grid of points
 show_fringes = True  # for showing using Matplotlib modelled interferometric fringes
+compare_raw_vect_distortions = True  # for testing vectorization speed up of distortion calculation
+test_vectorization = False  # for testing the vectorization speed up of distortion calculation
+if not compare_raw_vect_distortions and test_vectorization:
+    w = 520; h = 560  # enlarged image sizes for performance checking
+i_center = w // 2; j_center = h // 2  # generated image size properties
+radius = np.min([i_center, j_center])  # define the radius of an image as the smallest geometrical size
 calculate_filled_distorted_img = False
 fringe_step_vert = 10  # defines the horizontal fringes density and width
 
@@ -148,17 +154,67 @@ if show_fringes:
     plt.figure(); plt.imshow(fourier_img_draw, norm=LogNorm(vmin=minF, vmax=maxF))
 
 # %% Back transformation of the distorted image and comparison of Fourier spectrums
-restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1+0.035
-for i in range(w):
-    for j in range(h):
-        r = np.round(euclidean([i, j], [i_center, j_center])/radius, 6)  # normalized distance
-        # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
-        i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*r*r), 0))
-        j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*r*r), 0))
+restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1-0.035
 
-        # Reassignment pixel values
-        if i_distorted > 0 and i_distorted < w and j_distorted > 0 and j_distorted < h:
-            restored_fringes_raw[i_distorted, j_distorted] = distorted_fringes_raw[i, j]
+# Straight and slow implementation
+if compare_raw_vect_distortions:
+    t1 = time.time()
+    for i in range(w):
+        for j in range(h):
+            r = np.round(euclidean([i, j], [i_center, j_center])/radius, 6)  # normalized distance
+            # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
+            i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*r*r), 0))
+            j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*r*r), 0))
+            # Reassignment pixel values
+            if i_distorted >= 0 and i_distorted < w and j_distorted >= 0 and j_distorted < h:
+                restored_fringes_raw[i_distorted, j_distorted] = distorted_fringes_raw[i, j]
+    print("Raw distortion takes ms:", int(round(1000*(time.time() - t1), 0)))
+
+# Vectorization of the implementation above for speeding up the calculations
+t1 = time.time()
+i_coord_sq = np.arange(start=0, stop=w, step=1); j_coord_sq = np.arange(start=0, stop=h, step=1)
+jj, ii = np.meshgrid(j_coord_sq, i_coord_sq)
+i_coord_sq = np.power(i_coord_sq - i_center, 2); j_coord_sq = np.power(j_coord_sq - j_center, 2)
+jj_coord_sq, ii_coord_sq = np.meshgrid(j_coord_sq, i_coord_sq)
+radii_mesh = np.round(np.sqrt(jj_coord_sq + ii_coord_sq)/radius, 6); radii_mesh_sq = np.power(radii_mesh, 2)
+restored_fringes_raw_vect = np.zeros((w, h), dtype='float')
+
+# Calculation in for loop still performed
+# for i in range(w):
+#     for j in range(h):
+#         # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
+#         i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*radii_mesh_sq[i, j]), 0))
+#         if i_distorted >= 0 and i_distorted < w:
+#             j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*radii_mesh_sq[i, j]), 0))
+#             # Reassignment pixel values - transfer undistorted image to distorted one
+#             if j_distorted >= 0 and j_distorted < h:
+#                 restored_fringes_raw_vect[i_distorted, j_distorted] = distorted_fringes_raw[i, j]
+
+# Moved out calculation from for loops, remaining only sorting out the coordinates
+ii_dist = i_center + np.int16(np.round(((1 + k1*radii_mesh_sq)*(ii - i_center)), 0))
+jj_dist = j_center + np.int16(np.round(((1 + k1*radii_mesh_sq)*(jj - j_center)), 0))
+# i_distorted, j_distorted = 0, 0
+# for i in range(w):
+#     if np.min(jj_dist[i, :]) < h and np.min(ii_dist[i, :]) < w:
+#         for j in range(h):
+#             i_distorted = ii_dist[i, j]; j_distorted = jj_dist[i, j]
+#             if j_distorted < h and i_distorted < w:
+#                 restored_fringes_raw_vect[i_distorted, j_distorted] = distorted_fringes_raw[i, j]
+
+# I've just noticed that the checks in for loops are not necessary to perform, indices lay in suitable regions
+# So, it turns out that the simple loops are enough
+# for i in range(w):
+#     for j in range(h):
+#         restored_fringes_raw_vect[ii_dist[i, j], jj_dist[i, j]] = distorted_fringes_raw[i, j]
+# Or, even, going only on one row
+for i in range(w):
+    restored_fringes_raw_vect[ii_dist[i, :], jj_dist[i, :]] = distorted_fringes_raw[i, :]
+
+
+print("Vectorized distortion takes ms:", int(round(1000*(time.time() - t1), 0)))
+if compare_raw_vect_distortions:
+    plt.figure(); plt.imshow(restored_fringes_raw - restored_fringes_raw_vect)
+restored_fringes_raw = restored_fringes_raw_vect  # use further the vectorized form
 
 # Crop the shrinked borders - all zero values in row or column
 i_crop_top = 0; j_crop_left = 0; i_crop_bottom = 0; j_crop_right = 0
