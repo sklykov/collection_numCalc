@@ -93,10 +93,10 @@ for i_fringe_center in range(fringe_step_vert//4, w, fringe_step_vert):
             break
 
 # Distortion of fringes
-distorted_fringes_raw = np.zeros((w, h), dtype='float')
+distorted_fringes_raw = np.zeros((w, h), dtype='float'); norm_radius = 1.0/radius
 for i in range(w):
     for j in range(h):
-        r = np.round(euclidean([i, j], [i_center, j_center])/radius, 6)  # normalized distance
+        r = np.round(norm_radius*euclidean([i, j], [i_center, j_center]), 6)  # normalized distance
         # Similar to the model of the relation of undistorted pixel coordinates to the distorted one
         i_distorted = i_center + int(np.round((i-i_center)*(1 + k1*r*r), 0))
         j_distorted = j_center + int(np.round((j-j_center)*(1 + k1*r*r), 0))
@@ -104,6 +104,16 @@ for i in range(w):
         # Reassignment pixel values
         if i_distorted > 0 and i_distorted < w and j_distorted > 0 and j_distorted < h:
             distorted_fringes_raw[i_distorted, j_distorted] = img_fringes[i, j]
+
+# Other distortion model
+distorted_fringes_raw2 = np.zeros((w, h), dtype='float'); l1 = 1E-6
+jj_u, ii_u = np.meshgrid(np.arange(start=0, stop=h, step=1), np.arange(start=0, stop=w, step=1))
+radii_u = norm_radius*np.power((ii_u-i_center), 2) + np.power((jj_u-j_center), 2)
+radii_u_coeff = 1.0/(1.0 + l1*radii_u)
+jj_d = j_center + np.int16(np.round((jj_u - j_center)*radii_u_coeff, 0))
+ii_d = i_center + np.int16(np.round((ii_u - i_center)*radii_u_coeff, 0))
+distorted_fringes_raw2[ii_d, jj_d] = img_fringes
+plt.figure(); plt.imshow(distorted_fringes_raw2)
 
 # Restore artifacts introduced by the distortion - horizontally filling the gaps.
 # Seems that symmetry of application - because of distorted horizontally aligned fringes
@@ -270,6 +280,7 @@ else:
 # Interpolation of not assigned pixels using some interpolation (below - using 3x3 averaging mask) - Remove artifacts
 t1 = time.time(); restored_fringes_interpol = np.zeros((w_restored, h_restored), dtype='float')
 restored_fringes_interpol += restored_fringes_raw; interpolation_sum_coeff = 0.125
+interpolation_sum_coeffs = [1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125]
 restored_fringes_interpol2 = np.copy(restored_fringes_interpol)
 
 # Straight loop over the image
@@ -303,7 +314,8 @@ for zero_index in range(zero_ii.shape[0]):
     # Define mask coordinates - for calculation interpolation sum
     i_top = i-1; i_bottom = i+1; j_left = j-1; j_right = j+1
     # Calculate sum of pixels inside 3x3 mask using the numpy
-    restored_fringes_interpol_wt_borders[i-1, j-1] = (interpolation_sum_coeff
+    zero_mask_ii, _ = np.nonzero(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1] > 1E-6)
+    restored_fringes_interpol_wt_borders[i-1, j-1] = (interpolation_sum_coeffs[zero_mask_ii.shape[0]-1]
                                                       * np.sum(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1]))
 # plt.figure(); plt.imshow(restored_fringes_interpol2 - restored_fringes_interpol_wt_borders)
 # restored_fringes_interpol = restored_fringes_interpol_wt_borders
