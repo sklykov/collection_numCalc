@@ -19,7 +19,7 @@ import time
 
 # %% Parameters
 k1 = 0.125; k2 = 0.0; k3 = 0.0  # for modelling distortion of an image
-w = 250; h = 280  # default image sizes
+w = 250; h = 250  # default image sizes
 grid_step = 5  # for generation of grid with points (one pixel)
 plt.close("all")
 # Flags for showing / calculation of variables
@@ -28,6 +28,7 @@ show_fringes = True  # for showing using Matplotlib modelled interferometric fri
 compare_raw_vect_distortions = False  # for testing vectorization speed up of distortion calculation
 test_vectorization = False  # for testing the vectorization speed up of distortion calculation
 test_mean_filter = False; test_median_filter = False; test_mix_mean_median = False
+test_filters = test_mean_filter or test_median_filter or test_mix_mean_median  # to enter filters testing
 test_cropping = False  # test applying 1 (False) or 2 (True) methods below
 print_test_information = True  # print out various testing / benchmarking information
 if not compare_raw_vect_distortions and test_vectorization:
@@ -106,14 +107,14 @@ for i in range(w):
             distorted_fringes_raw[i_distorted, j_distorted] = img_fringes[i, j]
 
 # Other distortion model
-distorted_fringes_raw2 = np.zeros((w, h), dtype='float'); l1 = 1E-6
+distorted_fringes_raw2 = np.zeros((w, h), dtype='float'); l1 = 1E-3
 jj_u, ii_u = np.meshgrid(np.arange(start=0, stop=h, step=1), np.arange(start=0, stop=w, step=1))
-radii_u = norm_radius*np.power((ii_u-i_center), 2) + np.power((jj_u-j_center), 2)
+radii_u = norm_radius*(np.power((ii_u-i_center), 2) + np.power((jj_u-j_center), 2))
 radii_u_coeff = 1.0/(1.0 + l1*radii_u)
 jj_d = j_center + np.int16(np.round((jj_u - j_center)*radii_u_coeff, 0))
 ii_d = i_center + np.int16(np.round((ii_u - i_center)*radii_u_coeff, 0))
 distorted_fringes_raw2[ii_d, jj_d] = img_fringes
-plt.figure(); plt.imshow(distorted_fringes_raw2)
+# plt.figure(); plt.imshow(distorted_fringes_raw2)
 
 # Restore artifacts introduced by the distortion - horizontally filling the gaps.
 # Seems that symmetry of application - because of distorted horizontally aligned fringes
@@ -169,7 +170,7 @@ if show_fringes:
     plt.figure(); plt.imshow(fourier_img_draw, norm=LogNorm(vmin=minF, vmax=maxF))
 
 # %% Back transformation of the distorted image and comparison of Fourier spectrums
-restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1+0.06
+restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1+0.05
 
 # Straight and slow implementation
 if compare_raw_vect_distortions:
@@ -191,8 +192,7 @@ i_coord_sq = np.arange(start=0, stop=w, step=1); j_coord_sq = np.arange(start=0,
 jj, ii = np.meshgrid(j_coord_sq, i_coord_sq)
 i_coord_sq = np.power(i_coord_sq - i_center, 2); j_coord_sq = np.power(j_coord_sq - j_center, 2)
 jj_coord_sq, ii_coord_sq = np.meshgrid(j_coord_sq, i_coord_sq)
-# radii_mesh = np.round(np.sqrt(jj_coord_sq + ii_coord_sq)/radius, 6)
-radii_mesh_sq = np.round(np.power(np.sqrt(jj_coord_sq + ii_coord_sq)/radius, 2), 6)
+radii_mesh_sq = np.power(np.sqrt(jj_coord_sq + ii_coord_sq)*norm_radius, 2)
 restored_fringes_raw_vect = np.zeros((w, h), dtype='float')
 
 # Calculation in for loop still performed
@@ -207,8 +207,8 @@ restored_fringes_raw_vect = np.zeros((w, h), dtype='float')
 #                 restored_fringes_raw_vect[i_distorted, j_distorted] = distorted_fringes_raw[i, j]
 
 # Moved out calculation from for loops, remaining only sorting out the coordinates
-ii_dist = i_center + np.int16(np.round(((1 + k1*radii_mesh_sq)*(ii - i_center)), 0))
-jj_dist = j_center + np.int16(np.round(((1 + k1*radii_mesh_sq)*(jj - j_center)), 0))
+ii_dist = i_center + np.int16(np.round(((1.0 + k1*radii_mesh_sq)*(ii - i_center)), 0))
+jj_dist = j_center + np.int16(np.round(((1.0 + k1*radii_mesh_sq)*(jj - j_center)), 0))
 
 # i_distorted, j_distorted = 0, 0
 # for i in range(w):
@@ -233,7 +233,21 @@ jj_dist = j_center + np.int16(np.round(((1 + k1*radii_mesh_sq)*(jj - j_center)),
 #         restored_fringes_raw_vect[ii_dist[:, j], jj_dist[:, j]] = distorted_fringes_raw[:, j]
 
 # Test the direct assignment of matricies - to exclude the looping
-restored_fringes_raw_vect[ii_dist, jj_dist] = distorted_fringes_raw
+restored_fringes_raw_vect[ii_dist, jj_dist] = distorted_fringes_raw  # ??? which image to distort for checking all algorithms
+# restored_fringes_raw_vect[ii_dist, jj_dist] = img_fringes
+
+# Check which pixels not included / used twice during transform
+addressed_again_pixels = []; restored_fringes_raw_vect2 = np.zeros((w, h), dtype='float')
+for i in range(w):
+    for j in range(h):
+        if restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] < 1E-9:
+            restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = img_fringes[i, j]
+        else:
+            addressed_again_pixels.append([ii_dist[i, j], jj_dist[i, j]])
+            # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] += img_fringes[i, j]
+            # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] *= 0.5
+            restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = 0.0
+plt.figure(); plt.imshow(restored_fringes_raw_vect2)
 
 if print_test_information:
     print("Vectorized distortion takes ms:", int(round(1000*(time.time() - t1), 0)))
@@ -278,10 +292,9 @@ else:
     print("Cropped image sizes after 1 method:", w_restored, h_restored)
 
 # Interpolation of not assigned pixels using some interpolation (below - using 3x3 averaging mask) - Remove artifacts
-t1 = time.time(); restored_fringes_interpol = np.zeros((w_restored, h_restored), dtype='float')
-restored_fringes_interpol += restored_fringes_raw; interpolation_sum_coeff = 0.125
-interpolation_sum_coeffs = [1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125]
-restored_fringes_interpol2 = np.copy(restored_fringes_interpol)
+t1 = time.time(); restored_fringes_interpol = np.copy(restored_fringes_raw)
+interpolation_sum_coeffs = np.asarray([1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125])
+# restored_fringes_interpol2 = np.copy(restored_fringes_interpol)
 
 # Straight loop over the image
 # for i in range(1, w_restored-1):
@@ -306,8 +319,9 @@ restored_fringes_interpol2 = np.copy(restored_fringes_interpol)
 #             restored_fringes_interpol2[i, j] = np.sum(interpol_mask)*interpolation_sum_coeff
 # restored_fringes_interpol2 = restored_fringes_interpol2[1:w_restored-1, 1:h_restored-1]
 
-# Speed up by looping only on the calculated pixels of interest
+# Speed up by looping only on the calculated pixels of interest - vacant pixels not filled after conversion
 restored_fringes_interpol_wt_borders = restored_fringes_interpol[1:w_restored-1, 1:h_restored-1]
+plt.figure(); plt.imshow(restored_fringes_interpol_wt_borders)
 zero_ii, zero_jj = np.nonzero(restored_fringes_interpol_wt_borders < 1E-6)  # controvercially, returns indices of zero pixels
 for zero_index in range(zero_ii.shape[0]):
     i, j = zero_ii[zero_index] + 1, zero_jj[zero_index] + 1
@@ -317,29 +331,28 @@ for zero_index in range(zero_ii.shape[0]):
     zero_mask_ii, _ = np.nonzero(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1] > 1E-6)
     restored_fringes_interpol_wt_borders[i-1, j-1] = (interpolation_sum_coeffs[zero_mask_ii.shape[0]-1]
                                                       * np.sum(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1]))
-# plt.figure(); plt.imshow(restored_fringes_interpol2 - restored_fringes_interpol_wt_borders)
-# restored_fringes_interpol = restored_fringes_interpol_wt_borders
 if print_test_information:
     print("Interpolation takes ms:", int(round(1000*(time.time() - t1), 0)))
 
 # Avoiding interpolation of only selected pixels by applying some filter and removing artefacts
-restored_fringes_filter = np.copy(restored_fringes_raw)
-restored_fringes_filter = img_as_uint(restored_fringes_filter)  # need for mean, median filters
-footprint = np.asarray([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
-if test_mean_filter:
-    for iteration in range(2):
-        restored_fringes_filter = mean(restored_fringes_filter, footprint)
-    plt.figure(); plt.imshow(restored_fringes_filter)
-if test_median_filter and not test_mean_filter and not test_mix_mean_median:
-    for iteration in range(2):
+if test_filters:
+    restored_fringes_filter = np.copy(restored_fringes_raw)
+    restored_fringes_filter = img_as_uint(restored_fringes_filter)  # need for mean, median filters
+    footprint = np.asarray([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
+    if test_mean_filter:
+        for iteration in range(2):
+            restored_fringes_filter = mean(restored_fringes_filter, footprint)
+        plt.figure(); plt.imshow(restored_fringes_filter)
+    if test_median_filter and not test_mean_filter and not test_mix_mean_median:
+        for iteration in range(2):
+            restored_fringes_filter = median(restored_fringes_filter, footprint)
+        plt.figure(); plt.imshow(restored_fringes_filter)
+    if test_mix_mean_median and not test_median_filter and not test_mean_filter:
         restored_fringes_filter = median(restored_fringes_filter, footprint)
-    plt.figure(); plt.imshow(restored_fringes_filter)
-if test_mix_mean_median and not test_median_filter and not test_mean_filter:
-    restored_fringes_filter = median(restored_fringes_filter, footprint)
-    restored_fringes_filter = median(restored_fringes_filter, footprint)
-    restored_fringes_filter = mean(restored_fringes_filter, footprint)
-    plt.figure(); plt.imshow(restored_fringes_filter)
-# restored_fringes_filter = median(restored_fringes_filter)  # Tested, not closing all artifacts
+        restored_fringes_filter = median(restored_fringes_filter, footprint)
+        restored_fringes_filter = mean(restored_fringes_filter, footprint)
+        plt.figure(); plt.imshow(restored_fringes_filter)
+    # restored_fringes_filter = median(restored_fringes_filter)  # Tested, not closing all artifacts
 
 # Additional smooth of interpolated values
 # t1 = time.time()
