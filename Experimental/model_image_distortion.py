@@ -19,7 +19,7 @@ import time
 
 # %% Parameters
 k1 = 0.125; k2 = 0.0; k3 = 0.0  # for modelling distortion of an image
-w = 250; h = 250  # default image sizes
+w = 254; h = 280  # default image sizes
 grid_step = 5  # for generation of grid with points (one pixel)
 plt.close("all")
 # Flags for showing / calculation of variables
@@ -170,7 +170,8 @@ if show_fringes:
     plt.figure(); plt.imshow(fourier_img_draw, norm=LogNorm(vmin=minF, vmax=maxF))
 
 # %% Back transformation of the distorted image and comparison of Fourier spectrums
-restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1+0.05
+restored_fringes_raw = np.zeros((w, h), dtype='float'); k1 = -k1+0.065
+interpolation_sum_coeffs = np.asarray([1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125])
 
 # Straight and slow implementation
 if compare_raw_vect_distortions:
@@ -233,21 +234,57 @@ jj_dist = j_center + np.int16(np.round(((1.0 + k1*radii_mesh_sq)*(jj - j_center)
 #         restored_fringes_raw_vect[ii_dist[:, j], jj_dist[:, j]] = distorted_fringes_raw[:, j]
 
 # Test the direct assignment of matricies - to exclude the looping
-restored_fringes_raw_vect[ii_dist, jj_dist] = distorted_fringes_raw  # ??? which image to distort for checking all algorithms
+restored_fringes_raw_vect[ii_dist, jj_dist] = distorted_fringes_interpol_sm  # restoration of previously distorted image
 # restored_fringes_raw_vect[ii_dist, jj_dist] = img_fringes
 
 # Check which pixels not included / used twice during transform
-addressed_again_pixels = []; restored_fringes_raw_vect2 = np.zeros((w, h), dtype='float')
-for i in range(w):
-    for j in range(h):
-        if restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] < 1E-9:
-            restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = img_fringes[i, j]
-        else:
-            addressed_again_pixels.append([ii_dist[i, j], jj_dist[i, j]])
-            # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] += img_fringes[i, j]
-            # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] *= 0.5
-            restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = 0.0
-plt.figure(); plt.imshow(restored_fringes_raw_vect2)
+# addressed_again_pixels = []; restored_fringes_raw_vect2 = np.zeros((w, h), dtype='float')
+# for i in range(w):
+#     for j in range(h):
+#         if restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] < 1E-9:
+#             restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = img_fringes[i, j]
+#         else:
+#             addressed_again_pixels.append([ii_dist[i, j], jj_dist[i, j]])
+#             # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] += img_fringes[i, j]
+#             # restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] *= 0.5
+#             restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = 0.0
+# plt.figure(); plt.imshow(restored_fringes_raw_vect2)
+
+# Another vectorization using sparse mesh grids
+jj_sp, ii_sp = np.meshgrid(np.arange(start=0, stop=h, step=1), np.arange(start=0, stop=w, step=1), sparse=True)
+jj_coord_sq_sp, ii_coord_sq_sp = np.meshgrid(j_coord_sq, i_coord_sq, sparse=True)
+radii_mesh_sq_sp = np.power(np.sqrt(jj_coord_sq_sp + ii_coord_sq_sp)*norm_radius, 2)
+restored_fringes_raw_vect2 = np.zeros((w, h), dtype='float')
+ii_dist_sp = i_center + np.int16(np.round(((1.0 + k1*radii_mesh_sq_sp)*(ii_sp - i_center)), 0))
+jj_dist_sp = j_center + np.int16(np.round(((1.0 + k1*radii_mesh_sq_sp)*(jj_sp - j_center)), 0))
+restored_fringes_raw_vect2[ii_dist_sp, jj_dist_sp] = distorted_fringes_interpol_sm
+# Assign only unique points to some values
+# for i in range(w):
+#     for j in range(h):
+#         if restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] < 1E-9:
+#             restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = distorted_fringes_interpol_sm[i, j]
+#         else:
+#             restored_fringes_raw_vect2[ii_dist[i, j], jj_dist[i, j]] = 0.0
+# Better croppring of the reduced size images
+i_top = np.min(ii_dist_sp[:, 0]); i_bottom = np.max(ii_dist_sp[:, h-1])
+j_left = np.min(jj_dist_sp[0, :]); j_right = np.max(jj_dist_sp[0, :])
+restored_fringes_raw_vect2 = restored_fringes_raw_vect2[i_top:i_bottom, j_left:j_right]
+# w_restored2, h_restored2 = restored_fringes_raw_vect2.shape
+# plt.figure(); plt.imshow(restored_fringes_raw_vect2)
+# Performing interpolation
+# restored_fringes_interpol_wt_borders2 = restored_fringes_raw_vect2[1:w_restored2-1, 1:h_restored2-1]
+# zero_ii, zero_jj = np.nonzero(restored_fringes_interpol_wt_borders2 < 1E-6)  # controvercially, returns indices of zero pixels
+# for zero_index in range(zero_ii.shape[0]):
+#     i, j = zero_ii[zero_index] + 1, zero_jj[zero_index] + 1
+#     # Define mask coordinates - for calculation interpolation sum
+#     i_top = i-1; i_bottom = i+1; j_left = j-1; j_right = j+1
+#     # Calculate sum of pixels inside 3x3 mask using the numpy
+#     zero_mask_ii, _ = np.nonzero(restored_fringes_raw_vect2[i_top:i_bottom+1, j_left:j_right+1] > 1E-6)
+#     restored_fringes_interpol_wt_borders2[i-1, j-1] = (interpolation_sum_coeffs[zero_mask_ii.shape[0]-1]
+#                                                        * np.sum(restored_fringes_raw_vect2[i_top:i_bottom+1, j_left:j_right+1]))
+restored_fringes_interpol_sm2 = np.copy(restored_fringes_raw_vect2)
+restored_fringes_interpol_sm2 = gaussian(restored_fringes_interpol_sm2, sigma=0.85)
+plt.figure(); plt.imshow(restored_fringes_interpol_sm2)
 
 if print_test_information:
     print("Vectorized distortion takes ms:", int(round(1000*(time.time() - t1), 0)))
@@ -293,7 +330,6 @@ else:
 
 # Interpolation of not assigned pixels using some interpolation (below - using 3x3 averaging mask) - Remove artifacts
 t1 = time.time(); restored_fringes_interpol = np.copy(restored_fringes_raw)
-interpolation_sum_coeffs = np.asarray([1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125])
 # restored_fringes_interpol2 = np.copy(restored_fringes_interpol)
 
 # Straight loop over the image
@@ -321,18 +357,18 @@ interpolation_sum_coeffs = np.asarray([1.0, 0.5, 1/3, 0.25, 0.2, 1/6, 1/7, 0.125
 
 # Speed up by looping only on the calculated pixels of interest - vacant pixels not filled after conversion
 restored_fringes_interpol_wt_borders = restored_fringes_interpol[1:w_restored-1, 1:h_restored-1]
-plt.figure(); plt.imshow(restored_fringes_interpol_wt_borders)
-zero_ii, zero_jj = np.nonzero(restored_fringes_interpol_wt_borders < 1E-6)  # controvercially, returns indices of zero pixels
-for zero_index in range(zero_ii.shape[0]):
-    i, j = zero_ii[zero_index] + 1, zero_jj[zero_index] + 1
-    # Define mask coordinates - for calculation interpolation sum
-    i_top = i-1; i_bottom = i+1; j_left = j-1; j_right = j+1
-    # Calculate sum of pixels inside 3x3 mask using the numpy
-    zero_mask_ii, _ = np.nonzero(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1] > 1E-6)
-    restored_fringes_interpol_wt_borders[i-1, j-1] = (interpolation_sum_coeffs[zero_mask_ii.shape[0]-1]
-                                                      * np.sum(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1]))
-if print_test_information:
-    print("Interpolation takes ms:", int(round(1000*(time.time() - t1), 0)))
+# plt.figure(); plt.imshow(restored_fringes_interpol_wt_borders)
+# zero_ii, zero_jj = np.nonzero(restored_fringes_interpol_wt_borders < 1E-6)  # controvercially, returns indices of zero pixels
+# for zero_index in range(zero_ii.shape[0]):
+#     i, j = zero_ii[zero_index] + 1, zero_jj[zero_index] + 1
+#     # Define mask coordinates - for calculation interpolation sum
+#     i_top = i-1; i_bottom = i+1; j_left = j-1; j_right = j+1
+#     # Calculate sum of pixels inside 3x3 mask using the numpy
+#     zero_mask_ii, _ = np.nonzero(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1] > 1E-6)
+#     restored_fringes_interpol_wt_borders[i-1, j-1] = (interpolation_sum_coeffs[zero_mask_ii.shape[0]-1]
+#                                                       * np.sum(restored_fringes_interpol[i_top:i_bottom+1, j_left:j_right+1]))
+# if print_test_information:
+#     print("Interpolation takes ms:", int(round(1000*(time.time() - t1), 0)))
 
 # Avoiding interpolation of only selected pixels by applying some filter and removing artefacts
 if test_filters:
