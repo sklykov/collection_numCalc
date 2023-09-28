@@ -4,7 +4,9 @@ Measuring performance of various FFT functions applied on an image.
 
 @author: sklykov
 @license: The Unlicense
+
 """
+
 # %% Global imports
 import matplotlib.pyplot as plt
 import numpy as np
