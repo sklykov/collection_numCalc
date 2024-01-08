@@ -18,14 +18,18 @@ from skimage.restoration import richardson_lucy
 # %% Physical parameters
 wavelength = 0.55  # in micrometers
 k = 2.0*pi/wavelength  # angular frequency
-NA = 1.0  # microobjective property, ultimately NA = d/2*f, there d - aperture diameter, f - distance to the object (focal length)
+NA = 0.95  # microobjective property, ultimately NA = d/2*f, there d - aperture diameter, f - distance to the object (focal length)
 # Note that ideal Airy pattern will be (2*J1(x)/x)^2, there x = k*NA*r, there r - radius in the polar coordinates on the image
-pixel_size = 0.14  # in micrometers, physical length in pixels (um / pixels)
+pixel_size = 0.125  # in micrometers, physical length in pixels (um / pixels)
 pixel2um_coeff = k*NA*pixel_size  # coefficient used for relate pixels to physical units
 pixel2um_coeff_plot = k*NA*(pixel_size/10.0)  # coefficient used for better plotting with the reduced pixel size for preventing pixelated
 
+# %% Testing parameters
+show_psfs = False
+show_convolution_deconvolution = True
 
-# %% Functions
+
+# %% Ideal (theoretical) PSF convolution / deconvolution
 def ideal_psf_image(r):
     """
     Calculate ideal Airy intensity distribution (normalized to 1.0), as the function 4.0*(J1(r)/r).
@@ -160,7 +164,7 @@ def convolute_img_psf(img: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
     Parameters
     ----------
     img : numpy.ndarray
-        Sample image.
+        Sample image, not colour.
     psf_kernel : numpy.ndarray
         Calculated PSF kernel.
 
@@ -179,7 +183,7 @@ def convolute_img_psf(img: np.ndarray, psf_kernel: np.ndarray) -> np.ndarray:
     return convolved_img
 
 
-def plot_convolution(img: np.ndarray, psf_kernel: np.ndarray):
+def plot_convolution(img: np.ndarray, psf_kernel: np.ndarray) -> int:
     """
     Plot on 2 figures the initial sample image and convolved one (calculated by using convolute_img_psf function).
 
@@ -192,31 +196,75 @@ def plot_convolution(img: np.ndarray, psf_kernel: np.ndarray):
 
     Returns
     -------
-    None.
+    int
+        Randomly selected id for named plots for reusing it for further plotting figure naming.
 
     """
-    plt.figure(); plt.imshow(img, cmap=plt.cm.gray); plt.axis('off'); plt.tight_layout()
+    unique_id = np.random.randint(low=0, high=501)
+    plt.figure(f"Sample image {unique_id}"); plt.imshow(img, cmap=plt.cm.gray); plt.axis('off'); plt.tight_layout()
     conv_img = convolute_img_psf(img, psf_kernel)
-    plt.figure(); plt.imshow(conv_img, cmap=plt.cm.gray); plt.axis('off'); plt.tight_layout()
+    plt.figure(f"Convolved image {unique_id}"); plt.imshow(conv_img, cmap=plt.cm.gray); plt.axis('off'); plt.tight_layout()
+    return unique_id
+
+
+def deconvolve_img(convolved_img: np.ndarray, psf_kernel: np.ndarray, n_iterations: int = 20, keep_border_artifacts: bool = False) -> np.ndarray:
+    """
+    Wrap the skimage.restoration.richardson_lucy deconvolution function along with useful functionality.
+
+    Parameters
+    ----------
+    convolved_img : numpy.ndarray
+        Sample image, not colour.
+    psf_kernel : numpy.ndarray
+        Calculated PSF kernel, possibly approximated.
+    n_iterations : int, optional
+        Number of iterations for running skimage.restoration.richardson_lucy. The default is 20.
+    keep_border_artifacts : bool, optional
+        Flag for removing / keeping . The default is False.
+
+    Returns
+    -------
+    restored_img : numpy.ndarray
+        Deconvolved image.
+
+    """
+    conv_img_type = convolved_img.dtype; conv_img_max = np.max(convolved_img)
+    h, w = convolved_img.shape; kernel_size = int((psf_kernel.shape[0] + 1) / 2)
+    # Conversion of an input image to a float image
+    if 'float' not in str(conv_img_type):
+        convolved_img = convolved_img.astype(dtype=np.float32)
+    # Performing deconvolution and removing artifacts
+    convolved_img /= conv_img_max  # scaling of an image
+    restored_img = richardson_lucy(image=convolved_img, psf=psf_kernel, num_iter=n_iterations)
+    # Restoring input image type
+    restored_img *= conv_img_max
+    if 'float' not in str(conv_img_type):
+        restored_img = restored_img.astype(dtype=conv_img_type)
+    if not keep_border_artifacts:
+        if h - 2*kernel_size < 4 or w - 2*kernel_size < 4:
+            __warn_message = "The provided image is too small relative to the PSF kernel size and will contain only border artificts"
+            warnings.warn(__warn_message)
+        else:
+            restored_img = restored_img[kernel_size:h-kernel_size, kernel_size: w - kernel_size]  # remove border artifacts
+    return restored_img
 
 
 # %% Tests
 if __name__ == "__main__":
-    # testing various radii specifications
+    # various radii specifications for testing psf calculation
     # r = [0.0, 0.0, 0.2, 0.3]
     # r = np.linspace(0.0, 1.5, num=150)
     # r = np.linspace(-1.0, 1.0, num=21)
-    r = np.linspace(0, 10, num=11); r *= pixel2um_coeff
-    psf = ideal_psf_image(r)
+    # r = np.linspace(0, 10, num=11); r *= pixel2um_coeff
+    # psf = ideal_psf_image(r)
 
-    # Plotting the results
+    # Plotting the results of PSF, convolution / deconvolution
     plt.close('all')
-    show_ideal_psf(17, pixel2um_coeff/2); show_ideal_psf(80, pixel2um_coeff_plot)
+    if show_psfs:
+        show_ideal_psf(17, pixel2um_coeff/2); show_ideal_psf(80, pixel2um_coeff_plot)
     sample_img = loadSampleImage(); psf_kernel = get_ideal_psf_kernel(pixel2um_coeff/2)
-    blurred_img = convolute_img_psf(sample_img, psf_kernel); plot_convolution(sample_img, psf_kernel)
-    blurred_img = blurred_img.astype(dtype=np.float32)/np.max(blurred_img)
-    restored_img = richardson_lucy(image=blurred_img, psf=psf_kernel, num_iter=20)
-    h, w = restored_img.shape
-    restored_img = restored_img[10:h-10, 10:w-10]
-    plt.figure("Restored image"); plt.imshow(restored_img, cmap=plt.cm.gray); plt.tight_layout()
+    blurred_img = convolute_img_psf(sample_img, psf_kernel); restored_img = deconvolve_img(blurred_img, psf_kernel)
+    if show_convolution_deconvolution:
+        plot_id = plot_convolution(sample_img, psf_kernel)
+        plt.figure(f"Restored image {plot_id}"); plt.imshow(restored_img, cmap=plt.cm.gray); plt.axis('off'); plt.tight_layout()
     plt.show()
