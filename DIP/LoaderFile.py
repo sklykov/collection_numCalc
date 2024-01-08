@@ -43,7 +43,7 @@ def loadSampleImage(identifier: str = "castle"):
         scikit-image object.
     """
     # Some blank image for default return
-    sample = np.zeros((10, 10), dtype='int')
+    sample = np.zeros((10, 10), dtype='int8')
     sample = img_as_ubyte(sample, force_copy=True)
     # Default image return
     if identifier == "castle":
