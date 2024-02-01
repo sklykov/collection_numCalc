@@ -1,14 +1,15 @@
 # collection_numCalc
-- My own collection of Python scripts with a few basic Numerical calculation tasks, some simulation / evaluation scripts. 
-- Most of implemented numerical algorithms has been taken from the book "Introduction to Numerical Programming" by
+- This repository contains my own collection of Python scripts containing some common numerical calculation algorithms (e.g., numerical integration) 
+and some particular simulations / evaluations (e.g., microscopic images with fluorescent beads, their Brownian motion in water). 
+- Most of implemented numerical algorithms have been taken from the book "Introduction to Numerical Programming" by
 T.A. Beu (2015). A few others - from open sources like Wiki articles. As the reference for the DIP section - "Digital
-Image Processing" by Gonzalez R.C., Woods R.E., 2nd / 3rd ed. Some simulations have been implemented based on other
-sources (mostly, open).
-- **This project is for training and implementation-reference only purposes, so there aren't yet any installation instructions**
-- I observed in the past huge traffic of repository cloning. Moreover, the most of implemented
-here algorithms are well-known and have been implemented already in all popular packages for numerical calculations.
-I guess that many cloners of this repo were confused in the past by its previous name. Renaming, so far, resolved the
-issue.
-- All scripts have been developed in the Spyder IDE with common dependencies for numerical calculations: scipy(numpy),
-matplotlib, scikit-image (skimage), pyqt5, pyqtgraph. I don't see any necessity to specify it now in any "requirements" file for
-installation from a scratch. In the case of any interest, please, refer to import sections of the scripts.
+Image Processing" by Gonzalez R.C., Woods R.E., 2nd / 3rd ed.
+- *Note that this project is for training and implementation-reference only purposes, so there aren't yet any installation instructions*. 
+One, maybe, may find that it's more useful to implement these scripts as the Jupyter notebooks, but I prefer 
+the 'script form' for possible further reusing of the functions implemented in scripts.
+- *Also note that the most of implemented here algorithms are well-known and had been already implemented in all popular packages for numerical calculations*.
+- Common dependencies across almost all scripts: [NumPy](https://numpy.org/), [Matplotlib](https://matplotlib.org/), 
+[SciPy](https://scipy.org/). For Digital Imaging Process (DIP for short) also: [scikit-image](https://scikit-image.org/).
+Used IDE for scripts development: [Spyder](https://www.spyder-ide.org/). 
+
+Feb. 2024 update: Since someone found this repository useful, I've refined this short documentation to clarify the bullet points above.
