@@ -13,6 +13,8 @@ from skimage.util import img_as_ubyte
 from pathlib import Path
 import matplotlib.pyplot as plt
 # import numpy as np
+from skimage.exposure import histogram
+from skimage.color import rgba2rgb
 
 # %% Tests
 # sample_img_path = Path(__file__).parent.joinpath("resources").joinpath("nesvizh.jpg")  # work as expected, no complains below
@@ -37,3 +39,11 @@ if sample_img_path.is_file():
 if sample_img_gray is not None:
     plt.close('all'); plt.figure(); plt.imshow(sample_img_gray, cmap=plt.cm.gray); plt.axis('off')
     plt.colorbar(); plt.tight_layout()
+
+# Histogram for color image
+if sample_img_path.is_file():
+    sample_img = io.imread(sample_img_path); img_shape = sample_img.shape
+    if img_shape[2] == 4:  # for png file
+        sample_img = rgba2rgb(sample_img)
+    plt.figure(); plt.imshow(sample_img); plt.axis('off'); plt.tight_layout()
+    # Histogram - ...

@@ -46,7 +46,7 @@ countsNorm = np.asarray(hist[0], 'float')  # Conversion to np.array
 for i in range(len(countsNorm)):
     countsNorm[i] /= maxCount
 
-# %% Plot histogram
+# %% Plot histogram for the gray image
 plt.figure(3)
 axes = plt.axes()  # get the instance of axes for making minor plots and suppress the poped warning
 plt.rc('font', family='serif')  # setting font type
@@ -54,12 +54,11 @@ plt.plot(hist[1], countsNorm, 'bo-', markersize=6, linewidth=2)
 # %% Axes settings
 plt.axis([min(hist[1]), max(hist[1]), 0, 1+0.05])  # ymax and ymin - histogram normalized
 xTicks = np.arange(0, 257, 16, 'uint16')  # xMinorTicks = np.arange(0,257-16,16,'uint8')
-plt.xticks(xTicks, fontsize=12, fontfamily='Liberation Serif')
+plt.xticks(xTicks, fontsize=12)
 yTicks = np.arange(0, 1.05, 0.1, 'float')
-plt.yticks(yTicks, fontsize=12, fontfamily='Liberation Serif')
-plt.xlabel('intensity values U8 gray image', fontsize=14, fontfamily='Liberation Serif')
-plt.ylabel('normalized counts', fontsize=14, fontfamily='Liberation Serif')
+plt.yticks(yTicks, fontsize=12)
+plt.xlabel('intensity values U8 gray image', fontsize=14)
+plt.ylabel('normalized counts', fontsize=14)
 # axes.set_xticks(xMinorTicks,minor=True)
 plt.grid(which='both')
-# %% Picture preparition and saving
 plt.tight_layout()  # fill the picture better
