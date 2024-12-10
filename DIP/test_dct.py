@@ -7,7 +7,6 @@ Tests of DCT calculation.
 
 """
 # %% Imports
-# import numpy as np
 from scipy.fftpack import dct, idct
 from LoaderFile import loadSampleImage  # loading sample from 'resources' folder
 import matplotlib.pyplot as plt
@@ -22,7 +21,8 @@ pixel_size = nyq_pixel_size/100.0  # assuming that actual pixel size is little b
 spatial_frequency_unit = round(1.0/pixel_size, 9)  # the unit of the spatial frequency, like Hz and seconds - for DFT, DCT
 length_resolution_pixels = round(resolution_um/pixel_size, 9)   # can be used for direct limiting of the spatial frequency resolved by the system
 # about the frequency definition for Fourier transform: https://en.wikipedia.org/wiki/Fourier_transform#Angular_frequency_(%CF%89)
-# implementation details of numpy FFT (hint about frequency def.): https://numpy.org/doc/stable/reference/routines.fft.html#implementation-details
+# implementation details of numpy FFT (hint about frequency def.):
+# https://numpy.org/doc/stable/reference/routines.fft.html#implementation-details
 
 # %% Tests run as the main script
 if __name__ == "__main__":
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Replicate cut off unresolved frequencies and restore the image
     freq_h = int(round(length_resolution_pixels, 0) + 1); freq_w = int(round(length_resolution_pixels/ratio, 0) + 1)
-    cropped_img_dct1 = np.ones(shape=(h, w)); cropped_img_dct1[:, 0:freq_w] = img_dct[:, 0:freq_w]  # !!! cropping only on columns, rows - repeated
+    cropped_img_dct1 = np.ones(shape=(h, w)); cropped_img_dct1[:, 0:freq_w] = img_dct[:, 0:freq_w]  # !!! cropping only on columns, rows repeated
     plt.figure("Cropped Log DCT Pixel Size Based", figsize=(w_fig, w_fig*ratio))
     plt.imshow(np.log2(np.abs(cropped_img_dct1)), cmap=plt.cm.magma); plt.tight_layout()
     # restoring of the image based on the cropped DCT spectrum, scaling it back to 8 bit initial image
