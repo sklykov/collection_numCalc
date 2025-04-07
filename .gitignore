@@ -3,6 +3,8 @@ docs/
 documentation/
 Docs/ 
 DIP/fluo_beads_sim/ 
+# below - ignoring saved file with ML model
+ML_eval/*.joblib
 
 # Specifics from PyCharm
 .idea/

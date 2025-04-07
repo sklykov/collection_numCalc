@@ -10,12 +10,22 @@ Build and test non-linear multiparameters input-output model.
 import numpy as np
 import random
 import time
+from pathlib import Path
 
+# Checking that required libraries are installed
 scikit_available = False
 try:
     import sklearn
     if sklearn is not None:
         scikit_available = True
+except ModuleNotFoundError:
+    pass
+
+joblib_available = False
+try:
+    import joblib
+    if joblib is not None:
+        joblib_available = True
 except ModuleNotFoundError:
     pass
 
@@ -128,17 +138,7 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
 # %% Testing Model for input - output (Training data)
 if __name__ == "__main__":
     x_input = []; y_data = []  # input and output data for testing ML regression
-    # standard scanning scheme for getting data points (measure individual parameters)
-    # x11 = [3.0, 0.0, 0.0, 0.0]; x12 = [1.5, 0.0, 0.0, 0.0]; x13 = [1.0, 0.0, 0.0, 0.0]; x14 = [0.5, 0.0, 0.0, 0.0]; x15 = [0.25, 0.0, 0.0, 0.0]
-    # x21 = [0.0, 3.0, 0.0, 0.0]; x22 = [0.0, 1.5, 0.0, 0.0]; x23 = [0.0, 1.0, 0.0, 0.0]; x24 = [0.0, 0.5, 0.0, 0.0]; x25 = [0.0, 0.25, 0.0, 0.0]
-    # x31 = [0.0, 0.0, 3.0, 0.0]; x32 = [0.0, 0.0, 1.5, 0.0]; x33 = [0.0, 0.0, 1.0, 0.0]; x34 = [0.0, 0.0, 0.5, 0.0]; x35 = [0.0, 0.0, 0.25, 0.0]
-    # x41 = [0.0, 0.0, 0.0, 3.0]; x42 = [0.0, 0.0, 0.0, 1.5]; x43 = [0.0, 0.0, 0.0, 1.0]; x44 = [0.0, 0.0, 0.0, 0.5]; x45 = [0.0, 0.0, 0.0, 0.25]
-    # x16 = [0.1, 0.0, 0.0, 0.0]; x26 = [0.0, 0.1, 0.0, 0.0]; x36 = [0.0, 0.0, 0.1, 0.0]; x46 = [0.0, 0.0, 0.0, 0.1]
-    # x_input.append(x11); x_input.append(x12); x_input.append(x13); x_input.append(x14); x_input.append(x15); x_input.append(x16)
-    # x_input.append(x21); x_input.append(x22); x_input.append(x23); x_input.append(x24); x_input.append(x25); x_input.append(x26)
-    # x_input.append(x31); x_input.append(x32); x_input.append(x33); x_input.append(x34); x_input.append(x35); x_input.append(x36)
-    # x_input.append(x41); x_input.append(x42); x_input.append(x43); x_input.append(x44); x_input.append(x45); x_input.append(x46)
-    # Schematic above implemented in a loop below
+    # Standard scanning scheme for getting data points (measure individual parameters), appending collected data as rows
     for i in range(4):
         x_step = [0.0, 0.0, 0.0, 0.0]
         for j in range(6):
@@ -207,15 +207,48 @@ if __name__ == "__main__":
         x4 = zeroing_coefficients[3]*random.random()*x4_max
         x_row = [x1, x2, x3, x4]; x_input.append(x_row)  # add to the data
 
-    x_input = np.round(np.asarray(x_input), 3)
+    x_input = np.round(np.asarray(x_input), 3)  # input parameters on which Y data depending
 
-    # Getting output - Y
+    # Getting output - Y data
     for x_row in x_input:
         y = nonlinear_multiparam_model(x_row)
         y_data.append(y)
     y_data = np.asarray(y_data)
 
-    # ML testing
+    # Making input test data
+    x_test = []; x_test.append([0.0, 0.3, 0.0, 0.0])
+    for i in range(len(x_input)*3):
+        zero_ampls = random.choice([0, 1, 2, 3])  # choice how many zero amplitudes will be used in combinations
+        zeroing_coefficients = [1.0, 1.0, 1.0, 1.0]
+        if zero_ampls == 1:
+            zero_ampl = random.choice([0, 1, 2])  # select zero coefficient
+            zeroing_coefficients[zero_ampl] = 0.0
+        elif zero_ampls == 2:
+            zero_ampl1 = random.choice([0, 1, 2, 3]); indices = [0, 1, 2, 3]; del indices[zero_ampl1]
+            zero_ampl2 = random.choice(indices)  # select 2nd zero coefficient
+            zeroing_coefficients[zero_ampl1] = 0.0; zeroing_coefficients[zero_ampl2] = 0.0
+        elif zero_ampls == 3:
+            indices = [0, 1, 2, 3]
+            zero_ampl1 = random.choice(indices); del indices[zero_ampl1]
+            zero_ampl2 = random.choice(indices); del indices[indices.index(zero_ampl2)]  # select 2nd zero coefficient
+            zero_ampl3 = random.choice(indices)
+            zeroing_coefficients[zero_ampl1] = 0.0; zeroing_coefficients[zero_ampl2] = 0.0; zeroing_coefficients[zero_ampl3] = 0.0
+        # Compose random amplitudes in combination
+        x1 = zeroing_coefficients[0]*random.random()*x1_max
+        x2 = zeroing_coefficients[1]*random.random()*x2_max
+        x3 = zeroing_coefficients[2]*random.random()*x3_max
+        x4 = zeroing_coefficients[3]*random.random()*x4_max
+        x_row = [x1, x2, x3, x4]; x_test.append(x_row)  # add to the data
+    x_test = np.asarray(x_test)  # generated test data
+
+    # Exact test data returned by the function (ground truth data) for comparing with fitted one
+    y_test = []
+    for x_row in x_test:
+        y = nonlinear_multiparam_model(x_row)
+        y_test.append(y)
+    y_test = np.round(np.asarray(y_test), 3)
+
+    # ML Regression testing
     if scikit_available:
         # Testing kNN algorithm with different k of neighbours
         from sklearn import neighbors
@@ -244,46 +277,11 @@ if __name__ == "__main__":
         # Gradient Boosting - more accurate than Random forest
         t1 = time.perf_counter(); n_estimators_gb = int(round(2.5*len(x_input), 0))
         # default_grad_boost = GradientBoostingRegressor(n_estimators=n_estimators_gb)  # doesn't support directly multi-dimension regression
-        # def_grad_boost_model = default_grad_boost.fit(x_input, y_data)
         # MultiOutputRegressor wrapper supports multi dimension data
-        multi_grad_boost = MultiOutputRegressor(GradientBoostingRegressor(learning_rate=0.04,
-                                                                          n_estimators=n_estimators_gb))
+        multi_grad_boost = MultiOutputRegressor(GradientBoostingRegressor(learning_rate=0.04, n_estimators=n_estimators_gb))
         m_grad_boost_model = multi_grad_boost.fit(x_input, y_data)
         print(f"Multi Gradient Boost with {n_estimators_gb} estimators took ms for fitting:",
               int(round(1000.0*(time.perf_counter() - t1), 0)))
-
-        # Making test data
-        x_test = []; x_test.append([0.0, 0.3, 0.0, 0.0])
-        for i in range(len(x_input)*3):
-            zero_ampls = random.choice([0, 1, 2, 3])  # choice how many zero amplitudes will be used in combinations
-            zeroing_coefficients = [1.0, 1.0, 1.0, 1.0]
-            if zero_ampls == 1:
-                zero_ampl = random.choice([0, 1, 2])  # select zero coefficient
-                zeroing_coefficients[zero_ampl] = 0.0
-            elif zero_ampls == 2:
-                zero_ampl1 = random.choice([0, 1, 2, 3]); indices = [0, 1, 2, 3]; del indices[zero_ampl1]
-                zero_ampl2 = random.choice(indices)  # select 2nd zero coefficient
-                zeroing_coefficients[zero_ampl1] = 0.0; zeroing_coefficients[zero_ampl2] = 0.0
-            elif zero_ampls == 3:
-                indices = [0, 1, 2, 3]
-                zero_ampl1 = random.choice(indices); del indices[zero_ampl1]
-                zero_ampl2 = random.choice(indices); del indices[indices.index(zero_ampl2)]  # select 2nd zero coefficient
-                zero_ampl3 = random.choice(indices)
-                zeroing_coefficients[zero_ampl1] = 0.0; zeroing_coefficients[zero_ampl2] = 0.0; zeroing_coefficients[zero_ampl3] = 0.0
-            # Compose random amplitudes in combination
-            x1 = zeroing_coefficients[0]*random.random()*x1_max
-            x2 = zeroing_coefficients[1]*random.random()*x2_max
-            x3 = zeroing_coefficients[2]*random.random()*x3_max
-            x4 = zeroing_coefficients[3]*random.random()*x4_max
-            x_row = [x1, x2, x3, x4]; x_test.append(x_row)  # add to the data
-        x_test = np.asarray(x_test)  # generated test data
-
-        # Exact test data returned by the function (ground truth data)
-        y_test = []
-        for x_row in x_test:
-            y = nonlinear_multiparam_model(x_row)
-            y_test.append(y)
-        y_test = np.round(np.asarray(y_test), 3)
 
         # Fitting test data and compare with the provided by the function
         y_fit3 = np.round(knn_model3.predict(x_test), 3)
@@ -292,16 +290,11 @@ if __name__ == "__main__":
         y_fit_def_rand_for = np.round(def_rand_forest_model.predict(x_test), 3)
         diff_fit_test_rand_for = np.round(np.abs(y_test - y_fit_def_rand_for), 3)
         y_fit_grad_boost = np.round(m_grad_boost_model.predict(x_test), 3)
-        min_y_fit_grad_boost = np.min(y_fit_grad_boost)
-        if min_y_fit_grad_boost < 0.0:
-            y_fit_grad_boost += np.abs(min_y_fit_grad_boost)
+        # shift to the only positive values based on prior knowledge removed (was before added abs(np.min(y_fit_grad_boost)))
         diff_fit_test_grad_boost = np.round(np.abs(y_test - y_fit_grad_boost), 3)
 
         # Estimation of model accuracy (based on R2 score function - not needed explicitly for KNeighborsRegressor)
         # Hint on R2 score values: 1.0 → Perfect fit, 0.9+ → Excellent fit, 0.5–0.9 → Moderate fit, < 0.5 → Poor fit
-        # r2_score_knn3 = round(r2_score(y_test, y_fit3), 3)
-        # r2_score_knn5 = round(r2_score(y_test, y_fit5), 3)
-        # r2_score_knn7 = round(r2_score(y_test, y_fit7), 3)
         # Use native method for R2 score from KNeighborsRegressor
         r2_score_knn3 = round(knn3.score(x_test, y_test), 3)
         rmse_knn3 = round(root_mean_squared_error(y_test, y_fit3), 3)
@@ -319,3 +312,14 @@ if __name__ == "__main__":
         # Even R2 score is good, difference between fit and calculated data is relatively big
         print("R2 GradiBoost:", r2_score_grad_boost, " | RMSE:", rmse_grad_boost,
               "\n")
+
+        # Making fitted model persistent for reusing it, compared fitting with the model saved in memory
+        if joblib_available:
+            root_script_path = Path(__name__).parent
+            gradiboostregr_model_name = "gradiboostmodel.joblib"
+            model_path = root_script_path.joinpath(gradiboostregr_model_name)
+            joblib.dump(value=m_grad_boost_model, filename=model_path)
+            if model_path.exists() and model_path.is_file():
+                m_grad_boost_model_read = joblib.load(model_path)
+                y_fit_grad_boost_read = np.round(m_grad_boost_model_read.predict(x_test), 3)
+                diff_read_memory_grad_boost = np.round(np.abs(y_fit_grad_boost - y_fit_grad_boost_read), 3)  # 0.0 difference
