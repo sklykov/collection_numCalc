@@ -29,6 +29,9 @@ try:
 except ModuleNotFoundError:
     pass
 
+# %% Script parameters, flags
+test_saving_model = False
+
 
 # %% Model definition - e.g. 4 input parameters interconnected and resulted in 4 output, scaled responses
 def nonlinear_multiparam_model(x: np.array) -> np.array:
@@ -133,6 +136,53 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
     else:
         print("This model only resolves 4 inputs to 4 outputs")
         return x
+
+
+# %% Testing finding a target in a loop function
+def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3) -> np.ndarray:
+    """
+    Find which input should be applied on the nonlinear function for obtaining this as the output.
+
+    Parameters
+    ----------
+    target : np.ndarray
+        Desired set of inputs that should be outputted from the nonlinear function.
+    regressor : sciki tlearn class Regressor class with predict() method
+        DESCRIPTION.
+    stop_precision : float, optional
+        Precision (Epsilon) up to which optimization should run. The default is 1E-3.
+
+    Returns
+    -------
+    updated_target : np.ndarray
+        Input target that should be sent to the nonlinear function.
+
+    """
+    initial_predict = np.round(regressor.predict(target), 3)
+    diff = np.round(target - initial_predict, 3)  # difference between desired target and predicted one
+    updated_target = target + diff  # udpated target - that should be sent to an input for getting target as the output
+    mean_diff_targets = np.mean(np.abs(diff))
+    if mean_diff_targets > stop_precision:
+        for i in range(10):
+            predicted_target = np.round(regressor.predict(updated_target), 3)
+            diff = np.round(target - predicted_target, 3)
+            # below - calculation for checking that each loop step guides to decreasing of difference between target and prediction
+            optimization_step_diff = np.round(mean_diff_targets - np.mean(np.abs(diff)), 3)
+            # trying to find fraction of diff to still able to optimize
+            if optimization_step_diff < 0.0:
+                j = 0
+                while optimization_step_diff < 0.0 and j < 6:
+                    predicted_target = np.round(regressor.predict(updated_target - 0.2*diff), 3)
+                    diff = np.round(target - predicted_target, 3)
+                    optimization_step_diff = np.round(mean_diff_targets - np.mean(np.abs(diff)), 3)
+                    print(f"Used self correction of diff #{j}")
+                    j += 1
+            mean_diff_targets = np.round(np.mean(np.abs(diff)), 3)  # update mean diff.
+            print(f"Step #{i} has: mean of diff(target-predicted): {optimization_step_diff}, mean diff: {mean_diff_targets}")
+            if mean_diff_targets <= stop_precision or optimization_step_diff < 0.0:
+                break
+            updated_target = np.round(updated_target + diff, 3)
+    return updated_target
 
 
 # %% Testing Model for input - output (Training data)
@@ -314,12 +364,30 @@ if __name__ == "__main__":
               "\n")
 
         # Making fitted model persistent for reusing it, compared fitting with the model saved in memory
-        if joblib_available:
+        if joblib_available and test_saving_model:
             root_script_path = Path(__name__).parent
             gradiboostregr_model_name = "gradiboostmodel.joblib"
             model_path = root_script_path.joinpath(gradiboostregr_model_name)
-            joblib.dump(value=m_grad_boost_model, filename=model_path)
+            joblib.dump(value=m_grad_boost_model, filename=model_path, compress=3)
             if model_path.exists() and model_path.is_file():
                 m_grad_boost_model_read = joblib.load(model_path)
                 y_fit_grad_boost_read = np.round(m_grad_boost_model_read.predict(x_test), 3)
                 diff_read_memory_grad_boost = np.round(np.abs(y_fit_grad_boost - y_fit_grad_boost_read), 3)  # 0.0 difference
+        elif test_saving_model and not joblib_available:
+            print("Install 'joblib' library for testing saving of a fitted model")
+        else:
+            del joblib_available, test_saving_model
+
+        # Developing and testing finding of best fit for a target
+        x_target = np.asarray([0.04, 0.39, 0.0, 0.72]).reshape((1, -1))  # reshape required because the model fitted with 2D array
+        x_target_found = find_best_target(x_target, m_grad_boost_model)
+        x_target_predicted = np.round(m_grad_boost_model.predict(x_target_found), 3)
+        x_target_measured = np.round(nonlinear_multiparam_model(x_target_found[0]), 3)
+        print("Difference desired / predicted target:", np.round(x_target - x_target_predicted, 3))
+        print("Difference desired / measured after applying optimized target:", np.round(x_target - x_target_measured, 3))
+
+        # Clean up variables from excluding them from Variable Explorer in Spyder (for easier inspection)
+        del i, j, scan_ampl, scan_ampl_init, scan_i, scanning_indices, t1, x1, x2, x3, x4, x1_max, x2_max, x3_max, x4_max
+        del x4fit, x_row, x_step, xscanning, zero_ampl, zero_ampl1, zero_ampl2, zero_ampl3, zero_ampls, zeroing_coefficients
+        del n_estimators_gb, n_estimators_rf, n_neighbors, n_overall, n_randomized_points, r2_score_knn3, r2_score_knn5
+        del r2_score_def_rand_for, r2_score_knn7, rmse_knn3, rmse_knn5, rmse_grad_boost, rmse_def_rand_for, r2_score_grad_boost
