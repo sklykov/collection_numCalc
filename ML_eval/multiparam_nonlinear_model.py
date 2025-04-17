@@ -29,6 +29,14 @@ try:
 except ModuleNotFoundError:
     pass
 
+xgboost_available = False
+try:
+    import xgboost as xgb  # py-xgboost-cpu library from conda-forge is for minimal, CPU-based implementation
+    if xgb is not None:
+        xgboost_available = True
+except ModuleNotFoundError:
+    pass
+
 # %% Script parameters, flags
 test_saving_model = False
 
@@ -72,7 +80,7 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
                     if el < 0.5:
                         y[i] = a[i]*el + 0.01*random.randint(1, 7)*el
                     else:
-                        calc_value = (a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 6)*el
+                        calc_value = (a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 7)*el
                         if calc_value < max_value_replicated[i]:
                             y[i] = calc_value
                         else:
@@ -88,9 +96,9 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
                     index_i = nonzero_i.index(i); del nonzero_i[index_i]; i_other = nonzero_i[0]  # define other non-zero coefficient index
                     interplay_coefficient = intercoefficients_dependency[i][i_other]  # how variables influence each other
                     if el < 0.5:
-                        y[i] = interplay_coefficient*(1.0 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 6)*el)
+                        y[i] = interplay_coefficient*(1.0 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 8)*el)
                     else:
-                        calc_value = (1.0 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 5)*el)
+                        calc_value = (1.0 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 6)*el)
                         calc_value *= interplay_coefficient
                         if calc_value < max_value_replicated[i]:
                             y[i] = calc_value
@@ -106,9 +114,9 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
                     interplay_coefficient = intercoefficients_dependency[i][i_other1] + intercoefficients_dependency[i][i_other2]
                     interplay_coefficient *= 0.5
                     if el < 0.5:
-                        y[i] = interplay_coefficient*(0.8 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 7)*el)
+                        y[i] = interplay_coefficient*(0.8 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 9)*el)
                     else:
-                        calc_value = (0.8 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 7)*el)
+                        calc_value = (0.8 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 8)*el)
                         calc_value *= interplay_coefficient
                         if calc_value < max_value_replicated[i]:
                             y[i] = calc_value
@@ -122,9 +130,9 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
                 interplay_coefficient = intercoefficients_dependency[i][i_other1] + intercoefficients_dependency[i][i_other2]
                 interplay_coefficient += intercoefficients_dependency[i][i_other3]; interplay_coefficient *= 0.33
                 if el < 0.5:
-                    y[i] = (0.6 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 6)*el)
+                    y[i] = (0.6 - percentage_diff[i])*(a[i]*el + 0.01*random.randint(2, 7)*el)
                 else:
-                    calc_value = (0.6 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 7)*el)
+                    calc_value = (0.6 - percentage_diff[i])*((a[i]-1.0)*el*el + a[i]*el + 0.01*random.randint(1, 8)*el)
                     if calc_value < max_value_replicated[i]:
                         y[i] = calc_value
                     else:
@@ -148,9 +156,9 @@ def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3
     target : np.ndarray
         Desired set of inputs that should be outputted from the nonlinear function.
     regressor : sciki tlearn class Regressor class with predict() method
-        DESCRIPTION.
+        Instance of Regressor class (from in memory or read from a drive by 'joblib').
     stop_precision : float, optional
-        Precision (Epsilon) up to which optimization should run. The default is 1E-3.
+        Mean absolute error between target / prediction - Epsilon up to which optimization should run. The default is 1E-3.
 
     Returns
     -------
@@ -161,27 +169,36 @@ def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3
     initial_predict = np.round(regressor.predict(target), 3)
     diff = np.round(target - initial_predict, 3)  # difference between desired target and predicted one
     updated_target = target + diff  # udpated target - that should be sent to an input for getting target as the output
-    mean_diff_targets = np.mean(np.abs(diff))
+    mean_diff_targets = np.mean(np.abs(diff))  # mean absolute errors between target / predicted sets
     if mean_diff_targets > stop_precision:
         for i in range(10):
-            predicted_target = np.round(regressor.predict(updated_target), 3)
-            diff = np.round(target - predicted_target, 3)
+            predicted_target = np.round(regressor.predict(updated_target), 3)  # update predicted output
+            diff = np.round(target - predicted_target, 3)  # update diff between initial input (desired target) and predicted
             # below - calculation for checking that each loop step guides to decreasing of difference between target and prediction
             optimization_step_diff = np.round(mean_diff_targets - np.mean(np.abs(diff)), 3)
-            # trying to find fraction of diff to still able to optimize
+            # If optimization is negative on the current iteration, below try to find some fraction of diff to achieve positive optimization
             if optimization_step_diff < 0.0:
-                j = 0
-                while optimization_step_diff < 0.0 and j < 6:
-                    predicted_target = np.round(regressor.predict(updated_target - 0.2*diff), 3)
-                    diff = np.round(target - predicted_target, 3)
-                    optimization_step_diff = np.round(mean_diff_targets - np.mean(np.abs(diff)), 3)
-                    print(f"Used self correction of diff #{j}")
+                optimization_found = False
+                j = 1  # iteration for applying portion of diff
+                while j < 21:
+                    if j != 10:
+                        iter_diff = (1.0 - 0.1*j)*diff
+                        predicted_target = np.round(regressor.predict(updated_target + iter_diff), 3)
+                        diff_iter = np.round(target - predicted_target, 3)
+                        optimization_step_diff_iter = np.round(mean_diff_targets - np.mean(np.abs(diff_iter)), 3)
+                        # print(f"Used self correction of diff #{j}, {iter_diff}, {optimization_step_diff_iter}")
+                        if optimization_step_diff_iter > 0.0:
+                            optimization_found = True
+                            break  # return if the optimization guides to butter
                     j += 1
-            mean_diff_targets = np.round(np.mean(np.abs(diff)), 3)  # update mean diff.
+                if optimization_found:
+                    diff = diff_iter  # update diff from found iteration
+                    optimization_step_diff = optimization_step_diff_iter  # update each step iteration efficiency
+            mean_diff_targets = np.round(np.mean(np.abs(diff)), 3)  # update mean diff. (Mean Absolute Errors)
             print(f"Step #{i} has: mean of diff(target-predicted): {optimization_step_diff}, mean diff: {mean_diff_targets}")
-            if mean_diff_targets <= stop_precision or optimization_step_diff < 0.0:
-                break
-            updated_target = np.round(updated_target + diff, 3)
+            if mean_diff_targets <= stop_precision or optimization_step_diff <= 0.0:
+                break  # return the defined updated_target on a previous step
+            updated_target = np.round(updated_target + diff, 3)  # update target to reuse it in the outer for loop
     return updated_target
 
 
