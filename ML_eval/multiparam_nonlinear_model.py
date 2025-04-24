@@ -170,6 +170,7 @@ def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3
     diff = np.round(target - initial_predict, 3)  # difference between desired target and predicted one
     updated_target = target + diff  # udpated target - that should be sent to an input for getting target as the output
     mean_diff_targets = np.mean(np.abs(diff))  # mean absolute errors between target / predicted sets
+    previous_step_found_target = updated_target.copy()
     if mean_diff_targets > stop_precision:
         for i in range(10):
             predicted_target = np.round(regressor.predict(updated_target), 3)  # update predicted output
@@ -195,10 +196,16 @@ def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3
                     diff = diff_iter  # update diff from found iteration
                     optimization_step_diff = optimization_step_diff_iter  # update each step iteration efficiency
             mean_diff_targets = np.round(np.mean(np.abs(diff)), 3)  # update mean diff. (Mean Absolute Errors)
-            print(f"Step #{i} has: mean of diff(target-predicted): {optimization_step_diff}, mean diff: {mean_diff_targets}")
+            # print(f"Step #{i} has: mean of diff(target-predicted): {optimization_step_diff}, mean diff: {mean_diff_targets}")
+            # print(f"Step #{i} has: Diff. target - predicted target:", diff)
             if mean_diff_targets <= stop_precision or optimization_step_diff <= 0.0:
+                updated_target = previous_step_found_target.copy()
+                # print("Assigned from previous step target:", updated_target)
                 break  # return the defined updated_target on a previous step
+            previous_step_found_target = updated_target.copy()  # store found on the previous step target if the new one worsen
             updated_target = np.round(updated_target + diff, 3)  # update target to reuse it in the outer for loop
+            # print(f"Step #{i} found updated target:", updated_target)
+    # print("Found target to be sent:", updated_target)
     return updated_target
 
 
@@ -342,13 +349,22 @@ if __name__ == "__main__":
         print(f"Random Forest with {n_estimators_rf} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
 
         # Gradient Boosting - more accurate than Random forest
-        t1 = time.perf_counter(); n_estimators_gb = int(round(2.5*len(x_input), 0))
+        t1 = time.perf_counter(); n_estimators_gb = int(round(2.0*len(x_input), 0))
         # default_grad_boost = GradientBoostingRegressor(n_estimators=n_estimators_gb)  # doesn't support directly multi-dimension regression
         # MultiOutputRegressor wrapper supports multi dimension data
-        multi_grad_boost = MultiOutputRegressor(GradientBoostingRegressor(learning_rate=0.04, n_estimators=n_estimators_gb))
+        learn_rate_gbr = 0.04  # parameter for both GradientBoostingRegressor below and for XGBRegressor
+        multi_grad_boost = MultiOutputRegressor(GradientBoostingRegressor(learning_rate=learn_rate_gbr, n_estimators=n_estimators_gb))
         m_grad_boost_model = multi_grad_boost.fit(x_input, y_data)
         print(f"Multi Gradient Boost with {n_estimators_gb} estimators took ms for fitting:",
               int(round(1000.0*(time.perf_counter() - t1), 0)))
+
+        # Testing XGBoost regression - is it more precise as the GradientBoostingRegressor from scikit-learn
+        multi_xgb_regressor = None
+        if xgboost_available:
+            t1 = time.perf_counter()
+            multi_xgb_regressor = MultiOutputRegressor(xgb.XGBRegressor(learning_rate=learn_rate_gbr, n_estimators=n_estimators_gb))
+            multi_xgb_regressor.fit(x_input, y_data)
+            print(f"XGBRegressor with {n_estimators_gb} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
 
         # Fitting test data and compare with the provided by the function
         y_fit3 = np.round(knn_model3.predict(x_test), 3)
@@ -359,6 +375,8 @@ if __name__ == "__main__":
         y_fit_grad_boost = np.round(m_grad_boost_model.predict(x_test), 3)
         # shift to the only positive values based on prior knowledge removed (was before added abs(np.min(y_fit_grad_boost)))
         diff_fit_test_grad_boost = np.round(np.abs(y_test - y_fit_grad_boost), 3)
+        if multi_xgb_regressor is not None:
+            y_fit_xgb = np.round(multi_xgb_regressor.predict(x_test), 3)
 
         # Estimation of model accuracy (based on R2 score function - not needed explicitly for KNeighborsRegressor)
         # Hint on R2 score values: 1.0 → Perfect fit, 0.9+ → Excellent fit, 0.5–0.9 → Moderate fit, < 0.5 → Poor fit
@@ -372,13 +390,17 @@ if __name__ == "__main__":
         rmse_def_rand_for = round(root_mean_squared_error(y_test, y_fit_def_rand_for), 3)
         r2_score_grad_boost = round(m_grad_boost_model.score(x_test, y_test), 3)
         rmse_grad_boost = round(root_mean_squared_error(y_test, y_fit_grad_boost), 3)
+        if multi_xgb_regressor is not None:
+            r2_score_xgb = round(multi_xgb_regressor.score(x_test, y_test), 3)
+            rmse_xgb = round(root_mean_squared_error(y_test, y_fit_xgb), 3)
         print("kNN3 R2 score:", r2_score_knn3, " | RMSE:", rmse_knn3, "\n"
               + "kNN5 R2 score:", r2_score_knn5, " | RMSE:", rmse_knn5, "\n"
               + "kNN7 R2 score:", r2_score_knn7, " | ")
         print("R2 RandForest:", r2_score_def_rand_for, " | RMSE:", rmse_def_rand_for)
         # Even R2 score is good, difference between fit and calculated data is relatively big
-        print("R2 GradiBoost:", r2_score_grad_boost, " | RMSE:", rmse_grad_boost,
-              "\n")
+        print("R2 GradiBoost:", r2_score_grad_boost, " | RMSE:", rmse_grad_boost)
+        if multi_xgb_regressor is not None:
+            print("R2 XGB Regr.: ", r2_score_xgb, " | RMSE:", rmse_xgb, "\n")
 
         # Making fitted model persistent for reusing it, compared fitting with the model saved in memory
         if joblib_available and test_saving_model:
@@ -400,8 +422,13 @@ if __name__ == "__main__":
         x_target_found = find_best_target(x_target, m_grad_boost_model)
         x_target_predicted = np.round(m_grad_boost_model.predict(x_target_found), 3)
         x_target_measured = np.round(nonlinear_multiparam_model(x_target_found[0]), 3)
-        print("Difference desired / predicted target:", np.round(x_target - x_target_predicted, 3))
-        print("Difference desired / measured after applying optimized target:", np.round(x_target - x_target_measured, 3))
+        diff_target_predicted = np.round(x_target - x_target_predicted, 3)
+        mean_diff_target_predicted = np.round(np.mean(np.abs(diff_target_predicted)), 3)
+        diff_target_measured = np.round(x_target - x_target_measured, 3)
+        mean_diff_target_measured = np.round(np.mean(np.abs(diff_target_measured)), 3)
+        print("Difference desired / predicted target:", diff_target_predicted, " | Mean abs. diff.:", mean_diff_target_predicted)
+        print("Difference desired / measured after applying optimized target:", diff_target_measured,
+              " | Mean abs. diff.:", mean_diff_target_measured)
 
         # Clean up variables from excluding them from Variable Explorer in Spyder (for easier inspection)
         del i, j, scan_ampl, scan_ampl_init, scan_i, scanning_indices, t1, x1, x2, x3, x4, x1_max, x2_max, x3_max, x4_max
