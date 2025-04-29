@@ -12,6 +12,7 @@ import random
 import time
 from pathlib import Path
 import os
+import math
 
 # Checking that required libraries are installed
 scikit_available = False
@@ -329,7 +330,7 @@ if __name__ == "__main__":
         from sklearn import neighbors
         # from sklearn.metrics import r2_score
         from sklearn.metrics import root_mean_squared_error
-        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+        from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor
         from sklearn.multioutput import MultiOutputRegressor
         from sklearn.model_selection import GridSearchCV
 
@@ -368,28 +369,32 @@ if __name__ == "__main__":
             multi_xgb_regressor.fit(x_input, y_data)
             print(f"XGBRegressor with {n_estimators_gb} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
 
-        # Testing the grid search for optimal hyperparameters tuning
-        # built up number of estimators based on the input data length
-        n_estimators_gb_range = [int(round(0.45*(i+1)*len(x_input), 0)) for i in range(5)]  # makes it not equal stepping - 55% of length used
+        # Testing the grid search for optimal hyperparameters tuning for GBR model
+        # Building up number of estimators based on the input data length
+        n_estimators_gb_range = [int(round(0.45*(i+1)*len(x_input), 0)) for i in range(5)]  # makes it not equal stepping - % of length used
         # prefixes 'estimator_' before parameters naming are used because of wrapper MultiOutputRegressor. For single - use without prefix
         # note that search grows faster with number of used parameters below
         param_grid = {
             'estimator__n_estimators': n_estimators_gb_range,
-            'estimator__learning_rate': [0.02, 0.04, 0.06, 0.08, 0.1],
-            'estimator__max_depth': [3, 5, 7, 9]
+            'estimator__learning_rate': [0.025, 0.05, 0.075, 0.1],
+            'estimator__max_depth': [3, 5, 7]
             # 'estimator__subsample': [0.85, 0.9, 1.0]  # fraction of samples to be randomly selected for fitting each individual tree
             # subsample parameter switched off, because the input data maybe be not enough in the case of limited measurements
         }
         # requires much time for computation: [3, 5, 7, 9], [0.02, 0.04, 0.06, 0.08, 0.1], [0.85, 0.9, 1.0]
         available_threads = os.cpu_count(); assigned_threads = 1
         if available_threads > 2:
-            assigned_threads = available_threads - 2  # retain responsivness by not assigning 2 threads
+            assigned_threads = available_threads - 1  # retain responsivness by not assigning 1 thread (it's sufficiently enough)
         # below: MSE - standard score, n_jobs=-1 - use all available threads
-        print("**** GridSearchCV started for tuning hyperparameters... (will take a few minutes) ****"); t1 = time.perf_counter()
+        print("\n**** GridSearchCV started for tuning hyperparameters (GBR)... ****"); t1 = time.perf_counter()
+        # Note that final time required for search below is defined as N parameters combination x N cv (controlled by cv parameter below)
+        n_params_combinations = [len(value) for value in param_grid.values()]
+        cv = 5  # number of cross-validation folds - splits data into only these folds, cv-1 used for training, 1 - for validation
+        print("Number of required fits for performing Grid Search: ", cv*math.prod(n_params_combinations))
         grid_gbr = GridSearchCV(estimator=MultiOutputRegressor(GradientBoostingRegressor()), param_grid=param_grid,
-                                scoring='neg_mean_squared_error', n_jobs=assigned_threads)
+                                scoring='neg_mean_squared_error', n_jobs=assigned_threads, cv=cv)
         grid_gbr.fit(x_input, y_data)
-        print("GridSearch took min. for performing a search:", round((time.perf_counter() - t1)/60.0, 1), "\n")
+        print("GridSearch (GBR) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
         # Important note  - retrain the GBR on the foudn set of best parameters
         # remove prefix 'estimator__' from keys
         params_cleaned = {key.replace("estimator__", ""): value for key, value in grid_gbr.best_params_.items()}
@@ -397,7 +402,35 @@ if __name__ == "__main__":
         gbr_best_params = MultiOutputRegressor(GradientBoostingRegressor(**params_cleaned))
         gbr_best_params.fit(x_input, y_data)
         print(f"Multi Gradient Boost with found best params {params_cleaned} took ms for fitting:",
-              int(round(1000.0*(time.perf_counter() - t1), 0)))
+              int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+
+        # Testing grid search with same parameters but for XGB regressor (always much faster than using native GradientBoostingRegressor)
+        if xgboost_available:
+            print("**** GridSearchCV started for tuning hyperparameters (XGB)... ****"); t1 = time.perf_counter()
+            grid_xgb = GridSearchCV(estimator=MultiOutputRegressor(xgb.XGBRegressor()), param_grid=param_grid,
+                                    scoring='neg_mean_squared_error', n_jobs=assigned_threads, cv=cv)
+            grid_xgb.fit(x_input, y_data)
+            print("GridSearch (XGB) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
+            params_cleaned = {key.replace("estimator__", ""): value for key, value in grid_xgb.best_params_.items()}
+            t1 = time.perf_counter()
+            xgb_best_params = MultiOutputRegressor(xgb.XGBRegressor(**params_cleaned))
+            xgb_best_params.fit(x_input, y_data)
+            print(f"XGB with found best params {params_cleaned} took ms for fitting:",
+                  int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+
+        # Testing performance and accuracy found best parameters on a grid search for HistGradientBoostingRegressor
+        print("**** GridSearchCV started for tuning hyperparameters (Hist GBR)... ****"); t1 = time.perf_counter()
+        del param_grid['estimator__n_estimators']; param_grid['estimator__max_iter'] = n_estimators_gb_range  # exchange name of parameter
+        grid_histgbr = GridSearchCV(estimator=MultiOutputRegressor(HistGradientBoostingRegressor()), param_grid=param_grid,
+                                    scoring='neg_mean_squared_error', n_jobs=assigned_threads, cv=cv)
+        grid_histgbr.fit(x_input, y_data)
+        print("GridSearch (Hist GBR) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
+        params_cleaned = {key.replace("estimator__", ""): value for key, value in grid_histgbr.best_params_.items()}
+        t1 = time.perf_counter()
+        histgbr_best_params = MultiOutputRegressor(HistGradientBoostingRegressor(**params_cleaned))
+        histgbr_best_params.fit(x_input, y_data)
+        print(f"Hist GBR with found best params {params_cleaned} took ms for fitting:",
+              int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
 
         # Fitting test data and compare with the provided by the function
         y_fit3 = np.round(knn_model3.predict(x_test), 3)
@@ -407,10 +440,12 @@ if __name__ == "__main__":
         diff_fit_test_rand_for = np.round(np.abs(y_test - y_fit_def_rand_for), 3)
         y_fit_grad_boost = np.round(m_grad_boost_model.predict(x_test), 3)
         y_fit_grid_gbr = np.round(gbr_best_params.predict(x_test), 3)
+        y_fit_hist_gbr = np.round(histgbr_best_params.predict(x_test), 3)
         # shift to the only positive values based on prior knowledge removed (was before added abs(np.min(y_fit_grad_boost)))
         diff_fit_test_grad_boost = np.round(np.abs(y_test - y_fit_grad_boost), 3)
         if multi_xgb_regressor is not None:
             y_fit_xgb = np.round(multi_xgb_regressor.predict(x_test), 3)
+            y_fit_xgb_best = np.round(xgb_best_params.predict(x_test), 3)
 
         # Estimation of model accuracy (based on R2 score function - not needed explicitly for KNeighborsRegressor)
         # Hint on R2 score values: 1.0 → Perfect fit, 0.9+ → Excellent fit, 0.5–0.9 → Moderate fit, < 0.5 → Poor fit
@@ -426,18 +461,25 @@ if __name__ == "__main__":
         rmse_grad_boost = round(root_mean_squared_error(y_test, y_fit_grad_boost), 3)
         r2_score_grid_gbr = round(gbr_best_params.score(x_test, y_test), 3)
         rmse_grid_gbr = round(root_mean_squared_error(y_test, y_fit_grid_gbr), 3)
+        r2_score_hist_gbr = round(histgbr_best_params.score(x_test, y_test), 3)
+        rmse_hist_gbr = round(root_mean_squared_error(y_test, y_fit_hist_gbr), 3)
         if multi_xgb_regressor is not None:
             r2_score_xgb = round(multi_xgb_regressor.score(x_test, y_test), 3)
             rmse_xgb = round(root_mean_squared_error(y_test, y_fit_xgb), 3)
+            r2_score_xgb_best = round(xgb_best_params.score(x_test, y_test), 3)
+            rmse_xgb_best = round(root_mean_squared_error(y_test, y_fit_xgb_best), 3)
         print("kNN3 R2 score:", r2_score_knn3, " | RMSE:", rmse_knn3, "\n"
               + "kNN5 R2 score:", r2_score_knn5, " | RMSE:", rmse_knn5, "\n"
               + "kNN7 R2 score:", r2_score_knn7, " | ")
         print("R2 RandForest:", r2_score_def_rand_for, " | RMSE:", rmse_def_rand_for)
         # Even R2 score is good, difference between fit and calculated data is relatively big
-        print("R2 GradiBoost:", r2_score_grad_boost, " | RMSE:", rmse_grad_boost)
+        print("R2 Def. GBR:  ", r2_score_grad_boost, " | RMSE:", rmse_grad_boost)
+        print("R2 Best GBR:  ", r2_score_grid_gbr, " | RMSE:", rmse_grid_gbr)
+        print("R2 Hist GBR:  ", r2_score_hist_gbr, " | RMSE:", rmse_hist_gbr)
         if multi_xgb_regressor is not None:
             print("R2 XGB Regr.: ", r2_score_xgb, " | RMSE:", rmse_xgb)
-        print("R2 Grid GBR:", r2_score_grid_gbr, " | RMSE:", rmse_grid_gbr, "\n")
+            print("R2 XGB Best : ", r2_score_xgb_best, " | RMSE:", rmse_xgb_best)
+        print()
 
         # Making fitted model persistent for reusing it, compared fitting with the model saved in memory
         if joblib_available and test_saving_model:
