@@ -40,10 +40,11 @@ except ModuleNotFoundError:
     pass
 
 # %% Script parameters, flags
-test_saving_model = False
+test_saving_model = False  # test saving of fitted model using joblib serilization methods
+check_diff_models = False
 
 
-# %% Model definition - e.g. 4 input parameters interconnected and resulted in 4 output, scaled responses
+# %% Model definition - e.g. 4 input parameters nonlinearly interconnected and resulted in 4 output, scaled responses
 def nonlinear_multiparam_model(x: np.array) -> np.array:
     """
     Provide nonlinear function mapping 4 input non-negative float point values into 4 outputs.
@@ -148,7 +149,7 @@ def nonlinear_multiparam_model(x: np.array) -> np.array:
         return x
 
 
-# %% Testing finding a target in a loop function
+# %% Testing finding a target (desired outcome) in a loop function
 def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3) -> np.ndarray:
     """
     Find which input should be applied on the nonlinear function for obtaining this as the output.
@@ -211,9 +212,10 @@ def find_best_target(target: np.ndarray, regressor, stop_precision: float = 1E-3
     return updated_target
 
 
-# %% Testing Model for input - output (Training data)
+# %% Fitting various models, tuning parameters, comparing scores for them
 if __name__ == "__main__":
-    x_input = []; y_data = []  # input and output data for testing ML regression
+    x_input = []; y_data = []  # input and output data for testing ML regression (fitting)
+    # %% Data / measurements  preparation
     # Standard scanning scheme for getting data points (measure individual parameters), appending collected data as rows
     for i in range(4):
         x_step = [0.0, 0.0, 0.0, 0.0]
@@ -324,44 +326,39 @@ if __name__ == "__main__":
         y_test.append(y)
     y_test = np.round(np.asarray(y_test), 3)
 
-    # ML Regression testing
+    # %% ML Regression testing
     if scikit_available:
-        # Testing kNN algorithm with different k of neighbours
-        from sklearn import neighbors
-        # from sklearn.metrics import r2_score
+        from sklearn import neighbors  # kNN algorithm - fastest and simplest, but less accurate
+        # from sklearn.metrics import r2_score  # all models implement this score as a method
         from sklearn.metrics import root_mean_squared_error
         from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor
-        from sklearn.multioutput import MultiOutputRegressor
-        from sklearn.model_selection import GridSearchCV
+        from sklearn.multioutput import MultiOutputRegressor  # wraps up all GBR regressors for fitting 2D matrix as an input
+        from sklearn.model_selection import GridSearchCV, RandomizedSearchCV  # used for tuning parameters used by GBR models
 
         # kNN regression
-        n_neighbors = 3
-        knn3 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
+        n_neighbors = 3; knn3 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
         knn_model3 = knn3.fit(x_input, y_data)
-        n_neighbors = 5
-        knn5 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
+        n_neighbors = 5; knn5 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
         knn_model5 = knn5.fit(x_input, y_data)
-        n_neighbors = 7
-        knn7 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
+        n_neighbors = 7; knn7 = neighbors.KNeighborsRegressor(n_neighbors, weights="distance")
         knn_model7 = knn7.fit(x_input, y_data)
 
-        # Random forest (overall, more precise and stable than Nearest Neighbours)
+        # Random forest (overall, more precise and stable than Nearest Neighbours but less precise than GBR models)
         t1 = time.perf_counter(); n_estimators_rf = int(round(2.0*len(x_input), 0))  # increasing not equal to improving the accuracy
         default_rand_forest = RandomForestRegressor(n_estimators=n_estimators_rf)
         def_rand_forest_model = default_rand_forest.fit(x_input, y_data)
-        print(f"\nRandom Forest with {n_estimators_rf} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
+        print("\nEvaluation of individual fitting performance")
+        print(f"Random Forest with {n_estimators_rf} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
 
         # Gradient Boosting - more accurate than Random forest
         t1 = time.perf_counter(); n_estimators_gb = int(round(2.0*len(x_input), 0))
-        # default_grad_boost = GradientBoostingRegressor(n_estimators=n_estimators_gb)  # doesn't support directly multi-dimension regression
-        # MultiOutputRegressor wrapper supports multi dimension data
+        # MultiOutputRegressor supports multidimension input, GradientBoostingRegressor doesn't support directly multi-dimension regression
         learn_rate_gbr = 0.04  # parameter for both GradientBoostingRegressor below and for XGBRegressor
         multi_grad_boost = MultiOutputRegressor(GradientBoostingRegressor(learning_rate=learn_rate_gbr, n_estimators=n_estimators_gb))
         m_grad_boost_model = multi_grad_boost.fit(x_input, y_data)
-        print(f"Multi Gradient Boost with {n_estimators_gb} estimators took ms for fitting:",
-              int(round(1000.0*(time.perf_counter() - t1), 0)))
+        print(f"GBR with {n_estimators_gb} estimators took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)))
 
-        # Testing XGBoost regression - is it more precise as the GradientBoostingRegressor from scikit-learn
+        # Testing XGBoost regression. It is much faster for fitting and tuning than GBR from scikit-learn, but less precise
         multi_xgb_regressor = None
         if xgboost_available:
             t1 = time.perf_counter()
@@ -371,9 +368,9 @@ if __name__ == "__main__":
 
         # Testing the grid search for optimal hyperparameters tuning for GBR model
         # Building up number of estimators based on the input data length
-        n_estimators_gb_range = [int(round(0.45*(i+1)*len(x_input), 0)) for i in range(5)]  # makes it not equal stepping - % of length used
+        n_estimators_gb_range = [int(round(0.48*(i+1)*len(x_input), 0)) for i in range(8)]  # makes it not equal stepping - % of length used
         # prefixes 'estimator_' before parameters naming are used because of wrapper MultiOutputRegressor. For single - use without prefix
-        # note that search grows faster with number of used parameters below
+        # Note: search duration grows as combination of parameters below
         param_grid = {
             'estimator__n_estimators': n_estimators_gb_range,
             'estimator__learning_rate': [0.025, 0.05, 0.075, 0.1],
@@ -381,7 +378,6 @@ if __name__ == "__main__":
             # 'estimator__subsample': [0.85, 0.9, 1.0]  # fraction of samples to be randomly selected for fitting each individual tree
             # subsample parameter switched off, because the input data maybe be not enough in the case of limited measurements
         }
-        # requires much time for computation: [3, 5, 7, 9], [0.02, 0.04, 0.06, 0.08, 0.1], [0.85, 0.9, 1.0]
         available_threads = os.cpu_count(); assigned_threads = 1
         if available_threads > 2:
             assigned_threads = available_threads - 1  # retain responsivness by not assigning 1 thread (it's sufficiently enough)
@@ -392,17 +388,14 @@ if __name__ == "__main__":
         cv = 5  # number of cross-validation folds - splits data into only these folds, cv-1 used for training, 1 - for validation
         print("Number of required fits for performing Grid Search: ", cv*math.prod(n_params_combinations))
         grid_gbr = GridSearchCV(estimator=MultiOutputRegressor(GradientBoostingRegressor()), param_grid=param_grid,
-                                scoring='neg_mean_squared_error', n_jobs=assigned_threads, cv=cv)
+                                scoring='neg_mean_squared_error', n_jobs=-1, cv=cv)  # use all threads, let OS to distribute tasks
         grid_gbr.fit(x_input, y_data)
         print("GridSearch (GBR) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
-        # Important note  - retrain the GBR on the foudn set of best parameters
-        # remove prefix 'estimator__' from keys
+        # Important note  - retrain the GBR on the found set of best parameters, remove prefix 'estimator__' from keys
         params_cleaned = {key.replace("estimator__", ""): value for key, value in grid_gbr.best_params_.items()}
-        t1 = time.perf_counter()
-        gbr_best_params = MultiOutputRegressor(GradientBoostingRegressor(**params_cleaned))
+        t1 = time.perf_counter(); gbr_best_params = MultiOutputRegressor(GradientBoostingRegressor(**params_cleaned))
         gbr_best_params.fit(x_input, y_data)
-        print(f"Multi Gradient Boost with found best params {params_cleaned} took ms for fitting:",
-              int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+        print(f"GBR with found params on Grid {params_cleaned} took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
 
         # Testing grid search with same parameters but for XGB regressor (always much faster than using native GradientBoostingRegressor)
         if xgboost_available:
@@ -415,8 +408,7 @@ if __name__ == "__main__":
             t1 = time.perf_counter()
             xgb_best_params = MultiOutputRegressor(xgb.XGBRegressor(**params_cleaned))
             xgb_best_params.fit(x_input, y_data)
-            print(f"XGB with found best params {params_cleaned} took ms for fitting:",
-                  int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+            print(f"XGB with found params {params_cleaned} took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
 
         # Testing performance and accuracy found best parameters on a grid search for HistGradientBoostingRegressor
         print("**** GridSearchCV started for tuning hyperparameters (Hist GBR)... ****"); t1 = time.perf_counter()
@@ -426,36 +418,59 @@ if __name__ == "__main__":
         grid_histgbr.fit(x_input, y_data)
         print("GridSearch (Hist GBR) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
         params_cleaned = {key.replace("estimator__", ""): value for key, value in grid_histgbr.best_params_.items()}
-        t1 = time.perf_counter()
-        histgbr_best_params = MultiOutputRegressor(HistGradientBoostingRegressor(**params_cleaned))
+        t1 = time.perf_counter(); histgbr_best_params = MultiOutputRegressor(HistGradientBoostingRegressor(**params_cleaned))
         histgbr_best_params.fit(x_input, y_data)
-        print(f"Hist GBR with found best params {params_cleaned} took ms for fitting:",
-              int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+        print(f"Hist GBR with found params {params_cleaned} took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
 
-        # Fitting test data and compare with the provided by the function
-        y_fit3 = np.round(knn_model3.predict(x_test), 3)
-        y_fit5 = np.round(knn_model5.predict(x_test), 3)
-        y_fit7 = np.round(knn_model7.predict(x_test), 3)
-        y_fit_def_rand_for = np.round(def_rand_forest_model.predict(x_test), 3)
-        diff_fit_test_rand_for = np.round(np.abs(y_test - y_fit_def_rand_for), 3)
-        y_fit_grad_boost = np.round(m_grad_boost_model.predict(x_test), 3)
-        y_fit_grid_gbr = np.round(gbr_best_params.predict(x_test), 3)
-        y_fit_hist_gbr = np.round(histgbr_best_params.predict(x_test), 3)
-        # shift to the only positive values based on prior knowledge removed (was before added abs(np.min(y_fit_grad_boost)))
-        diff_fit_test_grad_boost = np.round(np.abs(y_test - y_fit_grad_boost), 3)
+        # Comparing results of deterministic GridSearch with RandomSearch that is overall faster and allows wider range of parameters
+        n_estimators_min = int(round(0.48*len(x_input), 0)); n_estimators_max = 9*n_estimators_min + 2
+        param_grid = {
+            'estimator__n_estimators': np.arange(start=n_estimators_min, stop=n_estimators_max, step=n_estimators_min),
+            'estimator__learning_rate': np.round(np.linspace(0.01, 0.1, 9), 3),
+            'estimator__max_depth': np.arange(3, 8, 2)
+        }
+        n_iterations = 30  # defines how many fits will be done (restricting number of computations)
+        print("**** RandomizedSearchCV started for tuning hyperparameters (GBR)... ****"); t1 = time.perf_counter()
+        rand_gbr = RandomizedSearchCV(estimator=MultiOutputRegressor(GradientBoostingRegressor()), param_distributions=param_grid,
+                                      scoring='neg_mean_squared_error', n_jobs=-1, cv=cv)  # use all threads, let OS to distribute tasks
+        rand_gbr.fit(x_input, y_data)
+        print("RandomizedSearch (GBR) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
+        # Important note  - retrain the GBR on the found set of best parameters, remove prefix 'estimator__' from keys
+        params_cleaned = {key.replace("estimator__", ""): int(value) if 'learning_rate' not in key else round(float(value), 3)
+                          for key, value in rand_gbr.best_params_.items()}
+        t1 = time.perf_counter(); gbr_rand_params = MultiOutputRegressor(GradientBoostingRegressor(**params_cleaned))
+        gbr_rand_params.fit(x_input, y_data)
+        print(f"GBR with found params on Rand. {params_cleaned} took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+
+        if xgboost_available:
+            print("**** RandomizedSearchCV started for tuning hyperparameters (XGB)... ****"); t1 = time.perf_counter()
+            rand_xgb = RandomizedSearchCV(estimator=MultiOutputRegressor(xgb.XGBRegressor()), param_distributions=param_grid,
+                                          scoring='neg_mean_squared_error', n_jobs=-1, cv=cv, n_iter=n_iterations)
+            rand_xgb.fit(x_input, y_data)
+            print("RandomizedSearch (XGB) took min. for get done:", round((time.perf_counter() - t1)/60.0, 2))
+            params_cleaned = {key.replace("estimator__", ""): int(value) if 'learning_rate' not in key else round(float(value), 3)
+                              for key, value in rand_xgb.best_params_.items()}
+            t1 = time.perf_counter()
+            xgb_rand_params = MultiOutputRegressor(xgb.XGBRegressor(**params_cleaned)); xgb_rand_params.fit(x_input, y_data)
+            print(f"Rand XGB with found params {params_cleaned} took ms for fitting:", int(round(1000.0*(time.perf_counter() - t1), 0)), "\n")
+
+        # Fitting test data and compare with the provided by the function (measurements)
+        y_fit3 = np.round(knn_model3.predict(x_test), 3); y_fit5 = np.round(knn_model5.predict(x_test), 3)
+        y_fit7 = np.round(knn_model7.predict(x_test), 3); y_fit_def_rand_for = np.round(def_rand_forest_model.predict(x_test), 3)
+        y_fit_grad_boost = np.round(m_grad_boost_model.predict(x_test), 3); y_fit_grid_gbr = np.round(gbr_best_params.predict(x_test), 3)
+        y_fit_hist_gbr = np.round(histgbr_best_params.predict(x_test), 3); y_fit_rand_gbr = np.round(gbr_rand_params.predict(x_test), 3)
         if multi_xgb_regressor is not None:
-            y_fit_xgb = np.round(multi_xgb_regressor.predict(x_test), 3)
-            y_fit_xgb_best = np.round(xgb_best_params.predict(x_test), 3)
+            y_fit_xgb = np.round(multi_xgb_regressor.predict(x_test), 3); y_fit_xgb_best = np.round(xgb_best_params.predict(x_test), 3)
+            y_fit_xgb_rand = np.round(xgb_rand_params.predict(x_test), 3)
+        if check_diff_models:
+            diff_fit_test_rand_for = np.round(np.abs(y_test - y_fit_def_rand_for), 3)
+            diff_fit_test_grad_boost = np.round(np.abs(y_test - y_fit_grad_boost), 3)
 
         # Estimation of model accuracy (based on R2 score function - not needed explicitly for KNeighborsRegressor)
         # Hint on R2 score values: 1.0 → Perfect fit, 0.9+ → Excellent fit, 0.5–0.9 → Moderate fit, < 0.5 → Poor fit
-        # Use native method for R2 score from KNeighborsRegressor
-        r2_score_knn3 = round(knn3.score(x_test, y_test), 3)
-        rmse_knn3 = round(root_mean_squared_error(y_test, y_fit3), 3)
-        r2_score_knn5 = round(knn5.score(x_test, y_test), 3)
-        rmse_knn5 = round(root_mean_squared_error(y_test, y_fit5), 3)
-        r2_score_knn7 = round(knn7.score(x_test, y_test), 3)
-        r2_score_def_rand_for = round(def_rand_forest_model.score(x_test, y_test), 3)
+        r2_score_knn3 = round(knn3.score(x_test, y_test), 3); rmse_knn3 = round(root_mean_squared_error(y_test, y_fit3), 3)
+        r2_score_knn5 = round(knn5.score(x_test, y_test), 3); rmse_knn5 = round(root_mean_squared_error(y_test, y_fit5), 3)
+        r2_score_knn7 = round(knn7.score(x_test, y_test), 3); r2_score_def_rand_for = round(def_rand_forest_model.score(x_test, y_test), 3)
         rmse_def_rand_for = round(root_mean_squared_error(y_test, y_fit_def_rand_for), 3)
         r2_score_grad_boost = round(m_grad_boost_model.score(x_test, y_test), 3)
         rmse_grad_boost = round(root_mean_squared_error(y_test, y_fit_grad_boost), 3)
@@ -463,22 +478,29 @@ if __name__ == "__main__":
         rmse_grid_gbr = round(root_mean_squared_error(y_test, y_fit_grid_gbr), 3)
         r2_score_hist_gbr = round(histgbr_best_params.score(x_test, y_test), 3)
         rmse_hist_gbr = round(root_mean_squared_error(y_test, y_fit_hist_gbr), 3)
+        r2_score_rand_gbr = round(gbr_rand_params.score(x_test, y_test), 3)
+        rmse_rand_gbr = round(root_mean_squared_error(y_test, y_fit_rand_gbr), 3)
         if multi_xgb_regressor is not None:
             r2_score_xgb = round(multi_xgb_regressor.score(x_test, y_test), 3)
             rmse_xgb = round(root_mean_squared_error(y_test, y_fit_xgb), 3)
             r2_score_xgb_best = round(xgb_best_params.score(x_test, y_test), 3)
             rmse_xgb_best = round(root_mean_squared_error(y_test, y_fit_xgb_best), 3)
+            r2_score_xgb_rand = round(xgb_rand_params.score(x_test, y_test), 3)
+            rmse_xgb_rand = round(root_mean_squared_error(y_test, y_fit_xgb_rand), 3)
+        print("***** Evaluation of model precision *****")
         print("kNN3 R2 score:", r2_score_knn3, " | RMSE:", rmse_knn3, "\n"
               + "kNN5 R2 score:", r2_score_knn5, " | RMSE:", rmse_knn5, "\n"
               + "kNN7 R2 score:", r2_score_knn7, " | ")
         print("R2 RandForest:", r2_score_def_rand_for, " | RMSE:", rmse_def_rand_for)
         # Even R2 score is good, difference between fit and calculated data is relatively big
         print("R2 Def. GBR:  ", r2_score_grad_boost, " | RMSE:", rmse_grad_boost)
-        print("R2 Best GBR:  ", r2_score_grid_gbr, " | RMSE:", rmse_grid_gbr)
+        print("R2 Grid GBR:  ", r2_score_grid_gbr, " | RMSE:", rmse_grid_gbr)
         print("R2 Hist GBR:  ", r2_score_hist_gbr, " | RMSE:", rmse_hist_gbr)
+        print("R2 Rand GBR:  ", r2_score_rand_gbr, " | RMSE:", rmse_rand_gbr)
         if multi_xgb_regressor is not None:
             print("R2 XGB Regr.: ", r2_score_xgb, " | RMSE:", rmse_xgb)
-            print("R2 XGB Best : ", r2_score_xgb_best, " | RMSE:", rmse_xgb_best)
+            print("R2 XGB Grid : ", r2_score_xgb_best, " | RMSE:", rmse_xgb_best)
+            print("R2 XGB Rand : ", r2_score_xgb_rand, " | RMSE:", rmse_xgb_rand)
         print()
 
         # Making fitted model persistent for reusing it, compared fitting with the model saved in memory
@@ -527,4 +549,5 @@ if __name__ == "__main__":
         del x4fit, x_row, x_step, xscanning, zero_ampl, zero_ampl1, zero_ampl2, zero_ampl3, zero_ampls, zeroing_coefficients
         del n_estimators_gb, n_estimators_rf, n_neighbors, n_overall, n_randomized_points, r2_score_knn3, r2_score_knn5
         del r2_score_def_rand_for, r2_score_knn7, rmse_knn3, rmse_knn5, rmse_grad_boost, rmse_def_rand_for, r2_score_grad_boost
-        del xgboost_available, use_scanning_guess, scikit_available
+        del xgboost_available, use_scanning_guess, scikit_available, n_estimators_max, n_estimators_min, n_iterations
+        del rmse_grid_gbr, rmse_hist_gbr, rmse_rand_gbr, rmse_xgb, rmse_xgb_best, rmse_xgb_rand
