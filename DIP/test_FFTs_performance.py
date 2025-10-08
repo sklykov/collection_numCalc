@@ -19,10 +19,10 @@ import random
 import os
 
 # For using and testing numba package, note its limitations on Python and Numpy version!
-numbda_installed = False
+numba_installed = False
 try:
     from numba import jit
-    numbda_installed = True
+    numba_installed = True
 except ModuleNotFoundError:
     print("The package numba isn't installed, functions with jit compilation won't be tested")
 
@@ -101,7 +101,7 @@ def pure_numpy_fft2(img):
     return np.abs(npfft.fftshift(npfft.fft2(img)))
 
 
-if numbda_installed:
+if numba_installed:
     # default compilation with option nopython=True produced the error and forces to use
     # below parameter, but it even makes computation slower
     # @njit also produces errors
@@ -154,7 +154,7 @@ if compare_scipy_numpy:
 
 
 # Measure performance - Numpy + numba jit accelaration
-if numbda_installed and compare_scipy_numpy:
+if numba_installed and compare_scipy_numpy:
     for i in range(n_iterations):
         t1 = time.time()
         jit_numpy_fft2(img_array[i])

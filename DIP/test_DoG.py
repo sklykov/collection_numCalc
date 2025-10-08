@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Evaluation of DoG filtering.
+Evaluation of DoG filtering by accounting non-zero pixels after applying it.
 
 @author: sklykov
 @license: The Unlicense
@@ -29,6 +29,8 @@ define_largest_sigma = True  # loop for defining the highest output evaluation
 
 # %% Run as the script
 if __name__ == "__main__":
+    if not plt.isinteractive():
+        plt.ion()
     # Plotting the original sample
     plt.close("all"); sample_img = loadSampleImage(); h, w = sample_img.shape; ratio = h/w; w_fig = 7.2
     plt.figure("Sample", figsize=(w_fig, w_fig*ratio)); plt.imshow(sample_img, cmap=plt.cm.gray); plt.tight_layout()
@@ -36,11 +38,10 @@ if __name__ == "__main__":
     if visualize_dog_images:
         # Show the result of applying filters
         img_dog1 = difference_of_gaussians(sample_img, low_sigma=low_sigma1, high_sigma=high_sigma1)
-        # Transform the DoG image
-        # img_dog1 += abs(np.min(img_dog1)); img_dog1 /= np.max(img_dog1)  # rescale it to positive values and normalize
-        img_dog1 = np.where(img_dog1 > 0.0, img_dog1, 0.0)  # saves only the positive values on the image
+        img_dog1 = np.where(img_dog1 > 0.0, img_dog1, 0.0)  # saves only the positive values on an image
         img_dog1 = rescale_intensity(img_as_ubyte(img_dog1))  # convert to U8 and rescaling the intensity
-        plt.figure(f"DoG: {low_sigma1}, {high_sigma1}", figsize=(w_fig, w_fig*ratio)); plt.imshow(img_dog1, cmap=plt.cm.gray); plt.tight_layout()
+        plt.figure(f"DoG: {low_sigma1}, {high_sigma1}", figsize=(w_fig, w_fig*ratio))
+        plt.imshow(img_dog1, cmap=plt.cm.gray); plt.tight_layout()
         print("DoG: Counted non-zero pixel values/number of pixels:", round(np.sum(img_dog1)/(h*w), 6))
 
         # Testing the same workflow on the pre-smoothed image
@@ -64,25 +65,22 @@ if __name__ == "__main__":
         print("Median DoG: Counted non-zero pixel values/number of pixels:", round(np.sum(img_dog_median)/(h*w), 6))
 
     if define_largest_sigma:
-        estimations = []  # for storing calculated
-        # Presmoothing initial image for supression of the sharp pixel noise
+        estimations = []  # for storing calculated effect estimations of DoG filtering
+        # Presmoothing initial image for suppression of the sharp pixel noise
         mask_r = 1; smoothing_mask = disk(mask_r)
-        sample_img = median(sample_img, smoothing_mask)
-        # sample_img = mean(sample_img, smoothing_mask)
+        sample_img = median(sample_img, smoothing_mask)  # median noise filtering
         plt.figure("Smoothed Sample", figsize=(w_fig, w_fig*ratio)); plt.imshow(sample_img, cmap=plt.cm.gray); plt.tight_layout()
         sigmas = np.round(np.arange(start=0.5, stop=6.6, step=0.1), 3)
         for sigma in sigmas:
             img_dog = difference_of_gaussians(sample_img, low_sigma=sigma)
             img_dog_pos = np.where(img_dog > 0.0, 1, 0)
-            img_dog = np.where(img_dog > 0.0, img_dog, 0.0); img_dog = rescale_intensity(img_as_ubyte(img_dog))
-            # estimations.append(round(np.sum(img_dog)/(h*w), 6))  # growing towards to the stop sigma value (starting from 1.3)
             estimations.append(round(np.sum(img_dog_pos)/(h*w), 6))  # sum of non-zero pixels (more borders or details => more non-zero pixels)
-        # Plot max effective sigma
+        # Plot max effective sigma (based on sum of non-zero pixels - detected edges of an image)
         max_est = np.max(estimations)
         if max_est < 1.0:
             estimations = list(2.0*np.asarray(estimations))
-        plt.figure("Estimation vs Sigma"); plt.plot(sigmas, estimations, 'o'); plt.tight_layout()
-        i_max = estimations.index(np.max(estimations))
+        plt.figure("Effectiveness Estimation (non-zero pixels) of DoG filtering vs Sigma")
+        plt.plot(sigmas, estimations, 'o'); plt.tight_layout(); i_max = estimations.index(np.max(estimations))
         img_dog = difference_of_gaussians(sample_img, low_sigma=sigmas[i_max])
         img_dog = np.where(img_dog > 0.0, img_dog, 0.0); img_dog = rescale_intensity(img_as_ubyte(img_dog))
         plt.figure(f"DoG Image with Max Estimation, Sigma: {sigmas[i_max]}", figsize=(w_fig, w_fig*ratio))
