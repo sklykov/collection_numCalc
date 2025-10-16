@@ -165,7 +165,7 @@ def lorentzian_fit_func(x: Union[float, np.ndarray], a: float, b: float) -> Unio
 # %% Sample data generation (lorentzian with noise)
 x_data = np.linspace(start=-2.0, stop=2.0, num=41)  # arbitrary X data
 y_lor = lorentzian(x_data, x0=0.0, gamma=1.0)  # lorentzian function
-y_lor_noise = add_noise_each_point(y_lor, percentage=20)  # adding noise value to the each data point sequentily from uniform distribution
+y_lor_noise = add_noise_each_point(y_lor, percentage=20)  # adding noise value to each data point sequentially from uniform distribution
 # Parabola fit
 try:
     fitted_parabola_params = curve_fit(parabola_fit_func, x_data, y_lor_noise)[0]
