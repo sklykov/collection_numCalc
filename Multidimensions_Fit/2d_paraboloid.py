@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import warnings
-from typing import Callable
+from typing import Callable, Tuple
 
 matplotlib.use('Qt5Agg')  # universally works for PyCharm and Spyder for setting interactive plotting
 
@@ -67,16 +67,36 @@ def fit_paraboloid(x_flat: np.ndarray, y_flat: np.ndarray, paraboloid_f: Callabl
     try:
         p, *_ = np.linalg.lstsq(A, z, rcond=None)
     except np.linalg.LinAlgError:
-        __message = "Paraboloid not fitted for provided parameters! All zeros will be returned!"; warnings.warn(__message)
+        __message = "Paraboloid not fitted for provided parameters! All zeros as parameters will be returned!"; warnings.warn(__message)
     return p
 
 
-def define_paraboloid_peak(coefficients: np.ndarray) -> tuple:
+def define_paraboloid_peak(coefficients: np.ndarray) -> Tuple[np.ndarray, bool]:
+    """
+    Define paraboloid peak coordinates (x, y) and return it coupled with flag showing if it is maximum peak.
+
+    Parameters
+    ----------
+    coefficients : np.ndarray
+        a, b, c, d, e, f coefficients of paraboloid.
+
+    Returns
+    -------
+    peak_coords : np.ndarray
+        2 coordinates x, y.
+    is_maximum : bool
+        If defined coordinates relates to a maximum.
+
+    """
     a, b, c, d, e, f = coefficients  # unpacking provided coefficients
     # Find peak according to computed gradient (dz/dx) and relation that it's zero in extremum: dz/dx = 0, dz/dy = 0
-    h = np.asarray([[2*a, c], [c, 2*b]])  # Actually, Hessian matrix
-    b = np.asarray([-d, -e])
-    peak_coords, *_ = np.linalg.lstsq(h, b, rcond=None)
+    h = np.asarray([[2.0*a, c], [c, 2.0*b]])  # Actually, Hessian matrix
+    b = np.asarray([-d, -e])  # from gradient definition
+    peak_coords = np.zeros((2, )); is_maximum = False  # default values
+    try:
+        peak_coords, *_ = np.linalg.lstsq(h, b, rcond=None)  # solving least-square problem with a determined matrix equation
+    except np.linalg.LinAlgError:
+        __message = "Peak not found by the Linear Least Square Solver"; warnings.warn(__message)
     # Check that peak is maximum using Hessian matrix
     is_maximum = h[0, 0] < 0.0 and h[1, 1] < 0.0 and h[0, 0]*h[1, 1] - h[0, 1]*h[1, 0] > 0.0
     return (peak_coords, is_maximum)
