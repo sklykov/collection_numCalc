@@ -71,8 +71,8 @@ if __name__ == '__main__':
         timings = [0.0]*len(keys_to_retrieve)
         for i in range(len(keys_to_retrieve)):
             t1 = time.perf_counter_ns()
-            if keys_to_retrieve[i] in loaded_dict:
-                value = loaded_dict[keys_to_retrieve[i]]
+            if keys_to_retrieve[i] in loaded_dict["Entry 1"]["A"]:
+                value = loaded_dict["Entry 1"]["A"][keys_to_retrieve[i]]
             timings[i] = round(1E-6*(time.perf_counter_ns() - t1), 3)
         print("Average retrieve of value by key time in ms:", round(np.mean(timings), 3))
 
