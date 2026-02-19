@@ -24,15 +24,16 @@ if __name__ == '__main__':
     # Generate huge dict mocking the predefined structure
     rng = np.random.default_rng()  # creates a random generator
     probe_key = tuple(np.round(rng.uniform(-2.0, 2.0, size=(91, )), 6))
-    probe_value = rng.integers(0, 2**12-2, size=(64, ))
+    # probe_value = rng.integers(0, 2**12-2, size=(64, ))
+    probe_value1 = rng.uniform(0.0, 300.0, size=(91, )); probe_value2 = np.round(rng.uniform(-2.0, 2.0, size=(91, )), 6)
     keys_to_retrieve = []
     t1 = time.perf_counter()
     for i in range(n_entries):
         key = np.round(rng.uniform(-2.0, 2.0, size=(91, )), 6).astype(np.float64)
         key = key.astype('>f8', copy=False)  # prepare key with special type: big-endian, 8 bytes for float
         key_h = hashlib.blake2b(key.tobytes(), digest_size=8).hexdigest()  # get hash sum from an array
-        value = rng.integers(0, 2**12-2, size=(64, ))
-        cache_dict["Entry 1"]["A"][key_h] = value
+        value1 = rng.uniform(0.0, 300.0, size=(91, )); value2 = np.round(rng.uniform(-2.0, 2.0, size=(91, )), 6)
+        cache_dict["Entry 1"]["A"][key_h] = value1, value2
         # prepare also data for checking retrieving performance
         if i % 5 == 0:  # save each 5th key for checking retrieving performance
             keys_to_retrieve.append(key_h)
@@ -61,17 +62,17 @@ if __name__ == '__main__':
         t1 = time.perf_counter()
         with open(str(storage_path), "rb") as data_file:
             if not test_joblib_save:
-                load_dict = pickle.load(data_file)
+                loaded_dict = pickle.load(data_file)
             else:
-                load_dict = load(data_file)
+                loaded_dict = load(data_file)
         print(f"Loading of {n_entries} entries takes sec-s:", (round(time.perf_counter() - t1, 2)))
 
         # Assess search performance
         timings = [0.0]*len(keys_to_retrieve)
         for i in range(len(keys_to_retrieve)):
             t1 = time.perf_counter_ns()
-            if keys_to_retrieve[i] in load_dict:
-                value = load_dict[keys_to_retrieve[i]]
+            if keys_to_retrieve[i] in loaded_dict:
+                value = loaded_dict[keys_to_retrieve[i]]
             timings[i] = round(1E-6*(time.perf_counter_ns() - t1), 3)
         print("Average retrieve of value by key time in ms:", round(np.mean(timings), 3))
 
