@@ -1,0 +1,2 @@
+D301, E702, E402, E226, W503 (composed with using Ruff linter)
+Line length: 145
