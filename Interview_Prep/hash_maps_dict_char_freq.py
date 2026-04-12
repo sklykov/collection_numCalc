@@ -9,8 +9,6 @@ One of its application - counting frequency of characters in a string.
 @license: The Unlicense
 
 """
-# %% Imports
-
 
 # %% Func.
 def char_frequency(text: str, character: str) -> int:
@@ -49,9 +47,6 @@ def char_frequency(text: str, character: str) -> int:
                 for letter in text:
                     freq_counts[letter] = freq_counts.get(letter, 0) + 1  # get method for a dict with a default value
                 return freq_counts[character]
-
-
-
 
 
 # %% Tests
