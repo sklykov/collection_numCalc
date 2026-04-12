@@ -9,7 +9,6 @@ Return indices of min / max values in 2D array.
 """
 import numpy as np
 
-
 img = np.asarray([[5, 5, 2], [1, 5, 2], [3, 5, 1]])
-coords_max_val = np.argwhere(np.isclose(img, img.max()))  # safer variant than comparison
-coords_min_val = np.argwhere(np.isclose(img, img.min()))
+coords_max_val = np.argwhere(np.isclose(img, img.max()))  # safer variant than direct comparison like img == img.max()
+coords_min_val = np.argwhere(np.isclose(img, img.min()))  # check data structure - it provides array like N, 2 - for 2D arrays
