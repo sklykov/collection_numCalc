@@ -1,0 +1,2 @@
+Hints for the commonly used commands: 
+git update-git-for-windows - for updating Git Windows client;
