@@ -1,2 +1,8 @@
 Hints for the commonly used commands: 
-git update-git-for-windows - for updating Git Windows client;
+1. git update-git-for-windows - for updating Git Windows client;
+2. pip install -e . - install developed package in the editable mode, 
+just with symlinks to the local folder;
+3. ruff check --fix src tests - ruff linter + autofix of formatting 
+issues, use pyproject.toml for configuration; 
+4. mypy src/<package> - typing rules checks, use pyproject.toml for 
+configuration;
