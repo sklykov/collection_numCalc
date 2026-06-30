@@ -1,0 +1,8 @@
+1. Debugging mode for launching Spyder:
+python -m spyder.app.start
+2. Common numerical libraries versions:
+scikit-learn==1.6.1
+numpy==1.24.4
+scipy==1.10.1
+matplotlib=3.10.8
+scikit-image=0.24.0
